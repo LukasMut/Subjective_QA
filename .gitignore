@@ -1,0 +1,9 @@
+
+.ipynb_checkpoints/data_exploration-checkpoint.ipynb
+.ipynb_checkpoints/model_training-checkpoint.ipynb
+__pycache__/utils.cpython-37.pyc
+data/grocery.tar
+models/.ipynb_checkpoints/Untitled-checkpoint.ipynb
+models/__pycache__/BertQA.cpython-37.pyc
+models/__pycache__/QAheads.cpython-37.pyc
+models/__pycache__/utils.cpython-37.pyc

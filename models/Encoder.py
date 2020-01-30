@@ -1,0 +1,67 @@
+__all__ = ['EncoderLSTM', 'EncoderGRU']
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+# torch.cuda.is_available() checks and returns a Boolean True if a GPU is available, else it'll return False
+is_cuda = torch.cuda.is_available()
+
+# If we have a GPU available, we'll set our device to GPU. We'll use this device variable later in our code.
+if is_cuda:
+    device = torch.device("cuda")
+    print("GPU is available")
+else:
+    device = torch.device("cpu")
+    print("GPU not available, CPU used")
+
+class EncoderLSTM(nn.Module):
+    def __init__(self, max_source_length:int, in_size:int=1024, n_layers:int=2, dropout:float=0.3):
+        super(EncoderLSTM, self).__init__()
+        self.in_size = in_size # dimensionality of BERT-large attention heads (i.e, 1024)
+        self.hidden_size = in_size // 2  # if hidden_size = in_size // 2 -> in_size for classification head is in_size due to bidir
+        self.n_layers = n_layers
+        self.dropout = dropout
+        self.max_source_length = max_source_length
+        
+        self.lstm = nn.LSTM(in_size, hidden_size, n_layers, batch_first=True, dropout=dropout, bidirectional=True)
+        
+    def forward(self, bert_outputs, qa_lengths, hidden):
+        qa_lengths = qa_lengths.detach().cpu().numpy()
+        packed = nn.utils.rnn.pack_padded_sequence(bert_outputs, qa_lengths, batch_first=True)
+        out, hidden = self.lstm(packed, hidden)
+        out, _ = nn.utils.rnn.pad_packed_sequence(out, batch_first=True, total_length=self.max_source_length)
+        return out, hidden
+    
+    def init_hidden(self, batch_size:int):
+        # NOTE: we need to initialise twice as many hidden states for bidirectional neural networks
+        n = self.n_layers * 2 if self.bidir else self.n_layers 
+        hidden_state = torch.zeros(n, batch_size, self.hidden_size, device=device)
+        cell_state = torch.zeros(n, batch_size, self.hidden_size, device=device)
+        hidden = (nn.init.xavier_uniform_(hidden_state), nn.init.xavier_uniform_(cell_state))
+        return hidden
+    
+class EncoderGRU(nn.Module):
+    def __init__(self, max_source_length:int, in_size:int=1024, n_layers:int=2, dropout:float=0.3):
+        super(EncoderGRU, self).__init__()
+        self.in_size = in_size # dimensionality of BERT-large attention heads (i.e, 1024)
+        self.hidden_size = in_size // 2 # if hidden_size = in_size // 2 -> in_size for classification head is in_size due to bidir
+        self.n_layers = n_layers
+        self.dropout = dropout
+        self.max_source_length = max_source_length
+        
+        self.gru = nn.GRU(in_size, hidden_size, n_layers, batch_first=True, dropout=dropout, bidirectional=True)
+        
+    def forward(self, bert_outputs, qa_lengths, hidden):
+        qa_lengths = qa_lengths.detach().cpu().numpy()
+        packed = nn.utils.rnn.pack_padded_sequence(bert_outputs, qa_lengths, batch_first=True)
+        out, hidden = self.gru(packed, hidden)
+        out, _ = nn.utils.rnn.pad_packed_sequence(out, batch_first=True, total_length=self.max_source_length)
+        return out, hidden
+    
+    def init_hidden(self, batch_size:int):
+        # NOTE: we need to initialise twice as many hidden states for bidirectional neural networks
+        n = self.n_layers * 2 if self.bidir else self.n_layers 
+        # NOTE: opposed to LSTM, GRUs don't need cell state (GRUs work similar to simple Elman RNNs)
+        hidden_state = torch.zeros(n, batch_size, self.hidden_size, device=device)
+        return nn.init.xavier_uniform_(hidden_state)
