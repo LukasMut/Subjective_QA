@@ -113,8 +113,10 @@ class FastQAPyTorchModule(nn.Module):
         # Some helpers
         float_tensor = torch.cuda.FloatTensor if emb_question.is_cuda else torch.FloatTensor
         long_tensor = torch.cuda.LongTensor if emb_question.is_cuda else torch.LongTensor
+        
         batch_size = question_length.data.shape[0]
         max_question_length = question_length.max().data[0]
+        
         support_mask = misc.mask_for_lengths(support_length)
         question_binary_mask = misc.mask_for_lengths(question_length, mask_right=False, value=1.0)
 
@@ -144,6 +146,7 @@ class FastQAPyTorchModule(nn.Module):
         support_features = torch.stack([word_in_question, wiq_w], dim=2)
 
         if self._with_char_embeddings:
+            
             # highway layer to allow for interaction between concatenated embeddings
             emb_question = self._embedding_projection(emb_question)
             emb_support = self._embedding_projection(emb_support)

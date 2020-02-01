@@ -1,15 +1,16 @@
-__all__ = ['HighwayBlock']
+__all__ = ['Highway']
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class HighwayBlock(nn.Module):
+class Highway(nn.Module):
 
     def __init__(self, input_size:int):
         super(Highway, self).__init__()
         self.proj = nn.Linear(input_size, input_size)
         self.transform = nn.Linear(input_size, input_size)
+        # transform gate bias should be initialized to -2 or -4 according to original paper (i.e., https://arxiv.org/pdf/1505.00387.pdf)
         self.transform.bias.data.fill_(-2.0)
 
     def forward(self, input):
@@ -19,7 +20,8 @@ class HighwayBlock(nn.Module):
             T(x, W_H) = transform gate (affine transform followed by sigmoid non-linearity)
             y = highway_out
         """
-        proj_gate = nn.functional.relu(self.proj(input))
-        transform_gate = nn.functional.sigmoid(self.transform(input))
+        proj_gate = F.relu(self.proj(input))
+        transform_gate = F.sigmoid(self.transform(input))
+        # * denotes Hadamard Products (elementwise multiplications)
         highway_out = (proj_gate * transform_gate) + (input * (1 - transform_gate))
         return highway_out

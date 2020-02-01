@@ -16,21 +16,21 @@ else:
     print("GPU not available, CPU used")
 
 class EncoderLSTM(nn.Module):
-    def __init__(self, max_source_length:int, in_size:int=1024, n_layers:int=2, dropout:float=0.3):
+    def __init__(self, max_qs_length:int, in_size:int=1024, n_layers:int=2, dropout:float=0.3):
         super(EncoderLSTM, self).__init__()
         self.in_size = in_size # dimensionality of BERT-large attention heads (i.e, 1024)
         self.hidden_size = in_size // 2  # if hidden_size = in_size // 2 -> in_size for classification head is in_size due to bidir
         self.n_layers = n_layers
         self.dropout = dropout
-        self.max_source_length = max_source_length
+        self.max_qs_length = max_qs_length
         
         self.lstm = nn.LSTM(in_size, hidden_size, n_layers, batch_first=True, dropout=dropout, bidirectional=True)
         
-    def forward(self, bert_outputs, qa_lengths, hidden):
-        qa_lengths = qa_lengths.detach().cpu().numpy()
-        packed = nn.utils.rnn.pack_padded_sequence(bert_outputs, qa_lengths, batch_first=True)
+    def forward(self, bert_outputs, qs_lengths, hidden):
+        qs_lengths = qs_lengths.detach().cpu().numpy()
+        packed = nn.utils.rnn.pack_padded_sequence(bert_outputs, qs_lengths, batch_first=True)
         out, hidden = self.lstm(packed, hidden)
-        out, _ = nn.utils.rnn.pad_packed_sequence(out, batch_first=True, total_length=self.max_source_length)
+        out, _ = nn.utils.rnn.pad_packed_sequence(out, batch_first=True, total_length=self.max_qs_length)
         return out, hidden
     
     def init_hidden(self, batch_size:int):
@@ -42,21 +42,21 @@ class EncoderLSTM(nn.Module):
         return hidden
     
 class EncoderGRU(nn.Module):
-    def __init__(self, max_source_length:int, in_size:int=1024, n_layers:int=2, dropout:float=0.3):
+    def __init__(self, max_qs_length:int, in_size:int=1024, n_layers:int=2, dropout:float=0.3):
         super(EncoderGRU, self).__init__()
         self.in_size = in_size # dimensionality of BERT-large attention heads (i.e, 1024)
         self.hidden_size = in_size // 2 # if hidden_size = in_size // 2 -> in_size for classification head is in_size due to bidir
         self.n_layers = n_layers
         self.dropout = dropout
-        self.max_source_length = max_source_length
+        self.max_qs_length = max_qs_length
         
         self.gru = nn.GRU(in_size, hidden_size, n_layers, batch_first=True, dropout=dropout, bidirectional=True)
         
-    def forward(self, bert_outputs, qa_lengths, hidden):
-        qa_lengths = qa_lengths.detach().cpu().numpy()
-        packed = nn.utils.rnn.pack_padded_sequence(bert_outputs, qa_lengths, batch_first=True)
+    def forward(self, bert_outputs, qs_lengths, hidden):
+        qs_lengths = qs_lengths.detach().cpu().numpy()
+        packed = nn.utils.rnn.pack_padded_sequence(bert_outputs, qs_lengths, batch_first=True)
         out, hidden = self.gru(packed, hidden)
-        out, _ = nn.utils.rnn.pad_packed_sequence(out, batch_first=True, total_length=self.max_source_length)
+        out, _ = nn.utils.rnn.pad_packed_sequence(out, batch_first=True, total_length=self.max_qs_length)
         return out, hidden
     
     def init_hidden(self, batch_size:int):
