@@ -26,13 +26,13 @@ def get_data(subdir:str='./data', source:str='/SQuAD/', split:str=None, domain:s
             f = json.load(f)
             del f['version']
             for line in f['data']:
-                for paragraph in line['paragraphs']:
-                    for qas in paragraph['qas']:
+                for p in line['paragraphs']:
+                    for qas in p['qas']:
                         answer = qas['answers'][0]['text'] if len(qas['answers']) == 1 else 'no_answer'
                         qas_pairs.append({'question': qas['question'], 
                                           'answer': answer,
                                           # TODO: figure out, why regex below is not working properly
-                                          'context': re.sub(r"\\", "", paragraph['context']), 
+                                          'context': re.sub(r"\\", "", p['context']), 
                                           'answerable': not qas['is_impossible']})
         if compute_lengths:
             return descriptive_stats_squad(qas_pairs)
