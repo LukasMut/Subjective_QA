@@ -1,15 +1,24 @@
-__all__ = ['LinearQAHead', 'RecurrentQAHead']
+__all__ = [
+           'LinearQAHead',
+           'RecurrentQAHead',
+          ]
 
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 
-from torch import nn
 from models.Encoder import *
 from models.Highway import Highway
        
 class LinearQAHead(nn.Module):
     
-    def __init__(self, in_size:int=1024, n_labels_qa:int=2, multitask:bool=False):
+    def __init__(
+                 self,
+                 in_size:int=1024,
+                 n_labels_qa:int=2,
+                 multitask:bool=False,
+                 ):
+        
         super(LinearQAHead, self).__init__()
         self.n_labels = n_labels_qa
         self.qa_outputs = nn.Linear(in_size, n_labels_qa)
@@ -22,10 +31,14 @@ class LinearQAHead(nn.Module):
             # subjectivity output layer
             self.sbj_outputs = nn.Linear(in_size, 2)
 
-    def forward(self, bert_outputs, start_positions=None, end_positions=None):
-        sequence_output = bert_outputs[0]
-        # NOTE: figure out, whether view operation in line below is necessary (e.g., linear layers can also deal with 3D inputs)
-        sequence_output = sequence_output.view(-1, sequence_output.shape[-1])
+    def forward(
+                self,
+                bert_outputs:torch.Tensor, 
+                start_positions=None,
+                end_positions=None,
+                ):
+        
+        sequence_output = bert_outputs[0]      
         logits = self.qa_outputs(sequence_output)
         start_logits, end_logits = logits.split(1, dim=-1)
         start_logits = start_logits.squeeze(-1)
@@ -59,10 +72,18 @@ class LinearQAHead(nn.Module):
         
 class RecurrentQAHead(nn.Module):
     
-    def __init__(self, max_source_length:int, in_size:int=1024, n_labels_qa:int=2, highway_block:bool=False, multitask:bool=False):
+    def __init__(
+                 self,
+                 max_seq_length:int,
+                 in_size:int=1024,
+                 n_labels_qa:int=2,
+                 highway_block:bool=False,
+                 multitask:bool=False,
+                 ):
+        
         super(RecurrentQAHead, self).__init__()
         self.n_labels = n_labels_qa
-        self.lstm_encoder = EncoderLSTM(max_source_length)
+        self.lstm_encoder = EncoderLSTM(max_seq_length)
         
         # if highway connection
         if highway_block:
@@ -78,16 +99,19 @@ class RecurrentQAHead(nn.Module):
             # subjectivity output layer
             self.sbj_outputs = nn.Linear(in_size, 2)
 
-    def forward(self, bert_outputs, qs_lengths, start_positions=None, end_positions=None):
+    def forward(
+                self,
+                bert_outputs:torch.Tensor,
+                seq_lengths:torch.Tensor,
+                start_positions=None,
+                end_positions=None,
+                ):
         
         sequence_output = bert_outputs[0]
         hidden_lstm = self.lstm_encoder.init_hidden(sequence_output.shape[0])
         
         # pass bert hidden representations through Bi-LSTM to compute temporal dependencies (and global interactions)
-        sequence_output, _ = self.lstm_encoder(sequence_output, qs_lengths, hidden_lstm)
-        
-        # NOTE: figure out, whether view operation in line below is necessary (linear layers can also deal with 3D inputs)
-        sequence_output = sequence_output.view(-1, sequence_output.shape[-1])
+        sequence_output, _ = self.lstm_encoder(sequence_output, seq_lengths, hidden_lstm)
         
         if hasattr(self, 'highway'):
             # pass output of Bi-LSTM through highway-connection (for better information flow)
