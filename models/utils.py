@@ -2,7 +2,7 @@ __all__ = [
            'freeze_bottom_n_layers',
            '_get_answers',
            '_to_cpu',
-          ]
+]
 
 import torch
 import transformers
@@ -13,7 +13,7 @@ def _get_answers(
                 b_input_ids:torch.Tensor,
                 start_logits:torch.Tensor,
                 end_logits:torch.Tensor,
-                ):
+):
     """
     Args:
         b_input_ids (torch.Tensor): batch of inputs IDs (batch_size x 512)
@@ -32,7 +32,7 @@ def _get_answers(
 def _to_cpu(
             tensor:torch.Tensor,
             to_numpy:bool=False,
-            ):
+):
     """
     Args:
         tensor (torch.Tensor): tensor to be casted onto CPU
@@ -50,11 +50,11 @@ def freeze_bottom_n_layers(
                            model,
                            n:int,
                            model_name:str,
-                           ):
-    """freeze bottom N transformer layers / attention heads of model
+):
+    """freeze bottom N transformer layers / attention heads of model (necessary if we want to compare different QA heads on SQuAD)
     Args:
         model (pretrained BERT or RoBERTa transformer model)
-        n (int): number of layers we want to freeze
+        n (int): number of attention layers we would like to freeze
         model_name (str): name of the pretrained model (must be one of {roberta, bert, distilbert})
     Return:
         model whose first N bottom layers are frozen (i.e., weights won't be updated during backpropagation)
