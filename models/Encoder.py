@@ -7,6 +7,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from models.utils import to_cpu
+
 # torch.cuda.is_available() checks and returns True if a GPU is available, else it'll return False
 #is_cuda = torch.cuda.is_available()
 
@@ -53,14 +55,12 @@ class EncoderLSTM(nn.Module):
                 hidden:torch.Tensor,
     ):
         #TODO: figure out, whether rnn.pack_padded_sequence is useful for QA (most likely, since we have padded seqs in each batch)
-        out, hidden = self.lstm(bert_outputs, hidden)
+        # out, hidden = self.lstm(bert_outputs, hidden)
         
-        #seq_lengths = seq_lengths.detach().cpu().numpy()
-        
-        #NOTE: set enforce_sorted to True, if you need ONNX exportability (sequences must be passed in decreasing order wrt length)
-        #packed = nn.utils.rnn.pack_padded_sequence(bert_outputs, seq_lengths, batch_first=True, enforce_sorted=False)
-        #out, hidden = self.lstm(packed, hidden)
-        #out, _ = nn.utils.rnn.pad_packed_sequence(out, batch_first=True, total_length=self.max_seq_length)
+        seq_lengths = to_cpu(seq_lengths, detach=True)        
+        packed = nn.utils.rnn.pack_padded_sequence(bert_outputs, seq_lengths, batch_first=True)
+        out, hidden = self.lstm(packed, hidden)
+        out, _ = nn.utils.rnn.pad_packed_sequence(out, batch_first=True, total_length=self.max_seq_length)
         return out, hidden
     
     def init_hidden(
@@ -109,16 +109,13 @@ class EncoderGRU(nn.Module):
                 hidden:torch.Tensor,
     ):
         
-        #TODO: figure out, whether rnn.pack_padded_sequence is useful for QA (most likely, since we have padded seqs in each batch)
-        out, hidden = self.gru(bert_outputs, hidden)
+        # TODO: figure out, whether rnn.pack_padded_sequence is useful for QA (most likely, since we have padded seqs in each batch)
+        # out, hidden = self.gru(bert_outputs, hidden)
         
-        #seq_lengths = seq_lengths.detach().cpu().numpy()
-        
-        #NOTE: set enforce_sorted to True, if you need ONNX exportability (sequences must be passed in decreasing order wrt length)
-        
-        #packed = nn.utils.rnn.pack_padded_sequence(bert_outputs, seq_lengths, batch_first=True)
-        #out, hidden = self.gru(packed, hidden)
-        #out, _ = nn.utils.rnn.pad_packed_sequence(out, batch_first=True, total_length=self.max_seq_length)
+        seq_lengths = to_cpu(seq_lengths, detach=True)        
+        packed = nn.utils.rnn.pack_padded_sequence(bert_outputs, seq_lengths, batch_first=True)
+        out, hidden = self.gru(packed, hidden)
+        out, _ = nn.utils.rnn.pad_packed_sequence(out, batch_first=True, total_length=self.max_seq_length)
         return out, hidden
     
     def init_hidden(

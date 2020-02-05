@@ -59,7 +59,7 @@ def sort_batch(
                start_pos:torch.Tensor,
                end_pos:torch.Tensor,
                PAD_token:int=0,
-)
+):
     indices, input_ids = zip(*sorted(enumerate(to_cpu(input_ids)), key=lambda seq: len(seq[1][seq[1] != PAD_token]), reverse=True))
     indices = np.array(list(indices))
     input_ids = torch.tensor(np.array(list(input_ids)), dtype=torch.long).to(device)
@@ -69,7 +69,7 @@ def freeze_bert_layers(
                        model,
                        model_name:str='bert',
 ):
-    """freeze transformer layers (necessary, if we want to compare different QA heads on SQuAD)
+    """freeze transformer layers (necessary, if we want to train different QA heads on SQuAD)
     Args:
         model (pre-trained BERT transformer model)
         model_name (str): name of the pre-trained transformer model
