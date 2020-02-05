@@ -14,6 +14,7 @@ __all__ = [
            'descriptive_stats_squad', 
            'descriptive_stats_subjqa', 
            'filter_sbj_levels',
+           'find_start_end_pos',
             ]
 
 
@@ -24,6 +25,7 @@ import pandas as pd
 import json
 import os
 import re
+import string
 import torch
 
 #from keras.preprocessing.sequence import pad_sequences
@@ -66,11 +68,11 @@ def get_data(
                 if compute_lengths:
                     for qas in p['qas']:
                         answer = qas['answers'][0]['text'] if len(qas['answers']) == 1 else ''
-                        answer_start = qas['answers'][0]['answer_start'] if len(qas['answers']) == 1 else 0
-                        answer_end = re.sub(r"\\", "", p['context']).split().index(answer.split()[-1]) if len(qas['answers']) == 1 else 0
+                        #answer_start = qas['answers'][0]['answer_start'] if len(qas['answers']) == 1 else 0
+                        #answer_end = re.sub(r"\\", "", p['context']).split().index(answer.split()[-1]) if len(qas['answers']) == 1 else 0
                         qas_pairs.append({'question': qas['question'], 
                                           'answer': answer,
-                                          'answer_span': (answer_start, answer_end),
+                                          #'answer_span': (answer_start, answer_end),
                                           # TODO: figure out, why regex below is not working properly
                                           'context': re.sub(r"\\", "", p['context']), 
                                           'is_answerable': not qas['is_impossible']})
@@ -663,28 +665,61 @@ def filter_sbj_levels(
     return {subj_level: freq for subj_level, freq in subj_levels_doc_frq.items() if subj_level in likert_scale}
 
 
-### OLD helpers ###
+## Helpers to find start and end positions of correct answer span in paragraph (e.g., review) ##
 
-def tokenize_qas(contexts:list, questions:list, max_bert_seq_len:int=512):
-    tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
-    input_lengths, input_ids, token_type_ids, attention_masks = [], [], [], []
-    q_dropped = 0
-    for context, question in zip(contexts, questions):
-        encoded_seq = tokenizer.encode(context, question)
-        seq_length = len(encoded_seq)
-        if seq_length > max_bert_seq_len:
-            q_dropped += 1
-            continue
+def remove_sq_brackets(string:str): 
+    string = re.sub(r'\[', '', string)
+    string = re.sub(r'\]', '', string)
+    return string
+
+def remove_punct(
+                 list_of_strings:list, 
+                 lower_case:bool,
+): 
+    if lower_case:
+        return list(map(lambda s: remove_sq_brackets(s.translate(str.maketrans('', '', string.punctuation)).lower()), list_of_strings))
+    else:
+        return list(map(lambda s: remove_sq_brackets(s.translate(str.maketrans('', '', string.punctuation))), list_of_strings))
+
+def check_remaining_indexes(
+                            ans_span:list,
+                            review:list,
+                            start_idx:int,
+                            lower_case:bool,
+):
+    review_span = review[start_idx + 1: start_idx + 1 + len(ans_span)]
+    review_span = remove_punct(review_span, lower_case=lower_case)
+    ans_span = remove_punct(ans_span, lower_case=lower_case)
+    is_correct_idx = False
+    if np.array_equal(ans_span, review_span):
+        is_correct_idx = True
+    return is_correct_idx
+
+def find_start_end_pos(
+                       answer:list,
+                       review:list,
+                       lower_case:bool,
+):
+    start = 0
+    end = len(review)
+    found_start_pos = False
+    while not found_start_pos:
+        start_token = remove_sq_brackets(answer[0])
+        start_idx = review.index(start_token, start, end)
+        if check_remaining_indexes(
+                                   answer[1:],
+                                   review,
+                                   start_idx,
+                                   lower_case,
+        ):
+            found_start_pos = True
         else:
-            input_lengths.append(seq_length)
-            encoded_dict = tokenizer.encode_plus(context, question, max_length=max_bert_seq_len, pad_to_max_length=True)
-            input_ids.append(encoded_dict['input_ids'])
-            token_type_ids.append(encoded_dict['token_type_ids'])
-            attention_masks.append(encoded_dict['attention_mask'])
-    if q_dropped == 0:
-        raise Exception('The max seq length parameter must be updated to actual max seq length.')
-    print("{} questions had to be dropped due to T > 512.".format(q_dropped))
-    return torch.tensor(input_lengths), torch.tensor(input_ids), torch.tensor(token_type_ids), torch.tensor(attention_masks)
+            start += start_idx
+    start_pos = start_idx
+    end_pos = start_idx + len(answer[1:])
+    assert len(answer) == (end_pos - start_pos  + 1), 'start and end positions do not match the correct answer span'
+    return (start_pos, end_pos)
+
 
 if __name__== "__main__":       
     main() 

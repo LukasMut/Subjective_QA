@@ -54,13 +54,13 @@ class EncoderLSTM(nn.Module):
                 seq_lengths:torch.Tensor,
                 hidden:torch.Tensor,
     ):
-        #TODO: figure out, whether rnn.pack_padded_sequence is useful for QA (most likely, since we have padded seqs in each batch)
-        # out, hidden = self.lstm(bert_outputs, hidden)
+        # TODO: figure out, whether rnn.pack_padded_sequence is useful for QA (most likely, since each batch contains padded)
+        out, hidden = self.lstm(bert_outputs, hidden)
         
-        seq_lengths = to_cpu(seq_lengths, detach=True)        
-        packed = nn.utils.rnn.pack_padded_sequence(bert_outputs, seq_lengths, batch_first=True)
-        out, hidden = self.lstm(packed, hidden)
-        out, _ = nn.utils.rnn.pad_packed_sequence(out, batch_first=True, total_length=self.max_seq_length)
+        #seq_lengths = to_cpu(seq_lengths, detach=True)        
+        #packed = nn.utils.rnn.pack_padded_sequence(bert_outputs, seq_lengths, batch_first=True)
+        #out, hidden = self.lstm(packed, hidden)
+        #out, _ = nn.utils.rnn.pad_packed_sequence(out, batch_first=True, total_length=self.max_seq_length)
         return out, hidden
     
     def init_hidden(
@@ -101,6 +101,7 @@ class EncoderGRU(nn.Module):
                           dropout=self.dropout,
                           bidirectional=self.bidir,
         )
+        
                 
     def forward(
                 self,
@@ -109,13 +110,13 @@ class EncoderGRU(nn.Module):
                 hidden:torch.Tensor,
     ):
         
-        # TODO: figure out, whether rnn.pack_padded_sequence is useful for QA (most likely, since we have padded seqs in each batch)
-        # out, hidden = self.gru(bert_outputs, hidden)
+        # TODO: figure out, whether rnn.pack_padded_sequence is useful for QA (most likely, since each batch contains padded)
+        out, hidden = self.gru(bert_outputs, hidden)
         
-        seq_lengths = to_cpu(seq_lengths, detach=True)        
-        packed = nn.utils.rnn.pack_padded_sequence(bert_outputs, seq_lengths, batch_first=True)
-        out, hidden = self.gru(packed, hidden)
-        out, _ = nn.utils.rnn.pad_packed_sequence(out, batch_first=True, total_length=self.max_seq_length)
+        #seq_lengths = to_cpu(seq_lengths, detach=True)        
+        #packed = nn.utils.rnn.pack_padded_sequence(bert_outputs, seq_lengths, batch_first=True)
+        #out, hidden = self.gru(packed, hidden)
+        #out, _ = nn.utils.rnn.pad_packed_sequence(out, batch_first=True, total_length=self.max_seq_length)
         return out, hidden
     
     def init_hidden(
@@ -124,6 +125,6 @@ class EncoderGRU(nn.Module):
     ):
         # NOTE: we need to initialise twice as many hidden states for bidirectional RNNs
         n = self.n_layers * 2 if self.bidir else self.n_layers 
-        # NOTE: opposed to LSTM, GRUs don't need cell state (GRUs work similar to simple Elman RNNs)
+        # NOTE: in contrast to LSTMs, GRUs don't need cell state inits (GRUs work similar to simple Elman RNNs)
         hidden_state = torch.zeros(n, batch_size, self.hidden_size, device=device)
         return nn.init.xavier_uniform_(hidden_state)

@@ -43,6 +43,7 @@ def get_answers(
         answers.append(answer)
     return answers
 
+# move tensor to CPU
 def to_cpu(
            tensor:torch.Tensor,
            detach:bool=False,
@@ -72,7 +73,7 @@ def sort_batch(
                PAD_token:int=0,
 ):
     indices, input_ids = zip(*sorted(enumerate(to_cpu(input_ids)), key=lambda seq: len(seq[1][seq[1] != PAD_token]), reverse=True))
-    indices = np.array(list(indices))
+    indices = np.array(indices) if isinstance(indices, list) else np.array(list(indices))
     input_ids = torch.tensor(np.array(list(input_ids)), dtype=torch.long).to(device)
     return input_ids, attn_masks[indices], token_type_ids[indices], input_lengths[indices], start_pos[indices], end_pos[indices]
 
