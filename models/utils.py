@@ -2,13 +2,24 @@ __all__ = [
            'get_answers',
            'to_cpu',
            'sort_batch',
-           'freeze_bert_layers',
+           'freeze_transformer_layers',
 ]
 
 import numpy as np
 
 import torch
 import transformers
+
+# torch.cuda.is_available() checks and returns True if a GPU is available, else it'll return False
+#is_cuda = torch.cuda.is_available()
+
+#if is_cuda:
+#    device = torch.device("cuda")
+#    print("GPU is available")
+#else:
+
+device = torch.device("cpu")
+print("GPU not available, CPU used")
 
 def get_answers(
                 tokenizer,
@@ -65,9 +76,9 @@ def sort_batch(
     input_ids = torch.tensor(np.array(list(input_ids)), dtype=torch.long).to(device)
     return input_ids, attn_masks[indices], token_type_ids[indices], input_lengths[indices], start_pos[indices], end_pos[indices]
 
-def freeze_bert_layers(
-                       model,
-                       model_name:str='bert',
+def freeze_transformer_layers(
+                              model,
+                              model_name:str='bert',
 ):
     """freeze transformer layers (necessary, if we want to train different QA heads on SQuAD)
     Args:
@@ -79,9 +90,9 @@ def freeze_bert_layers(
     model_names = ['roberta', 'bert',]
     model_name = model_name.lower()
     if model_name not in model_names:
-        raise ValueError('Wrong model name provided. Model name must be one of {roberta, bert}')
+        raise ValueError('Incorrect model name provided. Model name must be one of {roberta, bert}')
         
-    for name, param in model.named_parameters():
-        if name.startswith(model_name):
-            param.requires_grad = False
+    for n, p in model.named_parameters():
+        if n.startswith(model_name):
+            p.requires_grad = False
     return model

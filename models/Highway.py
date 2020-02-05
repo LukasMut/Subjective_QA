@@ -13,7 +13,7 @@ class Highway(nn.Module):
         super(Highway, self).__init__()
         self.input_size = input_size
         self.proj = nn.Linear(self.input_size, self.input_size)
-        nn.init.xavier_uniform(self.proj.weight)
+        nn.init.xavier_uniform_(self.proj.weight)
         self.transform = nn.Linear(self.input_size, self.input_size)
         # transform gate bias should be initialized to -2 or -4 according to original paper (i.e., https://arxiv.org/pdf/1505.00387.pdf)
         self.transform.bias.data.fill_(-2.0)
