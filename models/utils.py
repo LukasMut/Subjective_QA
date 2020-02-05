@@ -9,6 +9,7 @@ import transformers
 import re 
 
 def _get_answers(
+                tokenizer,
                 b_input_ids:torch.Tensor,
                 start_logits:torch.Tensor,
                 end_logits:torch.Tensor,

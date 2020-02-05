@@ -21,13 +21,11 @@ class LinearQAHead(nn.Module):
         
         super(LinearQAHead, self).__init__()
         self.n_labels = n_labels_qa
-        self.qa_outputs = nn.Linear(in_size, n_labels_qa)
-        self.multitask = False
+        self.qa_outputs = nn.Linear(in_size, self.n_labels)
+        self.multitask = multitask
         
         #if multi-task setting
-        if multitask:
-            self.multitask = True
-            
+        if self.multitask:
             # subjectivity output layer
             self.sbj_outputs = nn.Linear(in_size, 2)
 
@@ -74,7 +72,7 @@ class RecurrentQAHead(nn.Module):
     
     def __init__(
                  self,
-                 max_seq_length:int,
+                 max_seq_length:int=512,
                  in_size:int=1024,
                  n_labels_qa:int=2,
                  highway_block:bool=False,
@@ -89,13 +87,11 @@ class RecurrentQAHead(nn.Module):
         if highway_block:
             self.highway = Highway(in_size)
             
-        self.qa_outputs = nn.Linear(in_size, n_labels_qa)
-        self.multitask = False
+        self.qa_outputs = nn.Linear(in_size, self.n_labels)
+        self.multitask = multitask
         
         #if multi-task setting
-        if multitask:
-            self.multitask = True
-            
+        if self.multitask:    
             # subjectivity output layer
             self.sbj_outputs = nn.Linear(in_size, 2)
 

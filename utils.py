@@ -31,7 +31,12 @@ from transformers.tokenization_bert import BasicTokenizer, whitespace_tokenize
 from tqdm.auto import trange, tqdm
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, TensorDataset
 
-def get_file(subdir:str, source:str, subfolder:str, split:str=None):
+def get_file(
+             subdir:str,
+             source:str,
+             subfolder:str,
+             split=None,
+):
     subfolder = subfolder if re.search('\w/', subfolder) else subfolder + '/'
     PATH = subdir + source + subfolder
     if isinstance(split, str):
@@ -40,7 +45,13 @@ def get_file(subdir:str, source:str, subfolder:str, split:str=None):
     else:
         return PATH + os.listdir(PATH).pop()
 
-def get_data(subdir:str='./data', source:str='/SQuAD/', split:str=None, domain:str=None, compute_lengths:bool=False):
+def get_data(
+             subdir:str='./data',
+             source:str='/SQuAD/',
+             split:str=None,
+             domain:str=None,
+             compute_lengths:bool=False,
+):
     if source == '/SQuAD/': 
         assert isinstance(split, str), 'split must be one of {train, dev}'
         file = get_file(subdir, source, split)
@@ -174,7 +185,7 @@ def create_examples(paragraphs:list, is_training:bool=True):
                                start_position=start_position,
                                end_position=end_position,
                                is_impossible=is_impossible,
-                               )
+        )
     
         examples.append(example)
         
@@ -224,7 +235,7 @@ def convert_examples_to_features(
                                 pad_token_segment_id=0,
                                 mask_padding_with_zero=True,
                                 sequence_a_is_doc=False,
-                            ):
+):
     """Loads a data file into a list of `InputBatch`s."""
 
     unique_id = 1000000000
@@ -531,7 +542,7 @@ def _improve_answer_span(doc_tokens, input_start, input_end, tokenizer, orig_ans
 def split_into_train_and_dev(
                              train_examples:list,
                              train_proportion:float=0.8,
-                             ):
+):
     n_examples = len(train_examples)
     train_set = train_examples[:int(n_examples * train_proportion)]
     dev_set = train_examples[int(n_examples * train_proportion):]
@@ -540,7 +551,7 @@ def split_into_train_and_dev(
 def create_tensor_dataset(
                           features:list,
                           evaluate:bool=False,
-                          ):
+):
 
         all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
         all_input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
@@ -558,7 +569,7 @@ def create_tensor_dataset(
                                     all_example_index, 
                                     all_cls_index, 
                                     all_p_mask,
-                                    )
+            )
         else:
             all_start_positions = torch.tensor([f.start_position for f in features], dtype=torch.long)
             all_end_positions = torch.tensor([f.end_position for f in features], dtype=torch.long)
@@ -581,7 +592,7 @@ def create_batches(
                    dataset:torch.Tensor, 
                    batch_size:int,
                    split:str='train', 
-                   ):
+):
     """
     Args:
         dataset (torch.Tensor): TensorDataset
@@ -607,13 +618,13 @@ def sort_dict(some_dict:dict): return dict(sorted(some_dict.items(), key=lambda 
 def compute_doc_lengths(
                         df:pd.DataFrame,
                         col:str,
-                        ):
+):
     return [len(doc.split()) for doc in df.loc[:, col].values if isinstance(doc, str)]
 
 def descriptive_stats_squad(
                             qas_pairs:list,
                             docs:list=['question', 'answer', 'context'],
-                            ):
+):
     desc_stats_squad = {}
     
     def get_mean_doc_length_squad(
@@ -630,7 +641,7 @@ def descriptive_stats_subjqa(
                              df:pd.DataFrame,
                              cols:list,
                              domains:list=None,
-                             ):
+):
     if isinstance(domains, list):
         print('Computing descriptive stats per domain...')
         descript_stats = defaultdict(dict)
@@ -648,7 +659,7 @@ def descriptive_stats_subjqa(
 def filter_sbj_levels(
                       subj_levels_doc_frq:dict,
                       likert_scale:list,
-                      ):
+):
     return {subj_level: freq for subj_level, freq in subj_levels_doc_frq.items() if subj_level in likert_scale}
 
 
