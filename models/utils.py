@@ -1,12 +1,14 @@
 __all__ = [
-           'freeze_bottom_n_layers',
            'get_answers',
-           '_to_cpu',
+           'to_cpu',
+           'sort_batch',
+           'freeze_bert_layers',
 ]
+
+import numpy as np
 
 import torch
 import transformers
-import re 
 
 def get_answers(
                 tokenizer,
@@ -30,56 +32,56 @@ def get_answers(
         answers.append(answer)
     return answers
 
-def _to_cpu(
-            tensor:torch.Tensor,
-            to_numpy:bool=False,
+def to_cpu(
+           tensor:torch.Tensor,
+           detach:bool=False,
+           to_numpy:bool=True,
 ):
     """
     Args:
-        tensor (torch.Tensor): tensor to be casted onto CPU
-        to_numpy (bool): whether PyTorch tensor should be converted into NumPy array
+        tensor (torch.Tensor): tensor to be moved to CPU
+        detach (bool): whether tensor should be detached from computation graph (i.e., requires_grad = False)
+        to_numpy (bool): whether torch.Tensor should be converted into np.ndarray
     Return:
         tensor (np.ndarray OR torch.Tensor)
     """
-    tensor = tensor.detach().cpu()
-    if to_numpy:
-        return tensor.numpy()
-    else:
-        return tensor
+    tensor = tensor.detach().cpu() if detach else tensor.cpu()
+    if to_numpy: return tensor.numpy()
+    else: return tensor
 
-def freeze_bottom_n_layers(
-                           model,
-                           n:int,
-                           model_name:str,
+    
+# sort sequences in decreasing order w.r.t. to orig. sequence length
+def sort_batch(
+               input_ids:torch.Tensor,
+               attn_masks:torch.Tensor,
+               token_type_ids:torch.Tensor,
+               input_lengths:torch.Tensor,
+               start_pos:torch.Tensor,
+               end_pos:torch.Tensor,
+               PAD_token:int=0,
+)
+    indices, input_ids = zip(*sorted(enumerate(to_cpu(input_ids)), key=lambda seq: len(seq[1][seq[1] != PAD_token]), reverse=True))
+    indices = np.array(list(indices))
+    input_ids = torch.tensor(np.array(list(input_ids)), dtype=torch.long).to(device)
+    return input_ids, attn_masks[indices], token_type_ids[indices], input_lengths[indices], start_pos[indices], end_pos[indices]
+
+def freeze_bert_layers(
+                       model,
+                       model_name:str='bert',
 ):
-    """freeze bottom N transformer layers / attention heads of model (necessary if we want to compare different QA heads on SQuAD)
+    """freeze transformer layers (necessary, if we want to compare different QA heads on SQuAD)
     Args:
-        model (pretrained BERT or RoBERTa transformer model)
-        n (int): number of attention layers we would like to freeze
-        model_name (str): name of the pretrained model (must be one of {roberta, bert, distilbert})
+        model (pre-trained BERT transformer model)
+        model_name (str): name of the pre-trained transformer model
     Return:
-        model whose first N bottom layers are frozen (i.e., weights won't be updated during backpropagation)
+        QA model whose transformer layers are frozen (i.e., BERT weights won't be updated during backpropagation)
     """
-    model_names = ['roberta', 'bert', 'distilbert']
+    model_names = ['roberta', 'bert',]
     model_name = model_name.lower()
     if model_name not in model_names:
-        raise ValueError('Wrong model name provided. Model name must be one of {roberta, bert, distilbert}')
+        raise ValueError('Wrong model name provided. Model name must be one of {roberta, bert}')
         
     for name, param in model.named_parameters():
         if name.startswith(model_name):
-            layer_to_freeze = '.transformer.layer.' if model_name == 'distilbert' else '.encoder.layer.'
-            if re.search(r'^' + model_name + layer_to_freeze, name):
-                name = name.lstrip(model_name + layer_to_freeze)
-            try:
-                n_layer = int(name[:2])
-                if n_layer < n:
-                    param.requires_grad = False
-            except:
-                try:
-                    n_layer = int(name[0])
-                    if n_layer < n:
-                        param.requires_grad = False
-                except:
-                    if name.startswith(model_name + '.embeddings'):
-                        param.requires_grad = False
+            param.requires_grad = False
     return model
