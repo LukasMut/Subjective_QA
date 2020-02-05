@@ -1,7 +1,7 @@
 __all__ = [
            'LinearQAHead',
            'RecurrentQAHead',
-          ]
+]
 
 import torch
 import torch.nn as nn
@@ -17,7 +17,7 @@ class LinearQAHead(nn.Module):
                  in_size:int=1024,
                  n_labels_qa:int=2,
                  multitask:bool=False,
-                 ):
+    ):
         
         super(LinearQAHead, self).__init__()
         self.n_labels = n_labels_qa
@@ -34,7 +34,7 @@ class LinearQAHead(nn.Module):
                 bert_outputs:torch.Tensor, 
                 start_positions=None,
                 end_positions=None,
-                ):
+    ):
         
         sequence_output = bert_outputs[0]      
         logits = self.qa_outputs(sequence_output)
