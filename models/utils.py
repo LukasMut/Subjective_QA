@@ -16,6 +16,7 @@ def _get_answers(
 ):
     """
     Args:
+        tokenizer (BERT tokenizer)
         b_input_ids (torch.Tensor): batch of inputs IDs (batch_size x 512)
         start_logits (torch.Tensor): model's output logits for start positions
         end_logits (torch.Tensor): model's output logits for end positions
