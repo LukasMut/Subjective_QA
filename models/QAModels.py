@@ -62,7 +62,7 @@ class BertForQA(BertPreTrainedModel):
         bert_outputs = self.bert(
                             input_ids=input_ids,
                             token_type_ids=token_type_ids,
-                            attention_masks=attention_masks,
+                            attention_mask=attention_masks,
                             position_ids=position_ids,
                             head_mask=head_mask
       )
