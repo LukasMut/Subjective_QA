@@ -1,7 +1,7 @@
 __all__ = [
            'EncoderLSTM',
            'EncoderGRU',
-          ]
+]
 
 import torch
 import torch.nn as nn
@@ -26,8 +26,8 @@ class EncoderLSTM(nn.Module):
                  in_size:int=1024,
                  n_layers:int=2,
                  dropout:float=0.3,
-                 bidir:bool=True
-                 ):
+                 bidir:bool=True,
+    ):
         
         super(EncoderLSTM, self).__init__()
         self.in_size = in_size # dimensionality of BERT-large attention heads (i.e, 1024)
@@ -44,14 +44,14 @@ class EncoderLSTM(nn.Module):
                             batch_first=True,
                             dropout=self.dropout,
                             bidirectional=self.bidir,
-                            )
+        )
         
     def forward(
                 self,
                 bert_outputs:torch.Tensor,
                 seq_lengths:torch.Tensor,
                 hidden:torch.Tensor,
-                ):
+    ):
         #TODO: figure out, whether rnn.pack_padded_sequence is useful for QA (most likely, since we have padded seqs in each batch)
         out, hidden = self.lstm(bert_outputs, hidden)
         
@@ -66,7 +66,7 @@ class EncoderLSTM(nn.Module):
     def init_hidden(
                     self,
                     batch_size:int,
-                    ):
+    ):
         # NOTE: we need to initialise twice as many hidden states for bidirectional RNNs
         n = self.n_layers * 2 if self.bidir else self.n_layers 
         hidden_state = torch.zeros(n, batch_size, self.hidden_size, device=device)
@@ -82,8 +82,8 @@ class EncoderGRU(nn.Module):
                  in_size:int=1024,
                  n_layers:int=2,
                  dropout:float=0.3,
-                 bidir:bool=True
-                 ):
+                 bidir:bool=True,
+    ):
         
         super(EncoderGRU, self).__init__()
         self.in_size = in_size # dimensionality of BERT-large attention heads (i.e, 1024)
@@ -100,14 +100,14 @@ class EncoderGRU(nn.Module):
                           batch_first=True,
                           dropout=self.dropout,
                           bidirectional=self.bidir,
-                          )
+        )
                 
     def forward(
                 self,
                 bert_outputs:torch.Tensor,
                 seq_lengths:torch.Tensor,
                 hidden:torch.Tensor,
-                ):
+    ):
         
         #TODO: figure out, whether rnn.pack_padded_sequence is useful for QA (most likely, since we have padded seqs in each batch)
         out, hidden = self.gru(bert_outputs, hidden)
@@ -124,7 +124,7 @@ class EncoderGRU(nn.Module):
     def init_hidden(
                     self,
                     batch_size:int,
-                    ):
+    ):
         # NOTE: we need to initialise twice as many hidden states for bidirectional RNNs
         n = self.n_layers * 2 if self.bidir else self.n_layers 
         # NOTE: opposed to LSTM, GRUs don't need cell state (GRUs work similar to simple Elman RNNs)
