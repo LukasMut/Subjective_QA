@@ -1,6 +1,6 @@
 __all__ = [
            'freeze_bottom_n_layers',
-           '_get_answers',
+           'get_answers',
            '_to_cpu',
 ]
 
@@ -8,7 +8,7 @@ import torch
 import transformers
 import re 
 
-def _get_answers(
+def get_answers(
                 tokenizer,
                 b_input_ids:torch.Tensor,
                 start_logits:torch.Tensor,
