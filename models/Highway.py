@@ -6,10 +6,15 @@ import torch.nn.functional as F
 
 class Highway(nn.Module):
 
-    def __init__(self, input_size:int):
+    def __init__(
+                 self,
+                 input_size:int,
+    ):
         super(Highway, self).__init__()
-        self.proj = nn.Linear(input_size, input_size)
-        self.transform = nn.Linear(input_size, input_size)
+        self.input_size = input_size
+        self.proj = nn.Linear(self.input_size, self.input_size)
+        nn.init.xavier_uniform(self.proj.weight)
+        self.transform = nn.Linear(self.input_size, self.input_size)
         # transform gate bias should be initialized to -2 or -4 according to original paper (i.e., https://arxiv.org/pdf/1505.00387.pdf)
         self.transform.bias.data.fill_(-2.0)
 
@@ -21,7 +26,7 @@ class Highway(nn.Module):
             y = highway_out
         """
         proj_gate = F.relu(self.proj(input))
-        transform_gate = F.sigmoid(self.transform(input))
-        # * denotes Hadamard Products (elementwise multiplications)
-        highway_out = (proj_gate * transform_gate) + (input * (1 - transform_gate))
+        transform_gate = torch.sigmoid(self.transform(input))
+        # sum of two Hadamard products (elementwise matrix multiplications)
+        highway_out = torch.add(torch.mul(proj_gate, transform_gate), torch.mul(input, (1.0 - transform_gate)))
         return highway_out

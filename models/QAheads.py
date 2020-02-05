@@ -77,7 +77,7 @@ class RecurrentQAHead(nn.Module):
                  n_labels_qa:int=2,
                  highway_block:bool=False,
                  multitask:bool=False,
-                 ):
+    ):
         
         super(RecurrentQAHead, self).__init__()
         self.n_labels = n_labels_qa
@@ -101,7 +101,7 @@ class RecurrentQAHead(nn.Module):
                 seq_lengths:torch.Tensor,
                 start_positions=None,
                 end_positions=None,
-                ):
+    ):
         
         sequence_output = bert_outputs[0]
         hidden_lstm = self.lstm_encoder.init_hidden(sequence_output.shape[0])
@@ -111,7 +111,7 @@ class RecurrentQAHead(nn.Module):
         
         if hasattr(self, 'highway'):
             # pass output of Bi-LSTM through highway-connection (for better information flow)
-            sequence_output = Highway(sequence_output)
+            sequence_output = self.highway(sequence_output)
         
         # compute classification of answer span
         logits = self.qa_outputs(sequence_output)
