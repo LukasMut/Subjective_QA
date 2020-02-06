@@ -99,7 +99,8 @@ def get_data(
     else:
         raise Exception('You did not provide the correct subfolder name')
         
-        
+
+# NOTE: this function is only relevant for SubjQA data
 def convert_df_to_dict(subjqa:pd.DataFrame):
     
     columns = [
@@ -260,7 +261,8 @@ def create_examples(
                 start_position = char_to_word_offset[answer_offset]
                 try:
                     end_position = char_to_word_offset[answer_offset + answer_length - 1]
-                # sometimes orig. answer text has more white spaces between tokens than the same char. sequence in review text
+                # sometimes orig. answer text has more white spaces between tokens than the same char. sequence in review text,
+                # thus we will get an IndexError (i.e., answer_length is too long)
                 except IndexError:
                     orig_answer_text = context[answer_offset: example['answer']['answer_end']]
                     answer_length = len(orig_answer_text)
