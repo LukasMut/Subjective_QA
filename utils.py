@@ -126,6 +126,7 @@ def convert_df_to_dict(subjqa:pd.DataFrame):
         example['answer']['answer_text'] = subjqa.loc[i, columns[3]]
         answer_indices = convert_str_to_int(subjqa.loc[i, columns[4]])
         example['answer']['answer_start'] = 0 if example['answer']['answer_text'] == 'ANSWERNOTFOUND' else answer_indices[0]
+        example['answer']['answer_end'] = 0 if example['answer']['answer_text'] == 'ANSWERNOTFOUND' else answer_indices[1]
         example['domain'] = subjqa.loc[i, columns[5]]
         example['is_impossible'] = True if example['answer']['answer_text'] == 'ANSWERNOTFOUND' else False
         example['question_subj'] = 1 if subjqa.loc[i, columns[6]] > 3 else 0
@@ -158,7 +159,6 @@ def create_examples(
         return False
     
     def preproc_context(context:str):
-        context = re.sub(r"\\", "", context)
         doc_tokens = []
         char_to_word_offset = []
         prev_is_whitespace = True
@@ -175,12 +175,13 @@ def create_examples(
         return doc_tokens, char_to_word_offset
 
     example_instances = []
-
-
+    
     for example in examples:
 
         # TODO: figure out, whether we should strip off "ANSWERNOTFOUND" from reviews in SubjQA;
-        #       if not, then start and end positions should be second to the last index (i.e., sequence[-2]) instead of 0 (i.e., [CLS])
+        #       if not, then start and end positions should be second to the last index (i.e., sequence[-2]) instead of 0 (i.e., [CLS]),
+        #       since "ANSWERNOTFOUND" is last token in each review text
+        
         context = example["context"] if source == 'SQuAD' else example["review"].rstrip('ANSWERNOTFOUND')
         doc_tokens, char_to_word_offset = preproc_context(context)
 
@@ -241,25 +242,24 @@ def create_examples(
             start_position = None
             end_position = None
             is_impossible = example['is_impossible']
-            orig_answer_text = ''
             q_sbj = example['question_subj']
             a_sbj = example['ans_subj']
             domain = example['domain']
 
-            assert len(example['answer']) == 2, "Each answer must consist of an answer text and start index of answer"
+            assert len(example['answer']) == 3, "Each answer must consist of an answer text, a start and an end index of answer span"
 
             if not is_impossible:
+                orig_answer_text = example['answer']['answer_text']
                 answer_offset = example['answer']['answer_start']
                 answer_length = len(orig_answer_text)
                 start_position = char_to_word_offset[answer_offset]
                 try:
                     end_position = char_to_word_offset[answer_offset + answer_length - 1]
-                except:
-                    print("Answer offset: {}".format(answer_offset))
-                    print("Answer length: {}".format(answer_length))
-                    print("Char to word offset: {}".format(char_to_word_offset))
-                    print("Original answer text: {}".format(orig_answer_text))
-                    print()
+                # sometimes orig. answer text has more white spaces between tokens than the same char. sequence in review text
+                except IndexError:
+                    orig_answer_text = context[answer_offset: example['answer']['answer_end']]
+                    answer_length = len(orig_answer_text)
+                    end_position = char_to_word_offset[answer_offset + answer_length - 1]
 
                 actual_text = " ".join(doc_tokens[start_position : (end_position + 1)])
                 cleaned_answer_text = " ".join(whitespace_tokenize(orig_answer_text))
@@ -292,8 +292,7 @@ def create_examples(
         
     return example_instances 
     
-
-        
+    
 class InputExample(object):
     """
         A single training / test example.
