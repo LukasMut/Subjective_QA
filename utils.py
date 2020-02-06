@@ -125,6 +125,11 @@ def convert_df_to_dict(subjqa:pd.DataFrame):
         example['review'] = subjqa.loc[i, columns[2]]
         example['answer']['answer_text'] = subjqa.loc[i, columns[3]]
         answer_indices = convert_str_to_int(subjqa.loc[i, columns[4]])
+        
+        # TODO: figure out, whether we should strip off "ANSWERNOTFOUND" from reviews in SubjQA;
+        #       if not, then start and end positions should be second to the last index (i.e., sequence[-2]) instead of 0 (i.e., [CLS]),
+        #       since "ANSWERNOTFOUND" is last token in each review text
+        
         example['answer']['answer_start'] = 0 if example['answer']['answer_text'] == 'ANSWERNOTFOUND' else answer_indices[0]
         example['answer']['answer_end'] = 0 if example['answer']['answer_text'] == 'ANSWERNOTFOUND' else answer_indices[1]
         example['domain'] = subjqa.loc[i, columns[5]]
