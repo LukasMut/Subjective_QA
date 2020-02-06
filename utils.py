@@ -3,12 +3,12 @@ from __future__ import absolute_import, division, print_function
 __all__ = [
            'get_file', 
            'get_data',
+           'convert_df_to_dict',
            'create_examples',
            'convert_examples_to_features',
            'create_tensor_dataset',
            'create_batches',
            'split_into_train_and_dev',
-           'tokenize_qas', 
            'sort_dict', 
            'compute_doc_lengths', 
            'descriptive_stats_squad', 
@@ -28,6 +28,7 @@ import re
 import string
 import torch
 
+from collections import defaultdict, Counter
 #from keras.preprocessing.sequence import pad_sequences
 from transformers.tokenization_bert import BasicTokenizer, whitespace_tokenize
 from tqdm.auto import trange, tqdm
@@ -83,7 +84,7 @@ def get_data(
                 return paragraphs
     elif source == '/SubjQA/':
         if compute_lengths:
-            domains = ['books', 'electronics', 'grocery', 'movies', 'restaurants', 'tripadvisor', 'all']
+            domains = ['books', 'electronics', 'grocery', 'movies', 'restaurants', 'tripadvisor', 'trustyou', 'all']
             cols = ['question', 'review', 'human_ans_spans']
             desc_stats_subjqa = {}
             for domain in domains:
@@ -97,18 +98,58 @@ def get_data(
             return pd.read_csv(file)
     else:
         raise Exception('You did not provide the correct subfolder name')
-   
+        
+        
+def convert_df_to_dict(subjqa:pd.DataFrame):
     
-def create_examples(paragraphs:list, is_training:bool=True):
+    columns = [
+               'q_review_id',
+               'question', 
+               'review',
+               'human_ans_spans', 
+               'human_ans_indices',
+               'name',
+               'question_subj_level',
+               'does_the_answer_span_you_selected_expresses_a_subjective_opinion_or_an_objective_measurable_fact',
+    ]
+    examples = []
+    
+    def convert_str_to_int(str_idx:str):
+        str_idx = str_idx.translate(str.maketrans('', '', string.punctuation))
+        return tuple(int(idx) for idx in str_idx.split())
+
+    for i in range(len(subjqa)):
+        example = defaultdict(dict)
+        example['qa_id'] = subjqa.loc[i, columns[0]]
+        example['question'] = subjqa.loc[i, columns[1]]
+        example['review'] = subjqa.loc[i, columns[2]]
+        example['answer']['answer_text'] = subjqa.loc[i, columns[3]]
+        answer_indices = convert_str_to_int(subjqa.loc[i, columns[4]])
+        example['answer']['answer_start'] = 0 if example['answer']['answer_text'] == 'ANSWERNOTFOUND' else answer_indices[0]
+        example['domain'] = subjqa.loc[i, columns[5]]
+        example['is_impossible'] = True if example['answer']['answer_text'] == 'ANSWERNOTFOUND' else False
+        example['question_subj'] = 1 if subjqa.loc[i, columns[6]] > 3 else 0
+        example['ans_subj'] = 1 if subjqa.loc[i, columns[7]] > 3 else 0
+        examples.append(dict(example))
+    return examples
+    
+def create_examples(
+                    examples:list,
+                    source:str,
+                    is_training:bool=True,
+):
     """
     Args:
-        paragraphs(list): list of examples 
+        examples(list): list of examples 
         is_training (bool): whether we want to create examples for training or eval mode
     Return:
         list of examples (each example is an instance)
     """
-
-    if not isinstance(paragraphs, list):
+    sources = ['SQuAD', 'SubjQA']
+    if source not in sources:
+        raise ValueError('Data source must be one of {}'.format(sources))
+    
+    if not isinstance(examples, list):
         raise TypeError("Input should be a list of examples.")
         
     def is_whitespace(char:str):
@@ -116,15 +157,12 @@ def create_examples(paragraphs:list, is_training:bool=True):
             return True
         return False
     
-    examples = []
-    for para in paragraphs:
-        
-        para_text = re.sub(r"\\", "", para["context"])
+    def preproc_context(context:str):
+        context = re.sub(r"\\", "", context)
         doc_tokens = []
         char_to_word_offset = []
         prev_is_whitespace = True
-        
-        for c in para_text:
+        for c in context:
             if is_whitespace(c):
                 prev_is_whitespace = True
             else:
@@ -134,64 +172,125 @@ def create_examples(paragraphs:list, is_training:bool=True):
                     doc_tokens[-1] += c
                 prev_is_whitespace = False
             char_to_word_offset.append(len(doc_tokens) - 1)
-    
-        for qa in para["qas"]:
-            qas_id = qa["id"]
-            q_text = qa["question"]
+        return doc_tokens, char_to_word_offset
+
+    example_instances = []
+
+
+    for example in examples:
+
+        # TODO: figure out, whether we should strip off "ANSWERNOTFOUND" from reviews in SubjQA;
+        #       if not, then start and end positions should be second to the last index (i.e., sequence[-2]) instead of 0 (i.e., [CLS])
+        context = example["context"] if source == 'SQuAD' else example["review"].rstrip('ANSWERNOTFOUND')
+        doc_tokens, char_to_word_offset = preproc_context(context)
+
+        if source == 'SQuAD':
+
+            for qa in example["qas"]:
+
+                qas_id = qa["id"]
+                q_text = qa["question"]
+                dataset = 'SQuAD'
+                start_position = None
+                end_position = None
+                orig_answer_text = qa['answers'][0]['text'] if len(qa['answers']) == 1 else ''
+                is_impossible = qa['is_impossible']
+                q_sbj = 0
+                a_sbj = 0
+                domain = 'wikipedia'
+
+                # we don't need start and end positions in eval mode
+                if is_training:
+                    if (len(qa["answers"]) != 1) and (not is_impossible):
+                        raise ValueError("For training, each question should have exactly 1 answer.")
+
+                    if not is_impossible:
+                        answer = qa["answers"][0]
+                        orig_answer_text = answer["text"]
+                        answer_offset = answer["answer_start"]
+                        answer_length = len(orig_answer_text)
+                        start_position = char_to_word_offset[answer_offset]
+                        end_position = char_to_word_offset[answer_offset + answer_length - 1]
+
+                        # Only add answers where the text can be exactly recovered from the
+                        # document. If this CAN'T happen it's likely due to weird Unicode
+                        # stuff so we will just skip the example.
+                        #
+                        # Note that this means for training mode, every example is NOT
+                        # guaranteed to be preserved.
+
+                        actual_text = " ".join(doc_tokens[start_position : (end_position + 1)])
+                        cleaned_answer_text = " ".join(whitespace_tokenize(orig_answer_text))
+
+                        if actual_text.find(cleaned_answer_text) == -1:
+                            # logger.warning("Could not find answer: '%s' vs. '%s'", actual_text, cleaned_answer_text)
+                            # skip example, if answer cannot be recovered from document
+                            continue
+
+                    # elif question is NOT answerable, then answer is the empty string and start and end positions are 0 
+                    else:
+                        start_position = 0
+                        end_position = 0
+                        orig_answer_text = ""
+
+        elif source == 'SubjQA':
+
+            qas_id = example['qa_id']
+            q_text = example['question']
+            dataset = 'SubjQA'
             start_position = None
             end_position = None
-            orig_answer_text = qa['answers'][0]['text'] if len(qa['answers']) == 1 else ''
-            is_impossible = qa['is_impossible']
-            
-            # we don't need start and end positions in eval mode
-            if is_training:
-                if (len(qa["answers"]) != 1) and (not is_impossible):
-                    raise ValueError("For training, each question should have exactly 1 answer.")
-                    
-                if not is_impossible:
-                    answer = qa["answers"][0]
-                    orig_answer_text = answer["text"]
-                    answer_offset = answer["answer_start"]
-                    answer_length = len(orig_answer_text)
-                    start_position = char_to_word_offset[answer_offset]
+            is_impossible = example['is_impossible']
+            orig_answer_text = ''
+            q_sbj = example['question_subj']
+            a_sbj = example['ans_subj']
+            domain = example['domain']
+
+            assert len(example['answer']) == 2, "Each answer must consist of an answer text and start index of answer"
+
+            if not is_impossible:
+                answer_offset = example['answer']['answer_start']
+                answer_length = len(orig_answer_text)
+                start_position = char_to_word_offset[answer_offset]
+                try:
                     end_position = char_to_word_offset[answer_offset + answer_length - 1]
-                    
-                    # Only add answers where the text can be exactly recovered from the
-                    # document. If this CAN'T happen it's likely due to weird Unicode
-                    # stuff so we will just skip the example.
-                    #
-                    # Note that this means for training mode, every example is NOT
-                    # guaranteed to be preserved.
-                    
-                    actual_text = " ".join(doc_tokens[start_position : (end_position + 1)])
-                    cleaned_answer_text = " ".join(whitespace_tokenize(orig_answer_text))
-                    
-                    if actual_text.find(cleaned_answer_text) == -1:
-                        # logger.warning("Could not find answer: '%s' vs. '%s'", actual_text, cleaned_answer_text)
-                        # skip example, if answer cannot be recovered from document
-                        continue
-                
-                # elif question is NOT answerable, then answer is the empty string and start and end positions are 0 
-                else:
-                    start_position = 0
-                    end_position = 0
-                    orig_answer_text = ""
-               
-               
-                    
-        example = InputExample(
-                               qas_id=qas_id,
-                               q_text=q_text,
-                               doc_tokens=doc_tokens,
-                               orig_answer_text=orig_answer_text,
-                               start_position=start_position,
-                               end_position=end_position,
-                               is_impossible=is_impossible,
+                except:
+                    print("Answer offset: {}".format(answer_offset))
+                    print("Answer length: {}".format(answer_length))
+                    print("Char to word offset: {}".format(char_to_word_offset))
+                    print("Original answer text: {}".format(orig_answer_text))
+                    print()
+
+                actual_text = " ".join(doc_tokens[start_position : (end_position + 1)])
+                cleaned_answer_text = " ".join(whitespace_tokenize(orig_answer_text))
+
+                if actual_text.find(cleaned_answer_text) == -1:
+                    # skip example, if answer cannot be recovered from document
+                    continue
+
+            # elif question is NOT answerable, then answer is the empty string and start and end positions are 0 
+            else:
+                start_position = 0
+                end_position = 0
+                orig_answer_text = ""
+
+        example_instance = InputExample(
+                                        qas_id=qas_id,
+                                        q_text=q_text,
+                                        doc_tokens=doc_tokens,
+                                        orig_answer_text=orig_answer_text,
+                                        start_position=start_position,
+                                        end_position=end_position,
+                                        is_impossible=is_impossible,
+                                        q_sbj=q_sbj,
+                                        a_sbj=a_sbj,
+                                        domain=domain,
+                                        dataset=dataset,
         )
-    
-        examples.append(example)
+
+        example_instances.append(example_instance)
         
-    return examples   
+    return example_instances 
     
 
         
@@ -210,6 +309,10 @@ class InputExample(object):
         start_position=None,
         end_position=None,
         is_impossible=None,
+        q_sbj=None,
+        a_sbj=None,
+        domain=None,
+        dataset=None,
         ):
         
         self.qas_id = qas_id
@@ -219,6 +322,10 @@ class InputExample(object):
         self.start_position = start_position
         self.end_position = end_position
         self.is_impossible = is_impossible
+        self.q_sbj = q_sbj
+        self.a_sbj = a_sbj
+        self.domain = domain
+        self.dataset = dataset
         
         
 def convert_examples_to_features(
@@ -227,7 +334,9 @@ def convert_examples_to_features(
                                 max_seq_length,
                                 doc_stride,
                                 max_query_length,
-                                is_training,
+                                is_training, # is_training only relevant for SQuAD
+                                domain_to_idx,
+                                dataset_to_idx,
                                 cls_token="[CLS]",
                                 sep_token="[SEP]",
                                 pad_token=0,
@@ -241,7 +350,7 @@ def convert_examples_to_features(
     """Loads a data file into a list of `InputBatch`s."""
 
     unique_id = 1000000000
-
+    
     features = []
     for (example_index, example) in enumerate(tqdm(examples)):
 
@@ -254,8 +363,8 @@ def convert_examples_to_features(
         orig_to_tok_index = []
         all_doc_tokens = []
         
-        # the following step is necessary since WordPiece tokenized documents are longer than original documents
-        # want to find the new start and end positions of answer span (different indexes compared to original)
+        # the following step is necessary since WordPiece tokenized docs are longer than white_space tokenized docs
+        # want to find the new start and end positions of answer span (different indexes compared to original doc)
         for (i, token) in enumerate(example.doc_tokens):
             # accumulate number of subtokens until current index
             orig_to_tok_index.append(len(all_doc_tokens))
@@ -317,7 +426,7 @@ def convert_examples_to_features(
             tokens.append(cls_token)
             segment_ids.append(cls_token_segment_id)
             p_mask.append(0)
-            cls_index = 0  # Index of classification token [CLS]
+            cls_index = 0  # Index of special classification token [CLS]
 
             # BERT: CLS Question SEP Context SEP
             if not sequence_a_is_doc:
@@ -377,10 +486,15 @@ def convert_examples_to_features(
             assert len(input_ids) == max_seq_length
             assert len(input_mask) == max_seq_length
             assert len(segment_ids) == max_seq_length
-
+            
+            q_sbj = example.q_sbj
+            a_sbj = example.a_sbj
+            domain = domain_to_idx[example.domain]
+            dataset = dataset_to_idx[example.dataset]
             span_is_impossible = example.is_impossible
             start_position = None
             end_position = None
+            
             if is_training and not span_is_impossible:
                 # For training, if our document chunk does not contain an annotation
                 # we throw it out, since there is nothing to predict.
@@ -402,7 +516,7 @@ def convert_examples_to_features(
                     end_position = tok_end_position - doc_start + doc_offset
 
             if is_training and span_is_impossible:
-                start_position = cls_index
+                start_position = cls_index 
                 end_position = cls_index
 
 
@@ -424,6 +538,10 @@ def convert_examples_to_features(
                     start_position=start_position,
                     end_position=end_position,
                     is_impossible=span_is_impossible,
+                    q_sbj=q_sbj,
+                    a_sbj=a_sbj,
+                    domain=domain,
+                    dataset=dataset,
                 )
             )
             unique_id += 1
@@ -451,6 +569,10 @@ class InputFeatures(object):
         start_position=None,
         end_position=None,
         is_impossible=None,
+        q_sbj=None,
+        a_sbj=None,
+        domain=None,
+        dataset=None,
     ):
         self.unique_id = unique_id
         self.example_index = example_index
@@ -468,6 +590,10 @@ class InputFeatures(object):
         self.start_position = start_position
         self.end_position = end_position
         self.is_impossible = is_impossible
+        self.q_sbj = q_sbj
+        self.a_sbj = a_sbj
+        self.domain = domain
+        self.dataset = dataset
 
 def _check_is_max_context(doc_spans, cur_span_index, position):
     """Check if this is the 'max context' doc span for the token."""
@@ -561,6 +687,10 @@ def create_tensor_dataset(
         all_input_lengths = torch.tensor([f.input_length for f in features], dtype=torch.long)
         all_cls_index = torch.tensor([f.cls_index for f in features], dtype=torch.long)
         all_p_mask = torch.tensor([f.p_mask for f in features], dtype=torch.float)
+        all_q_sbj = torch.tensor([f.q_sbj for f in features], dtype=torch.long)
+        all_a_sbj = torch.tensor([f.a_sbj for f in features], dtype=torch.long)
+        all_domains = torch.tensor([f.domain for f in features], dtype=torch.long)
+        all_datasets = torch.tensor([f.dataset for f in features], dtype=torch.long)
         all_example_index = torch.arange(all_input_ids.size(0), dtype=torch.long)
         
         if evaluate:
@@ -585,6 +715,10 @@ def create_tensor_dataset(
                 all_end_positions,
                 all_cls_index,
                 all_p_mask,
+                all_q_sbj,
+                all_a_sbj,
+                all_domains,
+                all_datasets,
             )
 
         return dataset
@@ -599,7 +733,7 @@ def create_batches(
     Args:
         dataset (torch.Tensor): TensorDataset
         batch_size (int): number of sequences in each mini-batch
-        split (str): training or evaluation
+        split (str): training or eval setup
         num_samples (int): number of samples to draw (equivalent to number of iterations)
     Return:
         PyTorch data loader (DataLoader object)
@@ -665,12 +799,9 @@ def filter_sbj_levels(
     return {subj_level: freq for subj_level, freq in subj_levels_doc_frq.items() if subj_level in likert_scale}
 
 
-## Helpers to find start and end positions of correct answer span in paragraph (e.g., review) ##
+## Helpers to find start and end positions of annotated answer span in paragraph (i.e., review) due to missing positions in SubjQA ##
 
-def remove_sq_brackets(string:str): 
-    string = re.sub(r'\[', '', string)
-    string = re.sub(r'\]', '', string)
-    return string
+def remove_sq_brackets(string:str): return re.sub(r'\]', '', re.sub(r'\[', '', string))
 
 def remove_punct(
                  list_of_strings:list, 
@@ -696,15 +827,18 @@ def check_remaining_indexes(
     return is_correct_idx
 
 def find_start_end_pos(
-                       answer:list,
-                       review:list,
+                       answer:str,
+                       review:str,
                        lower_case:bool,
 ):
+    answer = answer.lower().split()
+    review = review.lower().split()
     start = 0
     end = len(review)
     found_start_pos = False
     while not found_start_pos:
         start_token = remove_sq_brackets(answer[0])
+        # NOTE: start is always inclusive and end is exclusive
         start_idx = review.index(start_token, start, end)
         if check_remaining_indexes(
                                    answer[1:],
@@ -714,7 +848,9 @@ def find_start_end_pos(
         ):
             found_start_pos = True
         else:
-            start += start_idx
+            # update start position to find correct answer span in review
+            idx_increment = (start_idx - start) + 1
+            start += idx_increment
     start_pos = start_idx
     end_pos = start_idx + len(answer[1:])
     assert len(answer) == (end_pos - start_pos  + 1), 'start and end positions do not match the correct answer span'
