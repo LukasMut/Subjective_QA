@@ -47,7 +47,6 @@ if __name__ == '__main__':
         
         if args.version == 'train':
         
-            # load SubjQA_data into memory
             subjqa_data_train = get_data(
                                          source='/SubjQA/',
                                          split='/train',
@@ -70,7 +69,21 @@ if __name__ == '__main__':
                                                  split='dev',
             )
             
+            # convert dictionaries into instances of preprocessed question-answer-review examples    
+            subjqa_examples_train = create_examples(
+                                                subjqa_data_train,
+                                                source='SubjQA',
+                                                is_training=True,
+            )
+
+            subjqa_examples_dev = create_examples(
+                                                  subjqa_data_dev,
+                                                  source='SubjQA',
+                                                  is_training=True,
+            )
+
         elif args.version == 'test':
+            
             subjqa_data_test = get_data(
                                         source='/SubjQA/',
                                         split='/test',
@@ -82,6 +95,12 @@ if __name__ == '__main__':
                                                   split='test',
             )
             
+            subjqa_examples_test = create_examples(
+                                                   subjqa_data_test,
+                                                   source='SubjQA',
+                                                   is_training=True,
+            )
+            
         else:
             raise ValueError('Version of experiment must be one of {train, test}')
         
@@ -89,11 +108,19 @@ if __name__ == '__main__':
         
         if args.version == 'train':
             
-            # load SQuAD_data into memory
             squad_data_train = get_data(
                                         source='/SQuAD/',
                                         split='train',
             )
+            
+            squad_examples_train = create_examples(
+                                       squad_data_train,
+                                       source='SQuAD',
+                                       is_training=True,
+            )
+
+            # create train and dev examples from SQuAD train set only
+            squad_examples_train, squad_examples_dev = split_into_train_and_dev(squad_examples_train)
    
     # TODO: figure out, whether we should use pretrained weights from 'bert-base-cased' or 'bert-base-uncased' model
     if args.bert_weights == 'cased':
