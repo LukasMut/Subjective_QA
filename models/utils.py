@@ -15,6 +15,13 @@ import torch.nn.functional as F
 import torch
 import transformers
 
+from collections import Counter, defaultdict
+from tqdm import trange, tqdm
+from torch.optim import Adam
+from transformers import AdamW
+from transformers import BertTokenizer, BertModel, BertForQuestionAnswering
+from transformers import get_cosine_with_hard_restarts_schedule_with_warmup, get_linear_schedule_with_warmup
+
 from eval_squad import compute_exact, compute_f1
 
 #torch.cuda.is_available() checks and returns True if a GPU is available, else it'll return False
