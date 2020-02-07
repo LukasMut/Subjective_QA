@@ -1,3 +1,24 @@
+__all__ = [
+           'parse_args',
+           'make_qid_to_has_ans',
+           'normalize_answer',
+           'get_tokens',
+           'compute_exact',
+           'compute_f1',
+           'get_raw_scores',
+           'apply_no_ans_threshold',
+           'make_eval_dict',
+           'merge_eval',
+           'plot_pr_curve',
+           'make_precision_recall_eval',
+           'run_precision_recall_analysis',
+           'histogram_na_prob',
+           'find_best_thresh',
+           'find_all_best_thresh',
+]
+            
+
+
 """Official evaluation script for SQuAD version 2.0.
 
 In addition to basic functionality, we also compute additional statistics and

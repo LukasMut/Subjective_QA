@@ -1,4 +1,6 @@
 __all__ = [
+           'compute_exact_batch',
+           'compute_f1_batch',
            'get_answers',
            'to_cpu',
            'sort_batch',
@@ -9,6 +11,8 @@ import numpy as np
 
 import torch
 import transformers
+
+from eval_squad import compute_exact, compute_f1
 
 # torch.cuda.is_available() checks and returns True if a GPU is available, else it'll return False
 #is_cuda = torch.cuda.is_available()
@@ -21,25 +25,33 @@ import transformers
 device = torch.device("cpu")
 print("GPU not available, CPU used")
 
+
+def compute_exact_batch(
+                        answers_gold:list,
+                        answers_pred:list,
+):
+    return sum([compute_exact(a_gold, a_pred) for a_gold, a_pred in zip(answers_gold, answers_pred)])
+
+def compute_f1_batch(
+                     answers_gold:list,
+                     answers_pred:list,
+):
+    return sum([compute_f1(a_gold, a_pred) for a_gold, a_pred in zip(answers_gold, answers_pred)])
+
 def get_answers(
                 tokenizer,
                 b_input_ids:torch.Tensor,
-                start_logits:torch.Tensor,
-                end_logits:torch.Tensor,
+                start_logs:torch.Tensor,
+                end_logs:torch.Tensor,
+                predictions:bool,
 ):
-    """
-    Args:
-        tokenizer (BERT tokenizer)
-        b_input_ids (torch.Tensor): batch of inputs IDs (batch_size x 512)
-        start_logits (torch.Tensor): model's output logits for start positions
-        end_logits (torch.Tensor): model's output logits for end positions
-    Return:
-        answers (list): list of predicted answers (str)
-    """
     answers = []
-    for input_ids, start_log, end_log in zip(b_input_ids, start_logits, end_logits):
+    for input_ids, start_log, end_log in zip(b_input_ids, start_logs, end_logs):
         all_tokens = tokenizer.convert_ids_to_tokens(input_ids)
-        answer = ' '.join(all_tokens[torch.argmax(start_log):torch.argmax(end_log) + 1])
+        if predictions:
+            answer = ' '.join(all_tokens[torch.argmax(start_log):torch.argmax(end_log) + 1])
+        else:
+            answer = ' '.join(all_tokens[start_log:end_log + 1])
         answers.append(answer)
     return answers
 
@@ -49,14 +61,6 @@ def to_cpu(
            detach:bool=False,
            to_numpy:bool=True,
 ):
-    """
-    Args:
-        tensor (torch.Tensor): tensor to be moved to CPU
-        detach (bool): whether tensor should be detached from computation graph (i.e., requires_grad = False)
-        to_numpy (bool): whether torch.Tensor should be converted into np.ndarray
-    Return:
-        tensor (np.ndarray OR torch.Tensor)
-    """
     tensor = tensor.detach().cpu() if detach else tensor.cpu()
     if to_numpy: return tensor.numpy()
     else: return tensor
@@ -91,8 +95,7 @@ def freeze_transformer_layers(
     model_names = ['roberta', 'bert',]
     model_name = model_name.lower()
     if model_name not in model_names:
-        raise ValueError('Incorrect model name provided. Model name must be one of {roberta, bert}')
-        
+        raise ValueError('Incorrect model name provided. Model name must be one of {}'.format(model_names))
     for n, p in model.named_parameters():
         if n.startswith(model_name):
             p.requires_grad = False
