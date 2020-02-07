@@ -101,7 +101,14 @@ def get_data(
         
 
 # NOTE: this function is only relevant for SubjQA data
-def convert_df_to_dict(subjqa:pd.DataFrame):
+def convert_df_to_dict(
+                       subjqa:pd.DataFrame,
+                       split:str,
+):
+    splits = ['train', 'dev', 'test']
+    if split not in splits:
+        # correct type but improper value
+        raise ValueError('Split must be one of {}'.format(splits))
     
     columns = [
                'q_review_id',
@@ -138,6 +145,11 @@ def convert_df_to_dict(subjqa:pd.DataFrame):
         example['question_subj'] = 1 if subjqa.loc[i, columns[6]] > 3 else 0
         example['ans_subj'] = 1 if subjqa.loc[i, columns[7]] > 3 else 0
         examples.append(dict(example))
+        
+    # save as .json file
+    with open('./data/SubjQA/all/' + split + '.json', 'w') as json_file:
+        json.dump(examples, json_file)
+        
     return examples
     
 def create_examples(
