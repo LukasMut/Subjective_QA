@@ -25,13 +25,15 @@ if __name__ == '__main__':
     parser.add_argument('--finetuning',  type=str, default='SQuAD',
             help='If SQuAD, fine tune on SQuAD only; if SubjQA, fine tune on SubjQA only; if both, fine tune on both SQuAD and SubjQA.')
     parser.add_argument('--version',  type=str, default='train',
-            help='If train, then train model on train set; if test, then evaluate model on test set.')
+            help='If train, then train model on train set(s); if test, then evaluate model on test set(s).')
     parser.add_argument('--multitask', action='store_true',
             help='If provided, MTL instead of STL setting.')
     parser.add_argument('--n_tasks', type=int, default=1,
-            help='Define number of tasks the model should be trained on. Only necessary, if MTL setting.')
+            help='Define number of tasks QA model should be trained on. Only necessary, if MTL setting.')
     parser.add_argument('--qa_head', type=str, default='linear',
-            help='If linear, fc linear head on top of BERT; if recurrent, Bi-LSTM encoder plus fc linear head on top of BERT.')
+            help='If linear, put fc linear head on top of BERT; if recurrent, put BiLSTM encoder plus fc linear head on top of BERT.')
+    parser.add_argument('--highway_connection', action='store_true',
+            help='If provided, put highway connection in between BiLSTM encoder and fc linear output head; NOT relevant for linear head')
     parser.add_argument('--bert_weights', type=str, default='cased',
             help='If cased, load pretrained weights from BERT cased model; if uncased, load pretrained weights from BERT uncased model.')
     parser.add_argument('--batch_size', type=int, default=32,
