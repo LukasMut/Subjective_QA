@@ -11,7 +11,7 @@ import re
 import torch 
 import transformers
 
-from collections import Counter, defaultdictj
+from collections import Counter, defaultdict
 from tqdm import trange, tqdm
 from transformers import BertTokenizer, BertModel, BertForQuestionAnswering
 
@@ -25,22 +25,24 @@ if __name__ == '__main__':
     parser.add_argument('--finetuning',  type=str, default='SQuAD',
             help='If SQuAD, fine tune on SQuAD only; if SubjQA, fine tune on SubjQA only; if both, fine tune on both SQuAD and SubjQA.')
     parser.add_argument('--version',  type=str, default='train',
-        help='If train, then train model on train set; if test, then evaluate model on test set.')
+            help='If train, then train model on train set; if test, then evaluate model on test set.')
     parser.add_argument('--multitask', action='store_true',
             help='If provided, MTL instead of STL setting.')
     parser.add_argument('--n_tasks', type=int, default=1,
-            help='Define number of tasks the model should be trained on.')
+            help='Define number of tasks the model should be trained on. Only necessary, if MTL setting.')
     parser.add_argument('--qa_head', type=str, default='linear',
             help='If linear, fc linear head on top of BERT; if recurrent, Bi-LSTM encoder plus fc linear head on top of BERT.')
+    parser.add_argument('--bert_weights', type=str, default='cased',
+            help='If cased, load pretrained weights from BERT cased model; if uncased, load pretrained weights from BERT uncased model.')
+    parser.add_argument('--batch_size', type=int, default=32,
+            help='Define mini-batch size.')
     parser.add_argument('--sd', type=str, default='',
             help='set model save directory for QA model.')
     args = parser.parse_args()
     print(args)
     
-    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
    
-    
     if (args.finetuning == 'SubjQA') or (args.finetuning == 'both'):
         
         if args.version == 'train':
@@ -94,13 +96,19 @@ if __name__ == '__main__':
             )
    
     # TODO: figure out, whether we should use pretrained weights from 'bert-base-cased' or 'bert-base-uncased' model
-    bert_tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
-    # choose pretrained weights
-    pretrained_weights = 'bert-large-cased-whole-word-masking-finetuned-squad'
-    # BERT cannot deal with sequences, where T > 512
-    max_seq_length = 512
-    # defin mini-batch size
-    batch_size = 32
+    if args.bert_weights == 'cased':
+        bert_tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
+        pretrained_weights = 'bert-large-cased-whole-word-masking-finetuned-squad'
+    elif args.bert_weights == 'uncased':
+        bert_tokenizer == BertTokenizer.from_pretrained('bert-base-uncased')
+        pretrained_weights = 'bert-large-uncased-whole-word-masking-finetuned-squad'
+    else:
+        raise ValueError('Pretrained weights must be loaded from an uncased or cased BERT model')
+    
+    # set hyperparameters
+    max_seq_length = 512 # BERT cannot deal with sequences, where T > 512
+    batch_size = args.batch_size
+    
     # create domain_to_idx and dataset_to_idx mappings
     domains = ['books', 'electronics', 'grocery', 'movies', 'restaurants', 'tripadvisor', 'all', 'wikipedia']
     datasets = ['SQuAD', 'SubjQA']
