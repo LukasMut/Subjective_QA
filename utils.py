@@ -84,7 +84,7 @@ def get_data(
                 return paragraphs
     elif source == '/SubjQA/':
         if compute_lengths:
-            domains = ['books', 'electronics', 'grocery', 'movies', 'restaurants', 'tripadvisor', 'trustyou', 'all']
+            domains = ['books', 'electronics', 'grocery', 'movies', 'restaurants', 'tripadvisor', 'all']
             cols = ['question', 'review', 'human_ans_spans']
             desc_stats_subjqa = {}
             for domain in domains:
@@ -93,9 +93,12 @@ def get_data(
                 desc_stats_subjqa[domain.capitalize()] = descriptive_stats_subjqa(domain_data, cols)
             return desc_stats_subjqa
         else:
-            assert isinstance(domain, str), 'domain must be one of {books, electronics, grocery, movies, restaurants, tripadvisor}'
+            domains = ['books', 'electronics', 'grocery', 'movies', 'restaurants', 'tripadvisor', 'all']
+            assert isinstance(domain, str), 'domain must be one of {}'.format(domains)
+            secret_domain = 'trustyou'
             file = get_file(subdir, source, domain, split)
-            return pd.read_csv(file)
+            subjqa_df = pd.read_csv(file)
+            return subjqa_df[subjqa_df.name != secret_domain]
     else:
         raise Exception('You did not provide the correct subfolder name')
         
@@ -133,11 +136,11 @@ def convert_df_to_dict(
         example['review'] = subjqa.loc[i, columns[2]]
         example['answer']['answer_text'] = subjqa.loc[i, columns[3]]
         answer_indices = convert_str_to_int(subjqa.loc[i, columns[4]])
-        
+
         # TODO: figure out, whether we should strip off "ANSWERNOTFOUND" from reviews in SubjQA;
         #       if not, then start and end positions should be second to the last index (i.e., sequence[-2]) instead of 0 (i.e., [CLS]),
         #       since "ANSWERNOTFOUND" is last token in each review text
-        
+
         example['answer']['answer_start'] = 0 if example['answer']['answer_text'] == 'ANSWERNOTFOUND' else answer_indices[0]
         example['answer']['answer_end'] = 0 if example['answer']['answer_text'] == 'ANSWERNOTFOUND' else answer_indices[1]
         example['domain'] = subjqa.loc[i, columns[5]]
