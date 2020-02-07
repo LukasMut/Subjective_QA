@@ -98,7 +98,8 @@ def get_data(
             secret_domain = 'trustyou'
             file = get_file(subdir, source, domain, split)
             subjqa_df = pd.read_csv(file)
-            return subjqa_df[subjqa_df.name != secret_domain]
+            subjqa_df = subjqa_df[subjqa_df.name != secret_domain] if domain == 'all' else subjqa_df
+            return subjqa_df
     else:
         raise Exception('You did not provide the correct subfolder name')
         
