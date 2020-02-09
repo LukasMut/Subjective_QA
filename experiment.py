@@ -32,7 +32,7 @@ if __name__ == '__main__':
     parser.add_argument('--finetuning',  type=str, default='SQuAD',
             help='If SQuAD, fine tune on SQuAD only; if SubjQA, fine tune on SubjQA only; if combined, fine tune on both SQuAD and SubjQA simultaneously.')
     parser.add_argument('--version',  type=str, default='train',
-            help='If train, then train model on train set(s); if test, then evaluate model on test set(s).')
+            help='If train, then train model on train set(s); if test, then evaluate model on SubjQA test set.')
     parser.add_argument('--multitask', action='store_true',
             help='If provided, MTL instead of STL setting.')
     parser.add_argument('--n_tasks', type=int, default=1,
@@ -40,7 +40,7 @@ if __name__ == '__main__':
     parser.add_argument('--qa_head', type=str, default='linear',
             help='If linear, put fc linear head on top of BERT; if recurrent, put BiLSTM encoder plus fc linear head on top of BERT.')
     parser.add_argument('--highway_connection', action='store_true',
-            help='If provided, put highway connection in between BiLSTM encoder and fc linear output head; NOT relevant for linear head')
+            help='If provided, put highway connection in between BERT OR BiLSTM encoder and fc linear output head.')
     parser.add_argument('--bert_weights', type=str, default='cased',
             help='If cased, load pretrained weights from BERT cased model; if uncased, load pretrained weights from BERT uncased model.')
     parser.add_argument('--batch_size', type=int, default=32,
@@ -51,7 +51,7 @@ if __name__ == '__main__':
             help='set model save directory for QA model.')
     args = parser.parse_args()
     
-    # check whether arg.parser works correctly
+    # see whether arg.parser works correctly
     print(args)
     print()
     
@@ -249,8 +249,9 @@ if __name__ == '__main__':
                                                batch_size=batch_size,
                                                split='eval',
             )
-            
-         # initialise QA model
+        
+                
+        # initialise QA model
         qa_head_name = 'RecurrentQAHead' if args.qa_head == 'recurrent' else 'LinearQAHead'
         model = BertForQA.from_pretrained(
                                           pretrained_weights,
@@ -264,20 +265,58 @@ if __name__ == '__main__':
         model.to(device)
 
         hypers = {
-                  "lr": 1e-3,
+                  "lr_adam": 1e-3,
+                  "lr_sgd": 1e-2,
                   "warmup_steps": 100,
                   "max_grad_norm": 10,
         }
 
         hypers["n_epochs"] = args.n_epochs
         hypers["squad"] = True if args.finetuning == 'SQuAD' or args.finetuning == 'combined' else False
-
+        
+        if args.optim == 'AdamW':
+            
+            optimizer = AdamW(
+                              model.parameters(), 
+                              lr=hypers['lr_adam'], 
+                              correct_bias=False,
+            )
+            
+            t_total = len(train_dl) * hypers['n_epochs'] # total number of training steps (i.e., step = iteration)
+            
+            scheduler = get_linear_schedule_with_warmup(
+                                                        optimizer, 
+                                                        num_warmup_steps=hypers["warmup_steps"], 
+                                                        num_training_steps=t_total,
+            )
+            
+        elif args.optim == 'Adam':
+            
+            optimizer = Adam(model.parameters(),
+                             lr=hypers['lr_adam'])
+            scheduler = None
+        
+        elif args.optim == 'SGD':
+            
+            optimizer = optim.SGD(model.parameters(),
+                                  lr=hypers['lr_sgd'], 
+                                  momentum=0.9)
+            scheduler = None
+        
+        else:
+            if isinstance(args.optim, str):
+                raise ValueError("Optimizer must be one of {AdamW, Adam, SGD}.")
+            else:
+                raise TypeError("Optimizer algorithm must be defined through a string and has to be one of {AdamW, Adam, SGD}.")
+        
         batch_losses, train_losses, train_accs, train_f1s, val_losses, val_accs, val_f1s, model = train(
                                                                                                         model=model,
                                                                                                         tokenizer=bert_tokenizer,
                                                                                                         train_dl=train_dl,
                                                                                                         val_dl=val_dl,
                                                                                                         batch_size=batch_size,
+                                                                                                        optimizer=optimizer,
+                                                                                                        scheduler=scheduler,
                                                                                                         args=hypers,
         )
                 
