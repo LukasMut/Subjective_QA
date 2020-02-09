@@ -255,9 +255,11 @@ if __name__ == '__main__':
                                                split='eval',
             )
         
-                
-        # initialise QA model
         qa_head_name = 'RecurrentQAHead' if args.qa_head == 'recurrent' else 'LinearQAHead'
+        highway = 'Highway' if args.highway_connection else ''
+        train_method = 'multitask' + '_' + str(args.n_tasks) if args.multitask else 'singletask'
+        
+        # initialise QA model
         model = BertForQA.from_pretrained(
                                           pretrained_weights,
                                           qa_head_name=qa_head_name,
@@ -281,6 +283,8 @@ if __name__ == '__main__':
         hypers["n_epochs"] = args.n_epochs
         hypers["freeze_bert"] = True if args.finetuning == 'SQuAD' or args.finetuning == 'combined' else False
         hypers["optim"] = args.optim
+        hypers["model_dir"] = args.sd
+        hypers["model_name"] = 'BERT' + '_' + bert_weights + '_' + qa_head_name + '_' + highway + '_' + train_method
         
         if args.optim == 'AdamW':
             
@@ -330,13 +334,11 @@ if __name__ == '__main__':
                                                                                                         train_dl=train_dl,
                                                                                                         val_dl=val_dl,
                                                                                                         batch_size=batch_size,
-                                                                                                        optimizer=optimizer,
                                                                                                         args=hypers,
+                                                                                                        optimizer=optimizer,
                                                                                                         scheduler=scheduler,
-        )
-        
-        
-                
+                                                                                                        early_stopping=True,
+        )    
             
     # we always test on SubjQA
     elif args.version == 'test':

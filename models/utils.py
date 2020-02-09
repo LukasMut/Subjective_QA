@@ -111,15 +111,17 @@ def to_cpu(
     if to_numpy: return tensor.numpy()
     else: return tensor
 
+# train loop 
 def train(
           model,
           tokenizer,
           train_dl,
           val_dl,
-          batch_size,
+          batch_size:int,
+          args:dict,
           optimizer,
-          args,
           scheduler=None,
+          early_stopping:bool=True,
 ):
     n_iters = len(train_dl)
     n_examples = n_iters * batch_size
@@ -136,6 +138,10 @@ def train(
     val_losses = []
     val_accs = []
     val_f1s = []
+    
+    # path to save models
+    PATH = os.getcwd()
+    model_path = PATH + args['model_dir']
         
     loss_func = nn.CrossEntropyLoss()
 
@@ -189,7 +195,9 @@ def train(
             
             batch_loss = (start_loss + end_loss) / 2
             
+            print("-------------------------------")
             print("Current batch loss: {}".format(batch_loss))
+            print("-------------------------------")
             print()
 
             batch_losses.append(batch_loss.item())
@@ -240,18 +248,22 @@ def train(
             current_batch_f1 = 100 * (batch_f1 / nb_tr_examples)
             current_batch_acc = 100 * (correct_answers / nb_tr_examples)
             
+            print("-------------------------------")
             print("Current batch exact-match: {} %".format(current_batch_acc))
             print("Current batch F1: {} %".format(current_batch_f1))
+            print("-------------------------------")
             print()
         
         train_loss = tr_loss / nb_tr_steps
         train_exact_match = 100 * (correct_answers / n_tr_examples)
         train_f1 = 100 * (batch_f1 / nb_tr_examples)
         
+        print("-------------------------------")
         print("---------- EPOCH {} ----------".format(epoch))
         print("----- Train loss: {} -----".format(tr_loss/nb_tr_steps))
         print("----- Train exact-match: {} % -----".format(train_exact_match))
         print("----- Train F1: {} % -----".format(train_f1))
+        print("-------------------------------")
         print()
 
         train_losses.append(train_loss)
@@ -340,19 +352,29 @@ def train(
         val_loss = val_loss / nb_val_steps
         val_exact_match = 100 * (correct_answers / n_tr_examples)
         val_f1 = 100 * (batch_f1 / nb_tr_examples)
-
+        
+        print("-------------------------------")
         print("---------- EPOCH {} ----------".format(epoch))
         print("----- Val loss: {} -----".format(val_loss))
         print("----- Val exact-match: {} % -----".format(val_exact_match))
         print("----- Val F1: {} % -----".format(val_f1))
+        print("-------------------------------")
         print()
-
+        
+        if (epoch == 0) or (val_exact_match > val_accs[-1]):
+            torch.save(model.state_dict(), model_path + '/epoch_%d.%s' % (epoch, args.model_name))
+        
         val_losses.append(val_loss)
         val_accs.append(val_exact_match)
         val_f1s.append(val_f1)
+        
+        if epoch > 0 and early_stopping:
+            if (val_accs[-2] > val_accs[-1]) and (val_f1s[-2] > val_f1s[-1]):
+                break
        
     return batch_losses, train_losses, train_accs, train_f1s, val_losses, val_accs, val_f1s, model
 
+# test loop
 def test(
           model,
           tokenizer,
@@ -443,10 +465,12 @@ def test(
     test_loss = test_loss / nb_test_steps
     test_exact_match = 100 * (correct_answers / n_tr_examples)
     test_f1 = 100 * (batch_f1 / nb_tr_examples)
-
+    
+    print("-------------------------------")
     print("---------- Inference ----------")
-    print("----- Total test loss: {} -----".format(test_loss))
+    print("----- Test loss: {} -----".format(test_loss))
     print("----- Test exact-match: {} % -----".format(test_exact_match))
     print("----- Test F1: {} % -----".format(test_f1))
+    print("-------------------------------")
    
     return test_loss, test_acc, test_f1
