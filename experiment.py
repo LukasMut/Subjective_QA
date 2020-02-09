@@ -338,7 +338,9 @@ if __name__ == '__main__':
                                                                                                         optimizer=optimizer,
                                                                                                         scheduler=scheduler,
                                                                                                         early_stopping=True,
-        )    
+        )  
+        
+        # TODO: save data
             
     # we always test on SubjQA
     elif args.version == 'test':
@@ -377,7 +379,7 @@ if __name__ == '__main__':
                                      split='eval',
             )
             
-            saved_model = 
+            saved_model = # load saved model
             
             test_loss, test_acc, test_f1 = test(
                                                 model=saved_model,
