@@ -29,7 +29,6 @@ np.random.seed(42)
 random.seed(42)
 torch.manual_seed(42)
 
-#torch.cuda.is_available() checks and returns True if a GPU is available, else it'll return False
 is_cuda = torch.cuda.is_available()
 
 if is_cuda:
@@ -121,28 +120,17 @@ def train(
           train_dl,
           val_dl,
           batch_size,
+          optimizer,
           args,
+          scheduler=None,
 ):
     n_examples = len(train_dl) * batch_size
-    t_total = len(train_dl) * args['n_epochs'] # total number of training steps (i.e., step = iteration)
-
-    if args["squad"]:
+    
+    if args["freeze_bert"]:
         model = freeze_transformer_layers(model)
         print("------ Pre-trained BERT model is frozen -------")
         
-    optimizer = AdamW(
-                      model.parameters(), 
-                      lr=args['lr'], 
-                      correct_bias=False,
-    )
-
-    scheduler = get_linear_schedule_with_warmup(
-                                                optimizer, 
-                                                num_warmup_steps=args["warmup_steps"], 
-                                                num_training_steps=t_total,
-    )
-    
-    # store loss, accuracy and F1 for plotting
+    # store loss and accuracy for plotting
     batch_losses = []
     train_losses = []
     train_accs = []
@@ -227,6 +215,7 @@ def train(
             batch_f1 += compute_f1_batch(true_answers, pred_answers)
                         
             # backpropagate error
+            
             #TODO: figure out whether you have to backpropagate the error separately for start and end loss
             #start_loss.backward()
             #end_loss.backward()
@@ -237,7 +226,10 @@ def train(
 
             # update model parameters and take a step using the computed gradient
             optimizer.step()
-            scheduler.step()
+            
+            # scheduler is only necessary, if we optimize through AdamW (BERT specific version of Adam)
+            if not isinstance(scheduler, type(None)):
+                scheduler.step()
 
             tr_loss += batch_loss.item()
             nb_tr_examples += b_input_ids.size(0)
@@ -283,6 +275,7 @@ def train(
             # unpack inputs from dataloader            
             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_cls_indexes, _, _, _, _, _ = batch
             
+            
             # sort sequences in batch in decreasing order w.r.t. to (original) sequence length
             b_input_ids, b_attn_masks, b_type_ids, b_input_lengths, b_start_pos, b_end_pos = sort_batch(
                                                                                                         b_input_ids,
@@ -309,6 +302,7 @@ def train(
                 # start and end loss must be computed separately
                 start_loss = loss_func(start_logits_val, b_start_pos)
                 end_loss = loss_func(end_logits_val, b_end_pos)
+
                 batch_loss_val = (start_loss + end_loss) / 2
                 print("Current val loss: {}".format(total_loss))
                 

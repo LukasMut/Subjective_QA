@@ -47,6 +47,8 @@ if __name__ == '__main__':
             help='Define mini-batch size.')
     parser.add_argument('--n_epochs', type=int, default=3,
             help='Set number of epochs model should train for. Should be a higher number, if we fine-tune on SubjQA only.')
+    parser.add_argument('--optim', type=str, default='AdamW',
+            help='Define optimizer. Must be one of {AdamW, Adam, SGD}.')
     parser.add_argument('--sd', type=str, default='',
             help='set model save directory for QA model.')
     args = parser.parse_args()
@@ -272,7 +274,7 @@ if __name__ == '__main__':
         }
 
         hypers["n_epochs"] = args.n_epochs
-        hypers["squad"] = True if args.finetuning == 'SQuAD' or args.finetuning == 'combined' else False
+        hypers["freeze_bert"] = True if args.finetuning == 'SQuAD' or args.finetuning == 'combined' else False
         
         if args.optim == 'AdamW':
             
@@ -307,7 +309,7 @@ if __name__ == '__main__':
             if isinstance(args.optim, str):
                 raise ValueError("Optimizer must be one of {AdamW, Adam, SGD}.")
             else:
-                raise TypeError("Optimizer algorithm must be defined through a string and has to be one of {AdamW, Adam, SGD}.")
+                raise TypeError("Optimizer algorithm must be defined through a string, and has to be one of {AdamW, Adam, SGD}.")
         
         batch_losses, train_losses, train_accs, train_f1s, val_losses, val_accs, val_f1s, model = train(
                                                                                                         model=model,
@@ -316,8 +318,8 @@ if __name__ == '__main__':
                                                                                                         val_dl=val_dl,
                                                                                                         batch_size=batch_size,
                                                                                                         optimizer=optimizer,
-                                                                                                        scheduler=scheduler,
                                                                                                         args=hypers,
+                                                                                                        scheduler=scheduler,
         )
                 
             
