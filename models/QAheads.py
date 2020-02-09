@@ -26,6 +26,7 @@ class LinearQAHead(nn.Module):
                  self,
                  in_size:int=1024,
                  n_labels_qa:int=2,
+                 highway_block:bool=False,
                  multitask:bool=False,
     ):
         
@@ -33,6 +34,10 @@ class LinearQAHead(nn.Module):
         self.n_labels = n_labels_qa
         self.qa_outputs = nn.Linear(in_size, self.n_labels)
         self.multitask = multitask
+        
+        # if highway connection
+        if highway_block:
+            self.highway = Highway(in_size)
         
         #if multi-task setting
         if self.multitask:
@@ -46,7 +51,12 @@ class LinearQAHead(nn.Module):
                 end_positions=None,
     ):
         
-        sequence_output = bert_outputs[0]      
+        sequence_output = bert_outputs[0]
+        
+        if hasattr(self, 'highway'):
+            # pass output of BERT through highway-connection (for better information flow)
+            sequence_output = self.highway(sequence_output)
+        
         logits = self.qa_outputs(sequence_output)
         start_logits, end_logits = logits.split(1, dim=-1)
         start_logits = start_logits.squeeze(-1)
@@ -116,7 +126,7 @@ class RecurrentQAHead(nn.Module):
         sequence_output = bert_outputs[0]
         hidden_lstm = self.lstm_encoder.init_hidden(sequence_output.shape[0])
         
-        # pass bert hidden representations through Bi-LSTM to compute temporal dependencies (and global interactions)
+        # pass bert hidden representations through Bi-LSTM to compute temporal dependencies and global interactions
         sequence_output, _ = self.lstm_encoder(sequence_output, seq_lengths, hidden_lstm)
         
         if hasattr(self, 'highway'):

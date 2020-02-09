@@ -47,6 +47,7 @@ class BertForQA(BertPreTrainedModel):
             self.qa_head = LinearQAHead(
                                         in_size=config.hidden_size,
                                         n_labels_qa=config.num_labels,
+                                        highway_block=self.highway_connection,
                                         multitask=self.multitask,
             )
             
