@@ -1,3 +1,5 @@
+from __future__ import absolute_import, division, print_function
+
 import numpy as np
 import pandas as pd
 import torch.nn as nn
@@ -43,6 +45,8 @@ if __name__ == '__main__':
             help='If cased, load pretrained weights from BERT cased model; if uncased, load pretrained weights from BERT uncased model.')
     parser.add_argument('--batch_size', type=int, default=32,
             help='Define mini-batch size.')
+    parser.add_argument('--n_epochs', type=int, default=3,
+            help='Set number of epochs model should train for. Should be a higher number, if we fine-tune on SubjQA only.')
     parser.add_argument('--sd', type=str, default='',
             help='set model save directory for QA model.')
     args = parser.parse_args()
@@ -51,7 +55,7 @@ if __name__ == '__main__':
     print(args)
     print()
     
-    # move model and tensors to GPU, if GPU is available
+    # move model and tensors to GPU, if GPU is available (device must be defined to do that)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     # set some crucial hyperparameters
@@ -245,8 +249,39 @@ if __name__ == '__main__':
                                                batch_size=batch_size,
                                                split='eval',
             )
+            
+         # initialise QA model
+        qa_head_name = 'RecurrentQAHead' if args.qa_head == 'recurrent' else 'LinearQAHead'
+        model = BertForQA.from_pretrained(
+                                          pretrained_weights,
+                                          qa_head_name=qa_head_name,
+                                          max_seq_length=max_seq_length,
+                                          highway_connection=args.highway_connection,
+                                          multitask=args.multitask,
+        )
+
+        # set model to device
+        model.to(device)
+
+        hypers = {
+                  "lr": 1e-3,
+                  "warmup_steps": 100,
+                  "max_grad_norm": 10,
+        }
+
+        hypers["n_epochs"] = args.n_epochs
+        hypers["squad"] = True if args.finetuning == 'SQuAD' or args.finetuning == 'combined' else False
+
+        batch_losses, train_losses, train_accs, train_f1s, val_losses, val_accs, val_f1s, model = train(
+                                                                                                        model=model,
+                                                                                                        tokenizer=bert_tokenizer,
+                                                                                                        train_dl=train_dl,
+                                                                                                        val_dl=val_dl,
+                                                                                                        batch_size=batch_size,
+                                                                                                        args=hypers,
+        )
                 
-        
+            
     # we always test on SubjQA
     elif args.version == 'test':
             
@@ -283,17 +318,3 @@ if __name__ == '__main__':
                                      batch_size=batch_size,
                                      split='eval',
             )
-            
-            
-    # initialise QA model
-    qa_head_name = 'RecurrentQAHead' if args.qa_head == 'recurrent' else 'LinearQAHead'
-    model = BertForQA.from_pretrained(
-                                      pretrained_weights,
-                                      qa_head_name=qa_head_name,
-                                      max_seq_length=max_seq_length,
-                                      highway_connection=args.highway_connection,
-                                      multitask=args.multitask,
-    )
-    
-    # set model to device
-    model.to(device)
