@@ -24,17 +24,6 @@ from utils import *
 np.random.seed(42)
 random.seed(42)
 torch.manual_seed(42)
-
-# move model and tensors to GPU, if GPU is available
-is_cuda = torch.cuda.is_available()
-
-if is_cuda:
-    device = torch.device("cuda")
-    print("GPU is available")
-else:
-    device = torch.device("cpu")
-    print("GPU not available, CPU used")
-print()
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -62,11 +51,40 @@ if __name__ == '__main__':
     print(args)
     print()
     
+    # move model and tensors to GPU, if GPU is available
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-   
-    if (args.finetuning == 'SubjQA') or (args.finetuning == 'combined'):
+    
+    # set some crucial hyperparameters
+    max_seq_length = 512 # BERT cannot deal with sequences, where T > 512
+    doc_stride = 200
+    max_query_length = 50
+    batch_size = args.batch_size
+    
+    # create domain_to_idx and dataset_to_idx mappings (necessary for auxiliary tasks)
+    domains = ['books', 'electronics', 'grocery', 'movies', 'restaurants', 'tripadvisor', 'all', 'wikipedia']
+    datasets = ['SQuAD', 'SubjQA']
+    idx_to_domain = dict(enumerate(domains))
+    domain_to_idx = {domain: idx for idx, domain in enumerate(domains)}
+    idx_to_dataset = dict(enumerate(datasets))
+    dataset_to_idx = {dataset: idx for idx, dataset in enumerate(datasets)}
+    
+     # TODO: figure out, whether we should use pretrained weights from 'bert-base-cased' or 'bert-base-uncased' model
+    if args.bert_weights == 'cased':
         
-        if args.version == 'train':
+        bert_tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
+        pretrained_weights = 'bert-large-cased-whole-word-masking-finetuned-squad'
+        
+    elif args.bert_weights == 'uncased':
+        
+        bert_tokenizer == BertTokenizer.from_pretrained('bert-base-uncased')
+        pretrained_weights = 'bert-large-uncased-whole-word-masking-finetuned-squad'
+        
+    else:
+        raise ValueError('Pretrained weights must be loaded from an uncased or cased BERT model.')
+   
+    if args.version == 'train':
+        
+        if args.finetuning == 'SubjQA' or args.finetuning == 'combined':
         
             subjqa_data_train = get_data(
                                          source='/SubjQA/',
@@ -92,9 +110,9 @@ if __name__ == '__main__':
             
             # convert dictionaries into instances of preprocessed question-answer-review examples    
             subjqa_examples_train = create_examples(
-                                                subjqa_data_train,
-                                                source='SubjQA',
-                                                is_training=True,
+                                                    subjqa_data_train,
+                                                    source='SubjQA',
+                                                    is_training=True,
             )
 
             subjqa_examples_dev = create_examples(
@@ -102,32 +120,40 @@ if __name__ == '__main__':
                                                   source='SubjQA',
                                                   is_training=True,
             )
+            
+            subjqa_features_train = convert_examples_to_features(
+                                                                 subjqa_examples_train, 
+                                                                 bert_tokenizer,
+                                                                 max_seq_length=max_seq_length,
+                                                                 doc_stride=doc_stride,
+                                                                 max_query_length=max_query_length,
+                                                                 is_training=True,
+                                                                 domain_to_idx=domain_to_idx,
+                                                                 dataset_to_idx=dataset_to_idx,
+            )
 
-        elif args.version == 'test':
-            
-            subjqa_data_test = get_data(
-                                        source='/SubjQA/',
-                                        split='/test',
-                                        domain='all',
+            subjqa_features_dev = convert_examples_to_features(
+                                                               subjqa_examples_dev, 
+                                                               bert_tokenizer,
+                                                               max_seq_length=max_seq_length,
+                                                               doc_stride=doc_stride,
+                                                               max_query_length=max_query_length,
+                                                               is_training=True,
+                                                               domain_to_idx=domain_to_idx,
+                                                               dataset_to_idx=dataset_to_idx,
             )
             
-            subjqa_data_test = convert_df_to_dict(
-                                                  subjqa_data_test,
-                                                  split='test',
+            subjqa_tensor_dataset_train = create_tensor_dataset(
+                                                                subjqa_features_train,
+                                                                evaluate=False,
             )
-            
-            subjqa_examples_test = create_examples(
-                                                   subjqa_data_test,
-                                                   source='SubjQA',
-                                                   is_training=True,
+
+            subjqa_tensor_dataset_dev = create_tensor_dataset(
+                                                              subjqa_features_dev,
+                                                              evaluate=False,
             )
-            
-        else:
-            raise ValueError('Version of experiment must be one of {train, test}')
-        
-    elif (args.finetuning == 'SQuAD') or (args.finetuning == 'combined'):
-        
-        if args.version == 'train':
+                
+        elif args.finetuning == 'SQuAD' or args.finetuning == 'combined':
             
             squad_data_train = get_data(
                                         source='/SQuAD/',
@@ -142,29 +168,132 @@ if __name__ == '__main__':
 
             # create train and dev examples from SQuAD train set only
             squad_examples_train, squad_examples_dev = split_into_train_and_dev(squad_examples_train)
-   
-    # TODO: figure out, whether we should use pretrained weights from 'bert-base-cased' or 'bert-base-uncased' model
-    if args.bert_weights == 'cased':
-        bert_tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
-        pretrained_weights = 'bert-large-cased-whole-word-masking-finetuned-squad'
-    elif args.bert_weights == 'uncased':
-        bert_tokenizer == BertTokenizer.from_pretrained('bert-base-uncased')
-        pretrained_weights = 'bert-large-uncased-whole-word-masking-finetuned-squad'
-    else:
-        raise ValueError('Pretrained weights must be loaded from an uncased or cased BERT model')
+            
+            
+            squad_features_train = convert_examples_to_features(
+                                                                squad_examples_train, 
+                                                                bert_tokenizer,
+                                                                max_seq_length=max_seq_length,
+                                                                doc_stride=doc_stride
+                                                                max_query_length=max_query_length,
+                                                                is_training=True,
+                                                                domain_to_idx=domain_to_idx,
+                                                                dataset_to_idx=dataset_to_idx,
+            )
+
+            squad_features_dev = convert_examples_to_features(
+                                                             squad_examples_dev, 
+                                                             bert_tokenizer,
+                                                             max_seq_length=max_seq_length,
+                                                             doc_stride=doc_stride
+                                                             max_query_length=max_query_length,
+                                                             is_training=True,
+                                                             domain_to_idx=domain_to_idx,
+                                                             dataset_to_idx=dataset_to_idx,
+            )
+            
+            squad_tensor_dataset_train = create_tensor_dataset(
+                                                   squad_features_train,
+                                                   evaluate=False,
+            )
+
+            squad_tensor_dataset_dev = create_tensor_dataset(
+                                                 squad_features_dev,
+                                                 evaluate=False,
+            )
+        
+        if args.finetuning == 'SQuAD':
+            
+            train_dl = create_batches(
+                                      dataset=squad_tensor_dataset_train,
+                                      batch_size=batch_size,
+                                      split='train',
+            )
+
+            val_dl = create_batches(
+                                    dataset=squad_tensor_dataset_dev,
+                                    batch_size=batch_size,
+                                    split='eval',
+            )
+            
+        elif args.finetuning == 'SubjQA':
+            
+            train_dl = create_batches(
+                                      dataset=subjqa_tensor_dataset_train,
+                                      batch_size=batch_size,
+                                      split='train',
+            )
+
+            val_dl = create_batches(
+                                    dataset=subjqa_tensor_dataset_dev,
+                                    batch_size=batch_size,
+                                    split='eval',
+            )
+                
+        elif args.finetuning == 'combined':
+            
+            train_dl = AlternatingBatchGenerator(
+                                                 squad_tensor_dataset_train,
+                                                 subjqa_tensor_dataset_train,
+                                                 batch_size=batch_size,
+                                                 split='train',
+            )
+
+            val_dl = AlternatingBatchGenerator(
+                                               squad_tensor_dataset_train,
+                                               subjqa_tensor_dataset_train,
+                                               batch_size=batch_size,
+                                               split='eval',
+            )
+                
+        
+    # we always test on SubjQA
+    elif args.version == 'test':
+            
+            subjqa_data_test = convert_df_to_dict(
+                                                  subjqa_data_test,
+                                                  split='test',
+            )
+            
+            # convert dictionaries into instances of preprocessed question-answer-review examples    
+            subjqa_examples_test = create_examples(
+                                                   subjqa_data_test,
+                                                   source='SubjQA',
+                                                   is_training=True,
+            )
+            
+            subjqa_features_test = convert_examples_to_features(
+                                                                subjqa_examples_test, 
+                                                                bert_tokenizer,
+                                                                max_seq_length=max_seq_length,
+                                                                doc_stride=doc_stride,
+                                                                max_query_length=max_query_length,
+                                                                is_training=True,
+                                                                domain_to_idx=domain_to_idx,
+                                                                dataset_to_idx=dataset_to_idx,
+            )
+            
+            subjqa_tensor_dataset_test = create_tensor_dataset(
+                                                               subjqa_features_test,
+                                                               evaluate=False,
+            )  
+            
+            test_dl = create_batches(
+                                     dataset=subjqa_tensor_dataset_test,
+                                     batch_size=batch_size,
+                                     split='eval',
+            )
+            
+            
+    # initialise QA model
+    qa_head_name = 'RecurrentQAHead' if args.qa_head == 'recurrent' else 'LinearQAHead'
+    model = BertForQA.from_pretrained(
+                                      pretrained_weights,
+                                      qa_head_name=qa_head_name,
+                                      max_seq_length=max_seq_length,
+                                      highway_connection=args.highway_connection,
+                                      multitask=args.multitask,
+    )
     
-    # set hyperparameters
-    max_seq_length = 512 # BERT cannot deal with sequences, where T > 512
-    batch_size = args.batch_size
-    
-    # create domain_to_idx and dataset_to_idx mappings (necessary for auxiliary tasks)
-    domains = ['books', 'electronics', 'grocery', 'movies', 'restaurants', 'tripadvisor', 'all', 'wikipedia']
-    datasets = ['SQuAD', 'SubjQA']
-    idx_to_domain = dict(enumerate(domains))
-    domain_to_idx = {domain: idx for idx, domain in enumerate(domains)}
-    idx_to_dataset = dict(enumerate(datasets))
-    dataset_to_idx = {dataset: idx for idx, dataset in enumerate(datasets)}
-    
-    
-    
-    
+    # set model to device
+    model.to(device)

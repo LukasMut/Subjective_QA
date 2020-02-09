@@ -736,18 +736,18 @@ def create_tensor_dataset(
             all_end_positions = torch.tensor([f.end_position for f in features], dtype=torch.long)
             
             dataset = TensorDataset(
-                all_input_ids,
-                all_input_mask,
-                all_segment_ids,
-                all_input_lengths,
-                all_start_positions,
-                all_end_positions,
-                all_cls_index,
-                all_p_mask,
-                all_q_sbj,
-                all_a_sbj,
-                all_domains,
-                all_datasets,
+                                    all_input_ids,
+                                    all_input_mask,
+                                    all_segment_ids,
+                                    all_input_lengths,
+                                    all_start_positions,
+                                    all_end_positions,
+                                    all_cls_index,
+                                    all_p_mask,
+                                    all_q_sbj,
+                                    all_a_sbj,
+                                    all_domains,
+                                    all_datasets,
             )
 
         return dataset
@@ -798,6 +798,7 @@ def create_alternating_batches(
             idx += batch_size
         return chunked_dataset
     
+    # TODO: figure out, whether this step is actually necessary (do we want to shuffle dataset before chunking?)
     if split == 'train':
         # during training randomly sample examples (hence, shuffle the dataset)
         np.random.shuffle(dataset_squad)
@@ -814,8 +815,9 @@ def create_alternating_batches(
                                            batch_size=batch_size,
     )
     dataset_squad_chunked.extend(dataset_subjqa_chunked)
-    #if split == 'train':
-    #    np.random.shuffle(dataset_squad_chunked)
+    if split == 'train':
+        # we don't want to present SQuAD and SubjQA examples to the model always in alternation (otherwise, MTL won't work)
+        np.random.shuffle(dataset_squad_chunked)
     dataset_combined = dataset_squad_chunked
     
     assert len(dataset_combined) == n_batches_total, 'Dataset does not contain correct number of chunked examples'
