@@ -17,10 +17,7 @@ import transformers
 
 from collections import Counter, defaultdict
 from tqdm import trange, tqdm
-from torch.optim import Adam
-from transformers import AdamW
 from transformers import BertTokenizer, BertModel, BertForQuestionAnswering
-from transformers import get_cosine_with_hard_restarts_schedule_with_warmup, get_linear_schedule_with_warmup
 
 from eval_squad import compute_exact, compute_f1
 
@@ -124,7 +121,8 @@ def train(
           args,
           scheduler=None,
 ):
-    n_examples = len(train_dl) * batch_size
+    n_iters = len(train_dl)
+    n_examples = n_iters * batch_size
     
     if args["freeze_bert"]:
         model = freeze_transformer_layers(model)
@@ -150,7 +148,7 @@ def train(
         tr_loss, correct_answers, batch_f1 = 0, 0, 0
         nb_tr_examples, nb_tr_steps = 0, 0
 
-        for step, batch in enumerate(tqdm(train_dl, desc="Iteration")):
+        for i, batch in enumerate(tqdm(train_dl, desc="Iteration")):
             
             batch_loss = 0
 
@@ -169,6 +167,9 @@ def train(
                                                                                                         b_start_pos,
                                                                                                         b_end_pos,
             )
+            
+            if args['optim'] == 'SGD' and not isinstance(scheduler, type(None)):
+                scheduler.step(epoch + i / n_iters)
             
             # zero-out gradients
             optimizer.zero_grad()
@@ -228,7 +229,7 @@ def train(
             optimizer.step()
             
             # scheduler is only necessary, if we optimize through AdamW (BERT specific version of Adam)
-            if not isinstance(scheduler, type(None)):
+            if args['optim'] == 'AdamW' and not isinstance(scheduler, type(None)):
                 scheduler.step()
 
             tr_loss += batch_loss.item()

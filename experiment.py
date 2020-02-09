@@ -14,8 +14,11 @@ import torch
 import transformers
 
 from collections import Counter, defaultdict
+from torch.optim import Adam, SGD, CosineAnnealingWarmRestarts
 from tqdm import trange, tqdm
 from transformers import BertTokenizer, BertModel, BertForQuestionAnswering
+from transformers import AdamW
+from transformers import get_cosine_with_hard_restarts_schedule_with_warmup, get_linear_schedule_with_warmup
 
 from eval_squad import *
 from models.QAModels import *
@@ -269,12 +272,14 @@ if __name__ == '__main__':
         hypers = {
                   "lr_adam": 1e-3,
                   "lr_sgd": 1e-2,
-                  "warmup_steps": 100,
+                  "lr_sgd_cos": 1e-1,
+                  "warmup_steps": 50,
                   "max_grad_norm": 10,
         }
 
         hypers["n_epochs"] = args.n_epochs
         hypers["freeze_bert"] = True if args.finetuning == 'SQuAD' or args.finetuning == 'combined' else False
+        hypers["optim"] = args.optim
         
         if args.optim == 'AdamW':
             
@@ -294,22 +299,32 @@ if __name__ == '__main__':
             
         elif args.optim == 'Adam':
             
-            optimizer = Adam(model.parameters(),
-                             lr=hypers['lr_adam'])
+            optimizer = Adam(
+                             model.parameters(),
+                             lr=hypers['lr_adam'],
+                             amsgrad=True,
+            )
             scheduler = None
         
         elif args.optim == 'SGD':
             
-            optimizer = optim.SGD(model.parameters(),
-                                  lr=hypers['lr_sgd'], 
-                                  momentum=0.9)
-            scheduler = None
+            optimizer = SGD(
+                            model.parameters(),
+                            lr=hypers['lr_sgd_cos'], 
+                            momentum=0.9,
+            )
+            # TODO: figure out, whether cosine-annealing is useful for SGD with momentum when optimizing a BERT-QA model
+            scheduler = None #CosineAnnealingWarmRestarts(
+                             #                       optimizer,
+                             #                       T_0=10,
+                             #                       T_mult=2,
+            #)
         
         else:
             if isinstance(args.optim, str):
                 raise ValueError("Optimizer must be one of {AdamW, Adam, SGD}.")
             else:
-                raise TypeError("Optimizer algorithm must be defined through a string, and has to be one of {AdamW, Adam, SGD}.")
+                raise TypeError("Optimizer must be defined through a string, and has to be one of {AdamW, Adam, SGD}.")
         
         batch_losses, train_losses, train_accs, train_f1s, val_losses, val_accs, val_f1s, model = train(
                                                                                                         model=model,
@@ -321,6 +336,8 @@ if __name__ == '__main__':
                                                                                                         args=hypers,
                                                                                                         scheduler=scheduler,
         )
+        
+        
                 
             
     # we always test on SubjQA
