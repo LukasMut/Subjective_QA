@@ -6,6 +6,7 @@ __all__ = [
            'compute_f1_batch',
            'to_cpu',
            'train',
+           'test',
 ]
 
 import numpy as np
@@ -111,7 +112,6 @@ def to_cpu(
     if to_numpy: return tensor.numpy()
     else: return tensor
 
-# train loop 
 def train(
           model,
           tokenizer,
@@ -128,7 +128,10 @@ def train(
     
     if args["freeze_bert"]:
         model = freeze_transformer_layers(model)
+        print("-----------------------------------------------")
         print("------ Pre-trained BERT model is frozen -------")
+        print("-----------------------------------------------")
+        print()
         
     # store loss and accuracy for plotting
     batch_losses = []
@@ -195,9 +198,9 @@ def train(
             
             batch_loss = (start_loss + end_loss) / 2
             
-            print("-------------------------------")
-            print("Current batch loss: {}".format(batch_loss))
-            print("-------------------------------")
+            print("----------------------------------")
+            print("----- Current batch loss: {} -----".format(batch_loss))
+            print("----------------------------------")
             print()
 
             batch_losses.append(batch_loss.item())
@@ -248,10 +251,10 @@ def train(
             current_batch_f1 = 100 * (batch_f1 / nb_tr_examples)
             current_batch_acc = 100 * (correct_answers / nb_tr_examples)
             
-            print("-------------------------------")
-            print("Current batch exact-match: {} %".format(current_batch_acc))
-            print("Current batch F1: {} %".format(current_batch_f1))
-            print("-------------------------------")
+            print("--------------------------------------------")
+            print("----- Current batch exact-match: {} % -----".format(current_batch_acc))
+            print("----- Current batch F1: {} % -----".format(current_batch_f1))
+            print("--------------------------------------------")
             print()
         
         train_loss = tr_loss / nb_tr_steps
@@ -374,7 +377,6 @@ def train(
        
     return batch_losses, train_losses, train_accs, train_f1s, val_losses, val_accs, val_f1s, model
 
-# test loop
 def test(
           model,
           tokenizer,
@@ -466,11 +468,13 @@ def test(
     test_exact_match = 100 * (correct_answers / n_tr_examples)
     test_f1 = 100 * (batch_f1 / nb_tr_examples)
     
+    print()
     print("-------------------------------")
     print("---------- Inference ----------")
     print("----- Test loss: {} -----".format(test_loss))
     print("----- Test exact-match: {} % -----".format(test_exact_match))
     print("----- Test F1: {} % -----".format(test_f1))
     print("-------------------------------")
+    print()
    
     return test_loss, test_acc, test_f1
