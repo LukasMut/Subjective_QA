@@ -9,6 +9,16 @@ import torch.nn.functional as F
 
 from models.Encoder import *
 from models.Highway import Highway
+
+
+is_cuda = torch.cuda.is_available()
+
+if is_cuda:
+    device = torch.device("cuda")
+    print("GPU is available")
+else:
+    device = torch.device("cpu")
+    print("GPU not available, CPU used")
        
 class LinearQAHead(nn.Module):
     

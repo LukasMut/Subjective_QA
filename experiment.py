@@ -20,10 +20,26 @@ from models.QAModels import *
 from models.utils import *
 from utils import *
 
+# set random seeds to reproduce results
+np.random.seed(42)
+random.seed(42)
+torch.manual_seed(42)
+
+# move model and tensors to GPU, if GPU is available
+is_cuda = torch.cuda.is_available()
+
+if is_cuda:
+    device = torch.device("cuda")
+    print("GPU is available")
+else:
+    device = torch.device("cpu")
+    print("GPU not available, CPU used")
+print()
+    
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--finetuning',  type=str, default='SQuAD',
-            help='If SQuAD, fine tune on SQuAD only; if SubjQA, fine tune on SubjQA only; if both, fine tune on both SQuAD and SubjQA.')
+            help='If SQuAD, fine tune on SQuAD only; if SubjQA, fine tune on SubjQA only; if combined, fine tune on both SQuAD and SubjQA simultaneously.')
     parser.add_argument('--version',  type=str, default='train',
             help='If train, then train model on train set(s); if test, then evaluate model on test set(s).')
     parser.add_argument('--multitask', action='store_true',
@@ -41,11 +57,14 @@ if __name__ == '__main__':
     parser.add_argument('--sd', type=str, default='',
             help='set model save directory for QA model.')
     args = parser.parse_args()
+    
+    # check whether arg.parser works correctly
     print(args)
+    print()
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
    
-    if (args.finetuning == 'SubjQA') or (args.finetuning == 'both'):
+    if (args.finetuning == 'SubjQA') or (args.finetuning == 'combined'):
         
         if args.version == 'train':
         
@@ -106,7 +125,7 @@ if __name__ == '__main__':
         else:
             raise ValueError('Version of experiment must be one of {train, test}')
         
-    elif (args.finetuning == 'SQuAD') or (args.finetuning == 'both'):
+    elif (args.finetuning == 'SQuAD') or (args.finetuning == 'combined'):
         
         if args.version == 'train':
             
@@ -138,12 +157,14 @@ if __name__ == '__main__':
     max_seq_length = 512 # BERT cannot deal with sequences, where T > 512
     batch_size = args.batch_size
     
-    # create domain_to_idx and dataset_to_idx mappings
+    # create domain_to_idx and dataset_to_idx mappings (necessary for auxiliary tasks)
     domains = ['books', 'electronics', 'grocery', 'movies', 'restaurants', 'tripadvisor', 'all', 'wikipedia']
     datasets = ['SQuAD', 'SubjQA']
     idx_to_domain = dict(enumerate(domains))
     domain_to_idx = {domain: idx for idx, domain in enumerate(domains)}
     idx_to_dataset = dict(enumerate(datasets))
     dataset_to_idx = {dataset: idx for idx, dataset in enumerate(datasets)}
+    
+    
     
     

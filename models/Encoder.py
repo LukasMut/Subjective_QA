@@ -9,16 +9,14 @@ import torch.nn.functional as F
 
 from models.utils import to_cpu
 
-# torch.cuda.is_available() checks and returns True if a GPU is available, else it'll return False
-#is_cuda = torch.cuda.is_available()
+is_cuda = torch.cuda.is_available()
 
-#if is_cuda:
-#    device = torch.device("cuda")
-#    print("GPU is available")
-#else:
-
-device = torch.device("cpu")
-print("GPU not available, CPU used")
+if is_cuda:
+    device = torch.device("cuda")
+    print("GPU is available")
+else:
+    device = torch.device("cpu")
+    print("GPU not available, CPU used")
 
 class EncoderLSTM(nn.Module):
     

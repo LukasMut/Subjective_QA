@@ -8,6 +8,20 @@ from models.Encoder import *
 from models.Highway import Highway
 from models.QAHeads import *
 
+# set random seeds to reproduce results
+np.random.seed(42)
+random.seed(42)
+torch.manual_seed(42)
+
+# move model to GPU, if GPU is available
+is_cuda = torch.cuda.is_available()
+
+if is_cuda:
+    device = torch.device("cuda")
+    print("GPU is available")
+else:
+    device = torch.device("cpu")
+    print("GPU not available, CPU used")
 
 class BertForQA(BertPreTrainedModel):
     

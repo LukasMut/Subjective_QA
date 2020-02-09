@@ -24,6 +24,11 @@ from transformers import get_cosine_with_hard_restarts_schedule_with_warmup, get
 
 from eval_squad import compute_exact, compute_f1
 
+# set random seeds to reproduce results
+np.random.seed(42)
+random.seed(42)
+torch.manual_seed(42)
+
 #torch.cuda.is_available() checks and returns True if a GPU is available, else it'll return False
 is_cuda = torch.cuda.is_available()
 

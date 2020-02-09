@@ -7,6 +7,7 @@ __all__ = [
            'create_examples',
            'convert_examples_to_features',
            'create_tensor_dataset',
+           'create_alternating_batches',
            'create_batches',
            'split_into_train_and_dev',
            'sort_dict', 
@@ -33,6 +34,11 @@ from collections import defaultdict, Counter
 from transformers.tokenization_bert import BasicTokenizer, whitespace_tokenize
 from tqdm.auto import trange, tqdm
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, TensorDataset
+
+# set random seeds to reproduce results
+np.random.seed(42)
+random.seed(42)
+torch.manual_seed(42)
 
 def get_file(
              subdir:str,
@@ -744,30 +750,100 @@ def create_tensor_dataset(
             )
 
         return dataset
-                 
 
+
+                
+## Generator of batches from SQuAD AND SubjQA (each batch consists of n = batch_size examples from SQuAD XOR SubjQA) ##
+
+class AlternatingBatchGenerator(object):
+    
+    def __init__(
+                 self,
+                 dataset_squad:torch.Tensor,
+                 dataset_subjqa:torch.Tensor,
+                 batch_size:int,
+                 split:str='train',
+    ):
+        self.dataset_squad = dataset_squad
+        self.dataset_subjqa = dataset_subjqa
+        self.batch_size = batch_size
+        self.n_batches = (len(dataset_squad) + len(dataset_subjqa)) // batch_size
+        self.split = split
+    
+    def __len__(self):
+        return self.n_batches
+    
+    def __iter__(self):
+        return create_alternating_batches(self.dataset_squad, self.dataset_subjqa, self.batch_size, self.n_batches, self.split)
+
+def create_alternating_batches(
+                               dataset_squad:torch.Tensor,
+                               dataset_subjqa:torch.Tensor,
+                               batch_size:int,
+                               n_batches_total:int,
+                               split:str='train',
+):
+    n_squad_examples, n_subjqa_examples = len(dataset_squad), len(dataset_subjqa)
+    
+    def chunk_dataset(
+                      dataset:torch.Tensor,
+                      n_examples:int,
+                      batch_size:int,
+    ):
+        chunked_dataset = []
+        idx = 0
+        for _ in range(n_examples // batch_size):
+            chunked_dataset.append(dataset[idx: idx + batch_size])
+            idx += batch_size
+        return chunked_dataset
+    
+    if split == 'train':
+        # during training randomly sample examples (hence, shuffle the dataset)
+        np.random.shuffle(dataset_squad)
+        np.random.shuffle(dataset_subjqa)
+        
+    dataset_squad_chunked = chunk_dataset(
+                                          dataset=dataset_squad,
+                                          n_examples=n_squad_examples, 
+                                          batch_size=batch_size,
+    )
+    dataset_subjqa_chunked = chunk_dataset(
+                                           dataset=dataset_subjqa,
+                                           n_examples=n_subjqa_examples,
+                                           batch_size=batch_size,
+    )
+    dataset_squad_chunked.extend(dataset_subjqa_chunked)
+    #if split == 'train':
+    #    np.random.shuffle(dataset_squad_chunked)
+    dataset_combined = dataset_squad_chunked
+    
+    assert len(dataset_combined) == n_batches_total, 'Dataset does not contain correct number of chunked examples'
+    
+    for batch in dataset_combined:
+        yield batch
+
+# create batches for SQuAD OR SubjQA separately
 def create_batches(
                    dataset:torch.Tensor, 
                    batch_size:int,
                    split:str='train', 
 ):
-    """
-    Args:
-        dataset (torch.Tensor): TensorDataset
-        batch_size (int): number of sequences in each mini-batch
-        split (str): training or eval setup
-        num_samples (int): number of samples to draw (equivalent to number of iterations)
-    Return:
-        PyTorch data loader (DataLoader object)
-    """
     if split == 'train':
        # during training randomly sample examples
-        sampler = RandomSampler(dataset, replacement=False)
+        sampler = RandomSampler(
+                                dataset,
+                                replacement=False,
+        )
     elif split == 'eval':
-        # during testing sequentially sample elements from the test set (i.e., always sample in the same order)
+        # during testing sequentially sample examples from the test set (alwas present in the same order)
         sampler = SequentialSampler(dataset)
-    dl = DataLoader(dataset, sampler=sampler, batch_size=batch_size)
+    dl = DataLoader(
+                    dataset,
+                    sampler=sampler,
+                    batch_size=batch_size,
+    )
     return dl
+
 
 ## Helper functions to compute descriptive statistics ##
 
