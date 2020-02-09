@@ -158,15 +158,16 @@ def train(
             # unpack inputs from dataloader            
             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_cls_indexes, _, _, _, _, _ = batch
             
-            # sort sequences in batch in decreasing order w.r.t. to (original) sequence length
-            b_input_ids, b_attn_masks, b_type_ids, b_input_lengths, b_start_pos, b_end_pos = sort_batch(
-                                                                                                        b_input_ids,
-                                                                                                        b_attn_masks,
-                                                                                                        b_token_type_ids,
-                                                                                                        b_input_lengths,
-                                                                                                        b_start_pos,
-                                                                                                        b_end_pos,
-            )
+            if args["sort_batch"]:
+                # sort sequences in batch in decreasing order w.r.t. to (original) sequence length
+                b_input_ids, b_attn_masks, b_type_ids, b_input_lengths, b_start_pos, b_end_pos = sort_batch(
+                                                                                                            b_input_ids,
+                                                                                                            b_attn_masks,
+                                                                                                            b_token_type_ids,
+                                                                                                            b_input_lengths,
+                                                                                                            b_start_pos,
+                                                                                                            b_end_pos,
+                )
             
             if args['optim'] == 'SGD' and not isinstance(scheduler, type(None)):
                 scheduler.step(epoch + i / n_iters)
@@ -276,16 +277,16 @@ def train(
             # unpack inputs from dataloader            
             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_cls_indexes, _, _, _, _, _ = batch
             
-            
-            # sort sequences in batch in decreasing order w.r.t. to (original) sequence length
-            b_input_ids, b_attn_masks, b_type_ids, b_input_lengths, b_start_pos, b_end_pos = sort_batch(
-                                                                                                        b_input_ids,
-                                                                                                        b_attn_masks,
-                                                                                                        b_token_type_ids,
-                                                                                                        b_input_lengths,
-                                                                                                        b_start_pos,
-                                                                                                        b_end_pos,
-            )
+            if args["sort_batch"]:
+                # sort sequences in batch in decreasing order w.r.t. to (original) sequence length
+                b_input_ids, b_attn_masks, b_type_ids, b_input_lengths, b_start_pos, b_end_pos = sort_batch(
+                                                                                                            b_input_ids,
+                                                                                                            b_attn_masks,
+                                                                                                            b_token_type_ids,
+                                                                                                            b_input_lengths,
+                                                                                                            b_start_pos,
+                                                                                                            b_end_pos,
+                )
             
             with torch.no_grad():
                 
@@ -351,3 +352,101 @@ def train(
         val_f1s.append(val_f1)
        
     return batch_losses, train_losses, train_accs, train_f1s, val_losses, val_accs, val_f1s, model
+
+def test(
+          model,
+          tokenizer,
+          test_dl,
+          batch_size:int,
+          sort_batch:bool=False,
+):
+    n_iters = len(test_dl)
+    n_examples = n_iters * batch_size
+       
+    ### Inference ###
+
+    # set model to eval mode
+    model.eval()
+
+    correct_answers_test, batch_f1_test = 0, 0
+    test_f1, test_loss = 0, 0
+    nb_test_steps = 0
+
+    for batch in test_dl:
+
+        batch_loss_test = 0
+
+        # add batch to current device
+        batch = tuple(t.to(device) for t in batch)
+
+        # unpack inputs from dataloader            
+        b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_cls_indexes, _, _, _, _, _ = batch
+
+        if sort_batch:
+            # sort sequences in batch in decreasing order w.r.t. to (original) sequence length
+            b_input_ids, b_attn_masks, b_type_ids, b_input_lengths, b_start_pos, b_end_pos = sort_batch(
+                                                                                                        b_input_ids,
+                                                                                                        b_attn_masks,
+                                                                                                        b_token_type_ids,
+                                                                                                        b_input_lengths,
+                                                                                                        b_start_pos,
+                                                                                                        b_end_pos,
+            )
+
+        with torch.no_grad():
+
+            start_logits_test, end_logits_test = model(
+                                                     input_ids=b_input_ids,
+                                                     attention_masks=b_attn_masks,
+                                                     token_type_ids=b_token_type_ids,
+                                                     input_lengths=b_input_lengths,
+            )
+
+            start_true_test = to_cpu(b_start_pos)
+            end_true_test = to_cpu(b_end_pos)
+
+            # start and end loss must be computed separately
+            start_loss = loss_func(start_logits_test, b_start_pos)
+            end_loss = loss_func(end_logits_test, b_end_pos)
+
+            batch_loss_test = (start_loss + end_loss) / 2
+
+            start_log_probs_test = to_cpu(F.log_softmax(start_logits_test, dim=1), detach=True, to_numpy=False)
+            end_log_probs_test = to_cpu(F.log_softmax(end_logits_test, dim=1), detach=True, to_numpy=False)
+
+            pred_answers = get_answers(
+                                       tokenizer=tokenizer,
+                                       b_input_ids=b_input_ids,
+                                       start_logs=start_log_probs_test,
+                                       end_logs=end_log_probs_test,
+                                       predictions=True,
+            )
+
+            true_answers = get_answers(
+                                       tokenizer=tokenizer,
+                                       b_input_ids=b_input_ids,
+                                       start_logs=b_start_pos,
+                                       end_logs=b_end_pos,
+                                       predictions=False,
+            )
+
+            correct_answers_test += compute_exact_batch(true_answers, pred_answers)
+            batch_f1_test += compute_f1_batch(true_answers, pred_answers)
+
+            test_loss += batch_loss_test.item()
+            nb_test_examples += b_input_ids.size(0)
+            nb_test_steps += 1
+
+            current_batch_f1 = 100 * (batch_f1_test / nb_test_examples)
+            current_batch_acc = 100 * (correct_answers_test / nb_test_examples)
+
+    test_loss = test_loss / nb_test_steps
+    test_exact_match = 100 * (correct_answers / n_tr_examples)
+    test_f1 = 100 * (batch_f1 / nb_tr_examples)
+
+    print("---------- Inference ----------")
+    print("----- Total test loss: {} -----".format(test_loss))
+    print("----- Test exact-match: {} % -----".format(test_exact_match))
+    print("----- Test F1: {} % -----".format(test_f1))
+   
+    return test_loss, test_acc, test_f1

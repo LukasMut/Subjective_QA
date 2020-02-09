@@ -32,9 +32,9 @@ torch.manual_seed(42)
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--finetuning',  type=str, default='SQuAD',
+    parser.add_argument('--finetuning', type=str, default='SQuAD',
             help='If SQuAD, fine tune on SQuAD only; if SubjQA, fine tune on SubjQA only; if combined, fine tune on both SQuAD and SubjQA simultaneously.')
-    parser.add_argument('--version',  type=str, default='train',
+    parser.add_argument('--version', type=str, default='train',
             help='If train, then train model on train set(s); if test, then evaluate model on SubjQA test set.')
     parser.add_argument('--multitask', action='store_true',
             help='If provided, MTL instead of STL setting.')
@@ -275,6 +275,7 @@ if __name__ == '__main__':
                   "lr_sgd_cos": 1e-1,
                   "warmup_steps": 50,
                   "max_grad_norm": 10,
+                  "sort_batch": False, # TODO: figure out, whether we should sort batch for RNNs (not necessary for linear QA heads)
         }
 
         hypers["n_epochs"] = args.n_epochs
@@ -321,11 +322,8 @@ if __name__ == '__main__':
             #)
         
         else:
-            if isinstance(args.optim, str):
-                raise ValueError("Optimizer must be one of {AdamW, Adam, SGD}.")
-            else:
-                raise TypeError("Optimizer must be defined through a string, and has to be one of {AdamW, Adam, SGD}.")
-        
+            raise ValueError("Optimizer must be one of {AdamW, Adam, SGD}.")
+                    
         batch_losses, train_losses, train_accs, train_f1s, val_losses, val_accs, val_f1s, model = train(
                                                                                                         model=model,
                                                                                                         tokenizer=bert_tokenizer,
@@ -375,4 +373,14 @@ if __name__ == '__main__':
                                      dataset=subjqa_tensor_dataset_test,
                                      batch_size=batch_size,
                                      split='eval',
+            )
+            
+            saved_model = 
+            
+            test_loss, test_acc, test_f1 = test(
+                                                model=saved_model,
+                                                tokenizer=bert_tokenizer,
+                                                test_dl=test_dl,
+                                                batch_size=batch_size,
+                                                sort_batch=False,
             )
