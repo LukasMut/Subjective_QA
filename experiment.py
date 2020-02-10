@@ -1,7 +1,6 @@
 from __future__ import absolute_import, division, print_function
 
 import numpy as np
-import pandas as pd
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -9,13 +8,13 @@ import argparse
 import datetime
 import json
 import os
+import random
 import re
 import torch 
 import transformers
 
 from collections import Counter, defaultdict
 from torch.optim import Adam, SGD, CosineAnnealingWarmRestarts
-from tqdm import trange, tqdm
 from transformers import BertTokenizer, BertModel, BertForQuestionAnswering
 from transformers import AdamW
 from transformers import get_cosine_with_hard_restarts_schedule_with_warmup, get_linear_schedule_with_warmup
@@ -54,6 +53,8 @@ if __name__ == '__main__':
             help='Define optimizer. Must be one of {AdamW, Adam, SGD}.')
     parser.add_argument('--sd', type=str, default='',
             help='set model save directory for QA model.')
+    parser.add_argument('--not_finetuned', action='store_true',
+            help='If provided, test pre-trained BERT large model, fine-tuned on SQuAD, on SubjQA (no prior task-specific fine-tuning)')
     args = parser.parse_args()
     
     # see whether arg.parser works correctly
@@ -90,7 +91,12 @@ if __name__ == '__main__':
         
     else:
         raise ValueError('Pretrained weights must be loaded from an uncased or cased BERT model.')
-   
+                    
+    qa_head_name = 'RecurrentQAHead' if args.qa_head == 'recurrent' else 'LinearQAHead'
+    highway = 'Highway' if args.highway_connection else ''
+    train_method = 'multitask' + '_' + str(args.n_tasks) if args.multitask else 'singletask'
+    model_name = 'BERT' + '_' + args.bert_weights + '_' + qa_head_name + '_' + highway + '_' + train_method
+    
     if args.version == 'train':
         
         if args.finetuning == 'SubjQA' or args.finetuning == 'combined':
@@ -255,10 +261,6 @@ if __name__ == '__main__':
                                                split='eval',
             )
         
-        qa_head_name = 'RecurrentQAHead' if args.qa_head == 'recurrent' else 'LinearQAHead'
-        highway = 'Highway' if args.highway_connection else ''
-        train_method = 'multitask' + '_' + str(args.n_tasks) if args.multitask else 'singletask'
-        
         # initialise QA model
         model = BertForQA.from_pretrained(
                                           pretrained_weights,
@@ -284,7 +286,7 @@ if __name__ == '__main__':
         hypers["freeze_bert"] = True if args.finetuning == 'SQuAD' or args.finetuning == 'combined' else False
         hypers["optim"] = args.optim
         hypers["model_dir"] = args.sd
-        hypers["model_name"] = 'BERT' + '_' + bert_weights + '_' + qa_head_name + '_' + highway + '_' + train_method
+        hypers["model_name"] = model_name
         
         if args.optim == 'AdamW':
             
@@ -338,10 +340,22 @@ if __name__ == '__main__':
                                                                                                         optimizer=optimizer,
                                                                                                         scheduler=scheduler,
                                                                                                         early_stopping=True,
-        )  
+        )
         
-        # TODO: save data
+        train_results  = dict()
+        train_results['batch_losses'] = batch_losses
+        train_results['train_losses'] = train_losses
+        train_results['train_accs'] = train_accs
+        train_results['train_f1s'] = train_f1s
+        train_results['val_losses'] = val_losses
+        train_results['val_accs'] = val_accs
+        train_results['val_f1s'] = val_f1s
             
+        with open('./results_train/' + model_name + '.json', 'w') as json_file:
+            json.dump(train_results, json_file)
+        
+        # TODO: implement model unfreezing (necessary for fine-tuning on SubjQA - freeze for ~ 2 epochs, unfreeze, train as long as for other setting)
+        
     # we always test on SubjQA
     elif args.version == 'test':
             
@@ -379,12 +393,33 @@ if __name__ == '__main__':
                                      split='eval',
             )
             
-            saved_model = # load saved model
+            if args.not_finetuned:
+                # test (simple) BERT-QA-model fine-tuned on SQuAD without (prior)task-specific fine-tuning on SubjQA
+                model = BertForQuestionAnswering.from_pretrained(pretrained_weights)
+                model_name = 'BERT_pretrained_SQuAD_no_fine_tuning'
+            else:
+                model = BertForQA.from_pretrained(
+                                                  pretrained_weights,
+                                                  qa_head_name=qa_head_name,
+                                                  max_seq_length=max_seq_length,
+                                                  highway_connection=args.highway_connection,
+                                                  multitask=args.multitask,
+                )
+                model.load_state_dict(torch.load(args.sd + '/%s' % (model_name)))
+                                                                 
             
             test_loss, test_acc, test_f1 = test(
-                                                model=saved_model,
+                                                model=model,
                                                 tokenizer=bert_tokenizer,
                                                 test_dl=test_dl,
                                                 batch_size=batch_size,
                                                 sort_batch=False,
             )
+            
+            test_results = dict()
+            test_results['test_loss'] = test_loss
+            test_results['test_acc'] = test_acc
+            test_results['test_f1'] = test_f1
+            
+            with open('./results_test/' + model_name + '.json', 'w') as json_file:
+                json.dump(test_results, json_file)

@@ -1,7 +1,10 @@
 __all__ = ['BertForQA']
 
-import torch
+import numpy as np
 import torch.nn as nn
+
+import random
+import torch
 
 from transformers import BertModel, BertPreTrainedModel
 from models.Encoder import *

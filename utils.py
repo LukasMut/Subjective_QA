@@ -7,7 +7,7 @@ __all__ = [
            'create_examples',
            'convert_examples_to_features',
            'create_tensor_dataset',
-           'AlternatingBatchGenerator'
+           'AlternatingBatchGenerator',
            'create_alternating_batches',
            'create_batches',
            'split_into_train_and_dev',
@@ -26,6 +26,7 @@ import pandas as pd
 
 import json
 import os
+import random
 import re
 import string
 import torch

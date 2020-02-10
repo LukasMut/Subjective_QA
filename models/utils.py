@@ -10,6 +10,7 @@ __all__ = [
 ]
 
 import numpy as np
+import random
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -143,8 +144,7 @@ def train(
     val_f1s = []
     
     # path to save models
-    PATH = os.getcwd()
-    model_path = PATH + args['model_dir']
+    model_path = args['model_dir'] 
         
     loss_func = nn.CrossEntropyLoss()
 
@@ -365,7 +365,7 @@ def train(
         print()
         
         if (epoch == 0) or (val_exact_match > val_accs[-1]):
-            torch.save(model.state_dict(), model_path + '/epoch_%d.%s' % (epoch, args.model_name))
+            torch.save(model.state_dict(), model_path + '/%s' % (args.model_name))
         
         val_losses.append(val_loss)
         val_accs.append(val_exact_match)
