@@ -112,7 +112,7 @@ if __name__ == '__main__':
     
     if args.version == 'train':
         
-        if args.finetuning == 'SubjQA' or args.finetuning == 'combined':
+        if args.finetuning == 'SubjQA':
         
             subjqa_data_train_df, hidden_domain_idx_train = get_data(
                                                                      source='/SubjQA/',
@@ -182,8 +182,37 @@ if __name__ == '__main__':
                                                               subjqa_features_dev,
                                                               evaluate=False,
             )
+            
+            train_dl = create_batches(
+                                      dataset=subjqa_tensor_dataset_train,
+                                      batch_size=batch_size,
+                                      split='train',
+            )
+
+            val_dl = create_batches(
+                                    dataset=subjqa_tensor_dataset_dev,
+                                    batch_size=batch_size,
+                                    split='eval',
+            )
+            
+            if args.multitask:
+                assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
+                if args.n_aux_tasks == 2:
+                    subjqa_domains = [f.domain for f in subjqa_features_train]
+                    domain_weights = get_class_weights(
+                                                       subjqa_classes=subjqa_domains,
+                                                       idx_to_class=idx_to_domains,
+                ) 
+                if qa_type == 'question':
+                    subjqa_qa_types = [f.q_sbj for f in subjqa_features_train] 
+                elif qa_type == 'answer':
+                    subjqa_qa_types = [f.a_sbj for f in subjqa_features_train]
+                qa_type_weights = get_class_weights(
+                                                    subjqa_classes=subjqa_qa_types,
+                                                    idx_to_class=idx_to_qa_types,
+                ) 
                 
-        elif args.finetuning == 'SQuAD' or args.finetuning == 'combined':
+        elif args.finetuning == 'SQuAD':
             
             squad_data_train = get_data(
                                         source='/SQuAD/',
@@ -231,8 +260,6 @@ if __name__ == '__main__':
                                                  squad_features_dev,
                                                  evaluate=False,
             )
-        
-        if args.finetuning == 'SQuAD':
             
             train_dl = create_batches(
                                       dataset=squad_tensor_dataset_train,
@@ -246,40 +273,126 @@ if __name__ == '__main__':
                                     split='eval',
             )
             
-            
-        elif args.finetuning == 'SubjQA':
-            
-            train_dl = create_batches(
-                                      dataset=subjqa_tensor_dataset_train,
-                                      batch_size=batch_size,
-                                      split='train',
+        elif args.finetuning == 'combined':
+             
+            # load SubjQA data 
+            subjqa_data_train_df, hidden_domain_idx_train = get_data(
+                                                                     source='/SubjQA/',
+                                                                     split='/train',
+                                                                     domain='all',
             )
 
-            val_dl = create_batches(
-                                    dataset=subjqa_tensor_dataset_dev,
-                                    batch_size=batch_size,
-                                    split='eval',
+            subjqa_data_dev_df, hidden_domain_idx_dev = get_data(
+                                                                 source='/SubjQA/',
+                                                                 split='/dev',
+                                                                 domain='all',
             )
             
-            if args.multitask:
-                assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
-                if args.n_aux_tasks == 2:
-                    subjqa_domains = [f.domain for f in subjqa_features_train]
-                    domain_weights = get_class_weights(
-                                                       subjqa_classes=subjqa_domains,
-                                                       idx_to_class=idx_to_domains,
-                ) 
-                if qa_type == 'question':
-                    subjqa_qa_types = [f.q_sbj for f in subjqa_features_train] 
-                elif qa_type == 'answer':
-                    subjqa_qa_types = [f.a_sbj for f in subjqa_features_train]
-                qa_type_weights = get_class_weights(
-                                                    subjqa_classes=subjqa_qa_types,
-                                                    idx_to_class=idx_to_qa_types,
-                )   
-                
-        elif args.finetuning == 'combined':
+            # convert pd.DataFrames into list of dictionaries (as many dicts as examples)
+            subjqa_data_train = convert_df_to_dict(
+                                                   subjqa_data_train_df,
+                                                   hidden_domain_indexes=hidden_domain_idx_train,
+                                                   split='train',
+            )
+            subjqa_data_dev = convert_df_to_dict(
+                                                 subjqa_data_dev_df,
+                                                 hidden_domain_indexes=hidden_domain_idx_dev,
+                                                 split='dev',
+            )
             
+            # convert dictionaries into instances of preprocessed question-answer-review examples    
+            subjqa_examples_train = create_examples(
+                                                    subjqa_data_train,
+                                                    source='SubjQA',
+                                                    is_training=True,
+            )
+
+            subjqa_examples_dev = create_examples(
+                                                  subjqa_data_dev,
+                                                  source='SubjQA',
+                                                  is_training=True,
+            )
+            
+            subjqa_features_train = convert_examples_to_features(
+                                                                 subjqa_examples_train, 
+                                                                 bert_tokenizer,
+                                                                 max_seq_length=max_seq_length,
+                                                                 doc_stride=doc_stride,
+                                                                 max_query_length=max_query_length,
+                                                                 is_training=True,
+                                                                 domain_to_idx=domain_to_idx,
+                                                                 dataset_to_idx=dataset_to_idx,
+            )
+
+            subjqa_features_dev = convert_examples_to_features(
+                                                               subjqa_examples_dev, 
+                                                               bert_tokenizer,
+                                                               max_seq_length=max_seq_length,
+                                                               doc_stride=doc_stride,
+                                                               max_query_length=max_query_length,
+                                                               is_training=True,
+                                                               domain_to_idx=domain_to_idx,
+                                                               dataset_to_idx=dataset_to_idx,
+            )
+            
+            subjqa_tensor_dataset_train = create_tensor_dataset(
+                                                                subjqa_features_train,
+                                                                evaluate=False,
+            )
+
+            subjqa_tensor_dataset_dev = create_tensor_dataset(
+                                                              subjqa_features_dev,
+                                                              evaluate=False,
+            )
+            
+            # load SQuAD data
+            squad_data_train = get_data(
+                                        source='/SQuAD/',
+                                        split='train',
+            )
+            
+            squad_examples_train = create_examples(
+                                       squad_data_train,
+                                       source='SQuAD',
+                                       is_training=True,
+            )
+
+            # create train and dev examples from SQuAD train set only
+            squad_examples_train, squad_examples_dev = split_into_train_and_dev(squad_examples_train)
+            
+            
+            squad_features_train = convert_examples_to_features(
+                                                                squad_examples_train, 
+                                                                bert_tokenizer,
+                                                                max_seq_length=max_seq_length,
+                                                                doc_stride=doc_stride,
+                                                                max_query_length=max_query_length,
+                                                                is_training=True,
+                                                                domain_to_idx=domain_to_idx,
+                                                                dataset_to_idx=dataset_to_idx,
+            )
+
+            squad_features_dev = convert_examples_to_features(
+                                                             squad_examples_dev, 
+                                                             bert_tokenizer,
+                                                             max_seq_length=max_seq_length,
+                                                             doc_stride=doc_stride,
+                                                             max_query_length=max_query_length,
+                                                             is_training=True,
+                                                             domain_to_idx=domain_to_idx,
+                                                             dataset_to_idx=dataset_to_idx,
+            )
+            
+            squad_tensor_dataset_train = create_tensor_dataset(
+                                                   squad_features_train,
+                                                   evaluate=False,
+            )
+
+            squad_tensor_dataset_dev = create_tensor_dataset(
+                                                 squad_features_dev,
+                                                 evaluate=False,
+            )
+              
             train_dl = AlternatingBatchGenerator(
                                                  squad_tensor_dataset_train,
                                                  subjqa_tensor_dataset_train,
