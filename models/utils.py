@@ -63,12 +63,15 @@ def sort_batch(
                input_lengths:torch.Tensor,
                start_pos:torch.Tensor,
                end_pos:torch.Tensor,
+               q_sbj:torch.Tensor,
+               a_sbj:torch.Tensor,
+               domains:torch.Tensor,
                PAD_token:int=0,
 ):
     indices, input_ids = zip(*sorted(enumerate(to_cpu(input_ids)), key=lambda seq: len(seq[1][seq[1] != PAD_token]), reverse=True))
     indices = np.array(indices) if isinstance(indices, list) else np.array(list(indices))
     input_ids = torch.tensor(np.array(list(input_ids)), dtype=torch.long).to(device)
-    return input_ids, attn_masks[indices], token_type_ids[indices], input_lengths[indices], start_pos[indices], end_pos[indices]
+    return input_ids, attn_masks[indices], token_type_ids[indices], input_lengths[indices], start_pos[indices], end_pos[indices], q_sbj[indices], a_sbj[indices], domains[indices]
 
 def get_answers(
                 tokenizer,
@@ -121,6 +124,8 @@ def train(
           scheduler=None,
           early_stopping:bool=True,
           n_aux_tasks=None,
+          qa_type_weights=None,
+          domain_weights=None,
 ):
     n_iters = len(train_dl)
     n_examples = n_iters * batch_size
@@ -144,14 +149,23 @@ def train(
     # path to save models
     model_path = args['model_dir'] 
     
-    # define loss function
+    # define loss function (Cross-Entropy is numerically more stable than LogSoftmax plus Negative-Log-Likelihood)
     loss_func = nn.CrossEntropyLoss()
+    
     if isinstance(n_aux_tasks, int):
+        
         if n_aux_tasks == 1:
-            sbj_loss_func = nn.BCEWithLogitsLoss()
+            assert isinstance(qa_type_weights, list), 'List of class weights for question-answer types is not provided'
+            # loss func for auxiliary task to inform model about subjectivity (binary classification)
+            sbj_loss_func = nn.BCEWithLogitsLoss(weight=qa_type_weights)
+            
         elif n_aux_tasks == 2:
-            sbj_loss_func = nn.BCEWithLogitsLoss()
-            domain_loss_func = nn.CrossEntropyLoss()
+            assert isinstance(qa_type_weights, list), 'List of class weights for question-answer types is not provided'
+            assert isinstance(domain_weights, list), 'List of class weights for different domains is not provided'
+            # loss func for auxiliary task to inform model about subjectivity (binary classification)
+            sbj_loss_func = nn.BCEWithLogitsLoss(weight=qa_type_weights)
+            # loss func for auxiliary task to inform model about different domains (multi-way classification)
+            domain_loss_func = nn.CrossEntropyLoss(weight=domain_weights)
     
     if args['freeze_bert']:
         if args['n_epochs'] <= 5:
@@ -178,23 +192,26 @@ def train(
 
         for i, batch in enumerate(tqdm(train_dl, desc="Iteration")):
             
-            batch_loss = 0
+            batch_loss, qa_loss, sbj_loss, domain_loss = 0, 0, 0, 0 
 
             # add batch to GPU
             batch = tuple(t.to(device) for t in batch)
 
             # unpack inputs from dataloader            
-            b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_cls_indexes, _, _, _, _, _ = batch
+            b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_cls_indexes, _, b_q_sbj, b_a_sbj, b_domains,  = batch
             
             if args["sort_batch"]:
                 # sort sequences in batch in decreasing order w.r.t. to (original) sequence length
-                b_input_ids, b_attn_masks, b_type_ids, b_input_lengths, b_start_pos, b_end_pos = sort_batch(
-                                                                                                            b_input_ids,
-                                                                                                            b_attn_masks,
-                                                                                                            b_token_type_ids,
-                                                                                                            b_input_lengths,
-                                                                                                            b_start_pos,
-                                                                                                            b_end_pos,
+                b_input_ids, b_attn_masks, b_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_q_sbj, b_a_sbj, b_domains = sort_batch(
+                                                                                                                        b_input_ids,
+                                                                                                                        b_attn_masks,
+                                                                                                                        b_token_type_ids,
+                                                                                                                        b_input_lengths,
+                                                                                                                        b_start_pos,
+                                                                                                                        b_end_pos,
+                                                                                                                        b_q_sbj,
+                                                                                                                        b_a_sbj,
+                                                                                                                        b_domains,
                 )
             
             if args['optim'] == 'SGD' and not isinstance(scheduler, type(None)):
@@ -221,6 +238,12 @@ def train(
                 )
                     start_logits, end_logits = ans_logits
                     
+                    # compute auxiliary loss
+                    if args['qa_type'] == 'question':
+                        sbj_loss = sbj_loss_func(sbj_logits, b_q_sbj)
+                    elif args['qa_type'] == 'answer':
+                        sbj_loss = sbj_loss_func(sbj_logits, b_a_sbj)
+                    
                 elif n_aux_tasks == 2:
                     ans_logits, sbj_logits, domain_logits = model(
                                                                   input_ids=b_input_ids,
@@ -230,6 +253,15 @@ def train(
                 )
                     start_logits, end_logits = ans_logits
                     
+                    # compute auxiliary losses
+                    if args['qa_type'] == 'question':
+                        sbj_loss = sbj_loss_func(sbj_logits, b_q_sbj)
+                    elif args['qa_type'] == 'answer':
+                        sbj_loss = sbj_loss_func(sbj_logits, b_a_sbj)
+                        
+                    domain_loss = domain_loss_func(domain_logits, b_domains)
+                
+                """
                 elif n_aux_tasks == 3:
                     ans_logits, sbj_logits, domain_logits, ds_logits = model(
                                                                              input_ids=b_input_ids,
@@ -238,11 +270,13 @@ def train(
                                                                              input_lengths=b_input_lengths,
                 )
                     start_logits, end_logits = ans_logits                    
-                    
+                """
+                
             # start and end loss must be computed separately
             start_loss = loss_func(start_logits, b_start_pos)
             end_loss = loss_func(end_logits, b_end_pos)
-            batch_loss = (start_loss + end_loss) / 2
+            qa_loss = (start_loss + end_loss) / 2
+            batch_loss += qa_loss + sbj_loss + domain_loss
             
             print("----------------------------------")
             print("----- Current batch loss: {} -----".format(batch_loss))
@@ -278,6 +312,12 @@ def train(
             #TODO: figure out whether you have to backpropagate the error separately for start and end loss
             #start_loss.backward()
             #end_loss.backward()
+            
+            #TODO: figure out how to backpropagte errors for MTL
+            #qa_loss.backward()
+            #sbj_loss.backward()
+            #domain_loss.backward()
+            
             batch_loss.backward()
             
             # clip gradients

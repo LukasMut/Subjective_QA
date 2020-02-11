@@ -7,6 +7,9 @@ __all__ = [
            'create_examples',
            'convert_examples_to_features',
            'create_tensor_dataset',
+           'get_class_weights',
+           'idx_to_class',
+           'class_to_idx',
            'AlternatingBatchGenerator',
            'create_alternating_batches',
            'create_batches',
@@ -767,8 +770,35 @@ def create_tensor_dataset(
 
         return dataset
 
+    
+def get_class_weights(
+                      subjqa_classes:list,
+                      idx_to_class:dict,
+                      squad_classes=None,
+):
+    n_total_subjqa = len(subjqa_classes)
+    class_distrib_subjqa = {idx_to_class[l]: freq for l, freq in Counter(subjqa_classes).items()}
+    
+    if isinstance(squad_classes, list):
+        n_squad_classes = len(squad_classes)
+        n_total = n_total_subjqa + n_squad_classes
+        if len(class_distrib_subjqa) > 2:
+            class_distrib_subjqa['wikipedia'] = n_squad_classes
+            class_distrib = class_distrib_subjqa
+        elif len(class_distrib_subjqa) == 2:
+            class_distrib_subjqa['obj'] += n_squad_classes
+            class_distrib = class_distrib_subjqa
+    else:
+        n_total = n_total_subjqa
+        class_distrib = class_distrib_subjqa
+        
+    class_weights = {c: 1 - (v / n_total) for c, v in class_distrib.items()}
+    class_weights = [class_weights[c] for _, c in idx_to_class.items()]
+    return class_weights
 
-                
+def idx_to_class(classes:list): return dict(enumerate(classes))
+def class_to_idx(classes:list): return {c: i for i, c in enumerate(classes)}
+
 ## Generator of batches from SQuAD AND SubjQA (each batch consists of n = batch_size examples from SQuAD XOR SubjQA) ##
 
 class AlternatingBatchGenerator(object):

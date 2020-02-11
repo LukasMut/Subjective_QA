@@ -70,15 +70,23 @@ if __name__ == '__main__':
     max_query_length = 50
     batch_size = args.batch_size
     
-    # create domain_to_idx and dataset_to_idx mappings (necessary for auxiliary tasks)
+    # classes for auxiliary tasks
     domains = ['books', 'tripadvisor', 'grocery', 'electronics', 'movies', 'restaurants', 'wikipedia']
-    datasets = ['SQuAD', 'SubjQA']
-    idx_to_domain = dict(enumerate(domains))
-    domain_to_idx = {domain: idx for idx, domain in enumerate(domains)}
-    idx_to_dataset = dict(enumerate(datasets))
-    dataset_to_idx = {dataset: idx for idx, dataset in enumerate(datasets)}
+    qa_types = ['sbj', 'obj']
     
-     # TODO: figure out, whether we should use pretrained weights from 'bert-base-cased' or 'bert-base-uncased' model
+    # define, whether we should inform model about question or answer type
+    qa_type = 'question'
+    
+    # create domain_to_idx, qa_type_to_idx and dataset_to_idx mappings (necessary for auxiliary tasks)
+    idx_to_domain = idx_to_class(domains)
+    domain_to_idx = class_to_idx(domains)
+    domain_weights = None
+    
+    idx_to_qa_type = idx_to_class(qa_types)
+    qa_type_to_idx = class_to_idx(qa_types)
+    qa_type_weights = None
+    
+    # TODO: figure out, whether we should use pretrained weights from 'bert-base-cased' or 'bert-base-uncased' model
     if args.bert_weights == 'cased':
         
         bert_tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
@@ -102,13 +110,13 @@ if __name__ == '__main__':
         
         if args.finetuning == 'SubjQA' or args.finetuning == 'combined':
         
-            subjqa_data_train = get_data(
+            subjqa_data_train_df = get_data(
                                          source='/SubjQA/',
                                          split='/train',
                                          domain='all',
             )
 
-            subjqa_data_dev = get_data(
+            subjqa_data_dev_df = get_data(
                                        source='/SubjQA/',
                                        split='/dev',
                                        domain='all',
@@ -232,6 +240,7 @@ if __name__ == '__main__':
                                     split='eval',
             )
             
+            
         elif args.finetuning == 'SubjQA':
             
             train_dl = create_batches(
@@ -245,6 +254,23 @@ if __name__ == '__main__':
                                     batch_size=batch_size,
                                     split='eval',
             )
+            
+            if args.multitask:
+                assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
+                if args.n_aux_tasks == 2:
+                    subjqa_domains = [f.domain for f in subjqa_features_train]
+                    domain_weights = get_class_weights(
+                                                       subjqa_classes=subjqa_domains,
+                                                       idx_to_class=idx_to_domains,
+                ) 
+                if qa_type == 'question':
+                    subjqa_qa_types = [f.q_sbj for f in subjqa_features_train] 
+                elif qa_type == 'answer':
+                    subjqa_qa_types = [f.a_sbj for f in subjqa_features_train]
+                qa_type_weights = get_class_weights(
+                                                    subjqa_classes=subjqa_qa_types,
+                                                    idx_to_class=idx_to_qa_types,
+                )   
                 
         elif args.finetuning == 'combined':
             
@@ -261,6 +287,28 @@ if __name__ == '__main__':
                                                batch_size=batch_size,
                                                split='eval',
             )
+            
+            if args.multitask:
+                assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
+                if args.n_aux_tasks == 2:
+                    squad_domains = [f.domain for f in squad_feature_train]
+                    subjqa_domains = [f.domain for f in subjqa_features_train]
+                    domain_weights = get_class_weights(
+                                                       subjqa_classes=subjqa_domains,
+                                                       idx_to_class=idx_to_domains,
+                                                       squad_classes=squad_domains,
+                ) 
+                if qa_type == 'question':
+                    subjqa_qa_types = [f.q_sbj for f in subjqa_features_train] 
+                    squad_qa_types = [f.q_sbj for f in squad_features_train] 
+                elif qa_type == 'answer':
+                    subjqa_qa_types = [f.a_sbj for f in subjqa_features_train]
+                    squad_qa_types = [f.a_sbj for f in squad_features_train]
+                qa_type_weights = get_class_weights(
+                                                    subjqa_classes=subjqa_qa_types,
+                                                    idx_to_class=idx_to_qa_types,
+                                                    squad_classes=squad_qa_types,
+                )   
         
         # initialise QA model
         model = BertForQA.from_pretrained(
@@ -289,6 +337,7 @@ if __name__ == '__main__':
         hypers["optim"] = args.optim
         hypers["model_dir"] = args.sd
         hypers["model_name"] = model_name
+        hypers["qa_type"] = qa_type
         
         if args.optim == 'AdamW':
             
@@ -343,6 +392,8 @@ if __name__ == '__main__':
                                                                                                         optimizer=optimizer,
                                                                                                         scheduler=scheduler,
                                                                                                         early_stopping=True,
+                                                                                                        qa_type_weights=qa_type_weights,
+                                                                                                        domain_weights=domain_weights,
         )
         
         train_results  = dict()
