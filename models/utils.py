@@ -198,7 +198,7 @@ def train(
             batch = tuple(t.to(device) for t in batch)
 
             # unpack inputs from dataloader            
-            b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_cls_indexes, _, b_q_sbj, b_a_sbj, b_domains,  = batch
+            b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_cls_indexes, _, b_q_sbj, b_a_sbj, b_domains, _ = batch
             
             if args["sort_batch"]:
                 # sort sequences in batch in decreasing order w.r.t. to (original) sequence length
