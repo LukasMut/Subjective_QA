@@ -198,7 +198,7 @@ if __name__ == '__main__':
                                                                 squad_examples_train, 
                                                                 bert_tokenizer,
                                                                 max_seq_length=max_seq_length,
-                                                                doc_stride=doc_stride
+                                                                doc_stride=doc_stride,
                                                                 max_query_length=max_query_length,
                                                                 is_training=True,
                                                                 domain_to_idx=domain_to_idx,
@@ -209,7 +209,7 @@ if __name__ == '__main__':
                                                              squad_examples_dev, 
                                                              bert_tokenizer,
                                                              max_seq_length=max_seq_length,
-                                                             doc_stride=doc_stride
+                                                             doc_stride=doc_stride,
                                                              max_query_length=max_query_length,
                                                              is_training=True,
                                                              domain_to_idx=domain_to_idx,
