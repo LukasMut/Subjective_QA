@@ -96,6 +96,7 @@ if __name__ == '__main__':
     highway = 'Highway' if args.highway_connection else ''
     train_method = 'multitask' + '_' + str(args.n_tasks) if args.multitask else 'singletask'
     model_name = 'BERT' + '_' + args.bert_weights + '_' + qa_head_name + '_' + highway + '_' + train_method
+    model_name = model_name.lower()
     
     if args.version == 'train':
         
@@ -396,7 +397,7 @@ if __name__ == '__main__':
             if args.not_finetuned:
                 # test (simple) BERT-QA-model fine-tuned on SQuAD without (prior)task-specific fine-tuning on SubjQA
                 model = BertForQuestionAnswering.from_pretrained(pretrained_weights)
-                model_name = 'BERT_pretrained_SQuAD_no_fine_tuning'
+                model_name = 'bert_pretrained_squad_no_fine_tuning'
             else:
                 model = BertForQA.from_pretrained(
                                                   pretrained_weights,
