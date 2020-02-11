@@ -136,7 +136,7 @@ def get_data(
 # NOTE: this function is only relevant for SubjQA data
 def convert_df_to_dict(
                        subjqa:pd.DataFrame,
-                       hidden_domain_indexes:list,
+                       hidden_domain_indexes=None,
                        split:str,
 ):
     splits = ['train', 'dev', 'test']
@@ -161,25 +161,27 @@ def convert_df_to_dict(
         return tuple(int(idx) for idx in str_idx.split())
 
     for i in range(len(subjqa)):
-        if i not in hidden_domain_indexes:
-            example = defaultdict(dict)
-            example['qa_id'] = subjqa.loc[i, columns[0]]
-            example['question'] = subjqa.loc[i, columns[1]]
-            example['review'] = subjqa.loc[i, columns[2]]
-            example['answer']['answer_text'] = subjqa.loc[i, columns[3]]
-            answer_indices = convert_str_to_int(subjqa.loc[i, columns[4]])
+        if isinstance(hidden_domain_indexes, list):
+            if i in hidden_domain_indexes:
+                continue
+        example = defaultdict(dict)
+        example['qa_id'] = subjqa.loc[i, columns[0]]
+        example['question'] = subjqa.loc[i, columns[1]]
+        example['review'] = subjqa.loc[i, columns[2]]
+        example['answer']['answer_text'] = subjqa.loc[i, columns[3]]
+        answer_indices = convert_str_to_int(subjqa.loc[i, columns[4]])
 
-            # TODO: figure out, whether we should strip off "ANSWERNOTFOUND" from reviews in SubjQA;
-            #       if not, then start and end positions should be second to the last index (i.e., sequence[-2]) instead of 0 (i.e., [CLS]),
-            #       since "ANSWERNOTFOUND" is last token in each review text
+        # TODO: figure out, whether we should strip off "ANSWERNOTFOUND" from reviews in SubjQA;
+        #       if not, then start and end positions should be second to the last index (i.e., sequence[-2]) instead of 0 (i.e., [CLS]),
+        #       since "ANSWERNOTFOUND" is last token in each review text
 
-            example['answer']['answer_start'] = 0 if example['answer']['answer_text'] == 'ANSWERNOTFOUND' else answer_indices[0]
-            example['answer']['answer_end'] = 0 if example['answer']['answer_text'] == 'ANSWERNOTFOUND' else answer_indices[1]
-            example['domain'] = subjqa.loc[i, columns[5]]
-            example['is_impossible'] = True if example['answer']['answer_text'] == 'ANSWERNOTFOUND' else False
-            example['question_subj'] = 1 if subjqa.loc[i, columns[6]] > 3 else 0
-            example['ans_subj'] = 1 if subjqa.loc[i, columns[7]] > 3 else 0
-            examples.append(dict(example))
+        example['answer']['answer_start'] = 0 if example['answer']['answer_text'] == 'ANSWERNOTFOUND' else answer_indices[0]
+        example['answer']['answer_end'] = 0 if example['answer']['answer_text'] == 'ANSWERNOTFOUND' else answer_indices[1]
+        example['domain'] = subjqa.loc[i, columns[5]]
+        example['is_impossible'] = True if example['answer']['answer_text'] == 'ANSWERNOTFOUND' else False
+        example['question_subj'] = 1 if subjqa.loc[i, columns[6]] > 3 else 0
+        example['ans_subj'] = 1 if subjqa.loc[i, columns[7]] > 3 else 0
+        examples.append(dict(example))
         
     # save as .json file
     with open('./data/SubjQA/all/' + split + '.json', 'w') as json_file:
