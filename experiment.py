@@ -72,6 +72,7 @@ if __name__ == '__main__':
     # classes for auxiliary tasks
     domains = ['books', 'tripadvisor', 'grocery', 'electronics', 'movies', 'restaurants', 'wikipedia']
     qa_types = ['sbj', 'obj']
+    datasets = ['SQuAD', 'SubjQA']
     
     # define, whether we should inform model about question or answer type
     qa_type = 'question'
@@ -84,6 +85,10 @@ if __name__ == '__main__':
     idx_to_qa_type = idx_to_class(qa_types)
     qa_type_to_idx = class_to_idx(qa_types)
     qa_type_weights = None
+    
+    idx_to_dataset = idx_to_class(datasets)
+    dataset_to_idx = class_to_idx(datasets)
+    dataset_weights = None
     
     # TODO: figure out, whether we should use pretrained weights from 'bert-base-cased' or 'bert-base-uncased' model
     if args.bert_weights == 'cased':
