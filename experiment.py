@@ -114,25 +114,27 @@ if __name__ == '__main__':
         
         if args.finetuning == 'SubjQA' or args.finetuning == 'combined':
         
-            subjqa_data_train_df = get_data(
-                                         source='/SubjQA/',
-                                         split='/train',
-                                         domain='all',
+            subjqa_data_train_df, hidden_domain_idx_train = get_data(
+                                                                     source='/SubjQA/',
+                                                                     split='/train',
+                                                                     domain='all',
             )
 
-            subjqa_data_dev_df = get_data(
-                                       source='/SubjQA/',
-                                       split='/dev',
-                                       domain='all',
+            subjqa_data_dev_df, hidden_domain_idx_dev = get_data(
+                                                                 source='/SubjQA/',
+                                                                 split='/dev',
+                                                                 domain='all',
             )
             
             # convert pd.DataFrames into list of dictionaries (as many dicts as examples)
             subjqa_data_train = convert_df_to_dict(
                                                    subjqa_data_train_df,
+                                                   hidden_domain_indexes=hidden_domain_idx_train,
                                                    split='train',
             )
             subjqa_data_dev = convert_df_to_dict(
                                                  subjqa_data_dev_df,
+                                                 hidden_domain_indexes=hidden_domain_idx_dev,
                                                  split='dev',
             )
             
@@ -416,9 +418,16 @@ if __name__ == '__main__':
         
     # we always test on SubjQA
     elif args.version == 'test':
+        
+            subjqa_data_test_df, hidden_domain_idx_test = get_data(
+                                                                   source='/SubjQA/',
+                                                                   split='/test',
+                                                                   domain='all',
+            )
             
             subjqa_data_test = convert_df_to_dict(
                                                   subjqa_data_test,
+                                                  hidden_domain_indexes= hidden_domain_idx_test
                                                   split='test',
             )
             

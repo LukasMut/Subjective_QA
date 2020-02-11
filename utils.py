@@ -123,8 +123,12 @@ def get_data(
             hidden_domain = 'trustyou'
             file = get_file(subdir, source, domain, split)
             subjqa_df = pd.read_csv(file)
-            subjqa_df = subjqa_df[subjqa_df.name != hidden_domain] if domain == 'all' else subjqa_df
-            return subjqa_df
+            if domain == 'all':
+                hidden_domain_indexes = subjqa_df[subjqa_df.name == hidden_domain].index.values.tolist()
+                subjqa_df = subjqa_df[subjqa_df.name != hidden_domain]
+                return subjqa_df, hidden_domain_indexes
+            else:
+                return subjqa_df
     else:
         raise Exception('You did not provide the correct subfolder name')
         
@@ -132,6 +136,7 @@ def get_data(
 # NOTE: this function is only relevant for SubjQA data
 def convert_df_to_dict(
                        subjqa:pd.DataFrame,
+                       hidden_domain_indexes:list,
                        split:str,
 ):
     splits = ['train', 'dev', 'test']
@@ -156,24 +161,25 @@ def convert_df_to_dict(
         return tuple(int(idx) for idx in str_idx.split())
 
     for i in range(len(subjqa)):
-        example = defaultdict(dict)
-        example['qa_id'] = subjqa.loc[i, columns[0]]
-        example['question'] = subjqa.loc[i, columns[1]]
-        example['review'] = subjqa.loc[i, columns[2]]
-        example['answer']['answer_text'] = subjqa.loc[i, columns[3]]
-        answer_indices = convert_str_to_int(subjqa.loc[i, columns[4]])
+        if i not in hidden_domain_indexes:
+            example = defaultdict(dict)
+            example['qa_id'] = subjqa.loc[i, columns[0]]
+            example['question'] = subjqa.loc[i, columns[1]]
+            example['review'] = subjqa.loc[i, columns[2]]
+            example['answer']['answer_text'] = subjqa.loc[i, columns[3]]
+            answer_indices = convert_str_to_int(subjqa.loc[i, columns[4]])
 
-        # TODO: figure out, whether we should strip off "ANSWERNOTFOUND" from reviews in SubjQA;
-        #       if not, then start and end positions should be second to the last index (i.e., sequence[-2]) instead of 0 (i.e., [CLS]),
-        #       since "ANSWERNOTFOUND" is last token in each review text
+            # TODO: figure out, whether we should strip off "ANSWERNOTFOUND" from reviews in SubjQA;
+            #       if not, then start and end positions should be second to the last index (i.e., sequence[-2]) instead of 0 (i.e., [CLS]),
+            #       since "ANSWERNOTFOUND" is last token in each review text
 
-        example['answer']['answer_start'] = 0 if example['answer']['answer_text'] == 'ANSWERNOTFOUND' else answer_indices[0]
-        example['answer']['answer_end'] = 0 if example['answer']['answer_text'] == 'ANSWERNOTFOUND' else answer_indices[1]
-        example['domain'] = subjqa.loc[i, columns[5]]
-        example['is_impossible'] = True if example['answer']['answer_text'] == 'ANSWERNOTFOUND' else False
-        example['question_subj'] = 1 if subjqa.loc[i, columns[6]] > 3 else 0
-        example['ans_subj'] = 1 if subjqa.loc[i, columns[7]] > 3 else 0
-        examples.append(dict(example))
+            example['answer']['answer_start'] = 0 if example['answer']['answer_text'] == 'ANSWERNOTFOUND' else answer_indices[0]
+            example['answer']['answer_end'] = 0 if example['answer']['answer_text'] == 'ANSWERNOTFOUND' else answer_indices[1]
+            example['domain'] = subjqa.loc[i, columns[5]]
+            example['is_impossible'] = True if example['answer']['answer_text'] == 'ANSWERNOTFOUND' else False
+            example['question_subj'] = 1 if subjqa.loc[i, columns[6]] > 3 else 0
+            example['ans_subj'] = 1 if subjqa.loc[i, columns[7]] > 3 else 0
+            examples.append(dict(example))
         
     # save as .json file
     with open('./data/SubjQA/all/' + split + '.json', 'w') as json_file:
