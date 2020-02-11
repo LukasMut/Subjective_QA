@@ -12,7 +12,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from collections import Counter, defaultdict
-from torch.optim import Adam, SGD, CosineAnnealingWarmRestarts
+from torch.optim import Adam, SGD
+from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from transformers import BertTokenizer, BertModel, BertForQuestionAnswering
 from transformers import AdamW
 from transformers import get_cosine_with_hard_restarts_schedule_with_warmup, get_linear_schedule_with_warmup
