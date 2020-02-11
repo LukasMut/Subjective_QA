@@ -137,7 +137,7 @@ def get_data(
 def convert_df_to_dict(
                        subjqa:pd.DataFrame,
                        hidden_domain_indexes=None,
-                       split:str,
+                       split:str='train',
 ):
     splits = ['train', 'dev', 'test']
     if split not in splits:
