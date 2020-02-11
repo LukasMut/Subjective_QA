@@ -33,22 +33,35 @@ class LinearQAHead(nn.Module):
                  n_labels_qa:int=2,
                  highway_block:bool=False,
                  multitask:bool=False,
+                 n_aux_tasks=None,
     ):
         
         super(LinearQAHead, self).__init__()
         self.n_labels = n_labels_qa
         self.qa_outputs = nn.Linear(in_size, self.n_labels)
         self.multitask = multitask
+        self.n_aux_tasks=n_aux_tasks
         
-        # if highway connection
         if highway_block:
             self.highway = Highway(in_size)
         
-        #if multi-task setting
         if self.multitask:
-            # subjectivity output layer
-            self.sbj_outputs = nn.Linear(in_size, 2)
-
+            if isinstance(self.n_aux_tasks, int):
+                # subjectivity output layer (must be present in every MTL setting)
+                self.sbj_outputs == nn.Linear(in_size, 2)
+                if self.n_aux_tasks == 2:
+                    # 6 domains in SubjQA plus Wikipedia from SQuAD --> 7 classes
+                    self.domain_outputs = nn.Linear(in_size, 7)
+                elif self.n_aux_tasks == 3:
+                    # 6 domains in SubjQA plus Wikipedia from SQuAD --> 7 classes
+                    self.domain_outputs = nn.Linear(in_size, 7)
+                    # SubjQA vs. SQuAD (binary classification whether seq belongs to SQuAD or SubjQA)
+                    self.ds_outputs = nn.Linear(in_size, 2)
+                else:
+                    raise ValueError("Model cannot perform more than 3 auxiliary tasks.")
+            else:
+                raise TypeError("Number of auxiliary tasks must be defined in a MTL setting.")
+                    
     def forward(
                 self,
                 bert_outputs:torch.Tensor, 
@@ -85,10 +98,18 @@ class LinearQAHead(nn.Module):
             end_loss = loss_fct(end_logits, end_positions)
             total_loss = (start_loss + end_loss) / 2
             outputs = (total_loss,) + outputs
-        
-        if self.multitask:
+            
+        if self.multitask and isinstance(self.n_aux_tasks, int):
             sbj_logits = self.sbj_outputs(sequence_output)
-            return outputs, sbj_logits
+            if self.n_aux_tasks == 1:
+                return outputs, sbj_logits
+            elif self.n_aux_tasks == 2:
+                domain_logits = self.domain_outputs(sequence_output)
+                return outputs, sbj_logits, domain_logits
+            elif self.n_aux_tasks == 3:
+                domain_logits = self.domain_outputs(sequence_output)
+                ds_logits = self.ds_outputs(sequence_output)
+                return outputs, sbj_logits, domain_logits, ds_logits
         else:
             return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)
         
@@ -102,23 +123,36 @@ class RecurrentQAHead(nn.Module):
                  n_labels_qa:int=2,
                  highway_block:bool=False,
                  multitask:bool=False,
+                 n_aux_tasks=None,
     ):
         
         super(RecurrentQAHead, self).__init__()
         self.n_labels = n_labels_qa
         self.lstm_encoder = EncoderLSTM(max_seq_length)
         
-        # if highway connection
         if highway_block:
             self.highway = Highway(in_size)
             
         self.qa_outputs = nn.Linear(in_size, self.n_labels)
         self.multitask = multitask
+        self.n_aux_tasks = n_aux_tasks
         
-        #if multi-task setting
-        if self.multitask:    
-            # subjectivity output layer
-            self.sbj_outputs = nn.Linear(in_size, 2)
+        if self.multitask:
+            if isinstance(self.n_aux_tasks, int):
+                # subjectivity output layer (must be present in every MTL setting)
+                self.sbj_outputs == nn.Linear(in_size, 2)
+                if self.n_aux_tasks == 2:
+                    # 6 domains in SubjQA plus Wikipedia from SQuAD --> 7 classes
+                    self.domain_outputs = nn.Linear(in_size, 7)
+                elif self.n_aux_tasks == 3:
+                    # 6 domains in SubjQA plus Wikipedia from SQuAD --> 7 classes
+                    self.domain_outputs = nn.Linear(in_size, 7)
+                    # SubjQA vs. SQuAD (binary classification whether seq belongs to SQuAD or SubjQA)
+                    self.ds_outputs = nn.Linear(in_size, 2)
+                else:
+                    raise ValueError("Model cannot perform more than 3 auxiliary tasks.")
+            else:
+                raise TypeError("Number of auxiliary tasks must be defined in a MTL setting.")
 
     def forward(
                 self,
@@ -165,8 +199,18 @@ class RecurrentQAHead(nn.Module):
             total_loss = (start_loss + end_loss) / 2
             outputs = (total_loss,) + outputs
         
-        if self.multitask:
+        if self.multitask and isinstance(self.n_aux_tasks, int):
             sbj_logits = self.sbj_outputs(sequence_output)
-            return outputs, sbj_logits
+            if self.n_aux_tasks == 1:
+                return outputs, sbj_logits
+            elif self.n_aux_tasks == 2:
+                domain_logits = self.domain_outputs(sequence_output)
+                return outputs, sbj_logits, domain_logits
+            elif self.n_aux_tasks == 3:
+                domain_logits = self.domain_outputs(sequence_output)
+                ds_logits = self.ds_outputs(sequence_output)
+                return outputs, sbj_logits, domain_logits, ds_logits
+            else:
+                raise ValueError("Model cannot perform more than 3 auxiliary tasks along the main task.")
         else:
             return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)

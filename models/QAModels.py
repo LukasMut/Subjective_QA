@@ -39,6 +39,7 @@ class BertForQA(BertPreTrainedModel):
                  max_seq_length:int=512,
                  highway_connection:bool=False,
                  multitask:bool=False,
+                 n_aux_tasks=None,
     ):
         
         super(BertForQA, self).__init__(config)
@@ -47,6 +48,7 @@ class BertForQA(BertPreTrainedModel):
         self.max_seq_length = max_seq_length
         self.highway_connection = highway_connection
         self.multitask = multitask
+        self.n_aux_tasks = n_aux_tasks
         
         assert isinstance(self.qa_head_name, str), "QA head must be defined, and has to be one of {'LinearQAHead', 'RecurrentQAHead'}"
         
@@ -56,6 +58,7 @@ class BertForQA(BertPreTrainedModel):
                                         n_labels_qa=config.num_labels,
                                         highway_block=self.highway_connection,
                                         multitask=self.multitask,
+                                        n_aux_tasks=self.n_aux_tasks,
             )
             
         elif self.qa_head_name == 'RecurrentQAHead':
@@ -65,6 +68,7 @@ class BertForQA(BertPreTrainedModel):
                                            n_labels_qa=config.num_labels,
                                            highway_block=self.highway_connection,
                                            multitask=self.multitask,
+                                           n_aux_tasks=self.n_aux_tasks,
             )
             
     def forward(

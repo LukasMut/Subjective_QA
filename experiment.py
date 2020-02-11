@@ -37,8 +37,8 @@ if __name__ == '__main__':
             help='If train, then train model on train set(s); if test, then evaluate model on SubjQA test set.')
     parser.add_argument('--multitask', action='store_true',
             help='If provided, MTL instead of STL setting.')
-    parser.add_argument('--n_tasks', type=int, default=1,
-            help='Define number of tasks QA model should be trained on. Only necessary, if MTL setting.')
+    parser.add_argument('--n_aux_tasks', type=int, default=None,
+            help='Define number of auxiliary tasks QA model should perform during training. Only necessary, if MTL setting.')
     parser.add_argument('--qa_head', type=str, default='linear',
             help='If linear, put fc linear head on top of BERT; if recurrent, put BiLSTM encoder plus fc linear head on top of BERT.')
     parser.add_argument('--highway_connection', action='store_true',
@@ -71,7 +71,7 @@ if __name__ == '__main__':
     batch_size = args.batch_size
     
     # create domain_to_idx and dataset_to_idx mappings (necessary for auxiliary tasks)
-    domains = ['books', 'electronics', 'grocery', 'movies', 'restaurants', 'tripadvisor', 'all', 'wikipedia']
+    domains = ['books', 'tripadvisor', 'grocery', 'electronics', 'movies', 'restaurants', 'wikipedia']
     datasets = ['SQuAD', 'SubjQA']
     idx_to_domain = dict(enumerate(domains))
     domain_to_idx = {domain: idx for idx, domain in enumerate(domains)}
@@ -94,7 +94,7 @@ if __name__ == '__main__':
                     
     qa_head_name = 'RecurrentQAHead' if args.qa_head == 'recurrent' else 'LinearQAHead'
     highway = 'Highway' if args.highway_connection else ''
-    train_method = 'multitask' + '_' + str(args.n_tasks) if args.multitask else 'singletask'
+    train_method = 'multitask' + '_' + str(args.n_aux_tasks) if args.multitask else 'singletask'
     model_name = 'BERT' + '_' + args.bert_weights + '_' + qa_head_name + '_' + highway + '_' + train_method
     model_name = model_name.lower()
     
@@ -269,6 +269,7 @@ if __name__ == '__main__':
                                           max_seq_length=max_seq_length,
                                           highway_connection=args.highway_connection,
                                           multitask=args.multitask,
+                                          n_aux_tasks=args.n_aux_tasks,
         )
 
         # set model to device
@@ -337,6 +338,7 @@ if __name__ == '__main__':
                                                                                                         train_dl=train_dl,
                                                                                                         val_dl=val_dl,
                                                                                                         batch_size=batch_size,
+                                                                                                        n_aux_tasks=args.n_aux_tasks,
                                                                                                         args=hypers,
                                                                                                         optimizer=optimizer,
                                                                                                         scheduler=scheduler,
@@ -405,6 +407,7 @@ if __name__ == '__main__':
                                                   max_seq_length=max_seq_length,
                                                   highway_connection=args.highway_connection,
                                                   multitask=args.multitask,
+                                                  n_aux_taks=args.n_aux_tasks,
                 )
                 model.load_state_dict(torch.load(args.sd + '/%s' % (model_name)))
                                                                  
@@ -414,6 +417,7 @@ if __name__ == '__main__':
                                                 tokenizer=bert_tokenizer,
                                                 test_dl=test_dl,
                                                 batch_size=batch_size,
+                                                n_tasks=args.n_tasks,
                                                 sort_batch=False,
             )
             

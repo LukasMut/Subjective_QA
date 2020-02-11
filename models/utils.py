@@ -120,6 +120,7 @@ def train(
           optimizer,
           scheduler=None,
           early_stopping:bool=True,
+          n_aux_tasks=None,
 ):
     n_iters = len(train_dl)
     n_examples = n_iters * batch_size
@@ -145,6 +146,12 @@ def train(
     
     # define loss function
     loss_func = nn.CrossEntropyLoss()
+    if isinstance(n_aux_tasks, int):
+        if n_aux_tasks == 1:
+            sbj_loss_func = nn.BCEWithLogitsLoss()
+        elif n_aux_tasks == 2:
+            sbj_loss_func = nn.BCEWithLogitsLoss()
+            domain_loss_func = nn.CrossEntropyLoss()
     
     if args['freeze_bert']:
         if args['n_epochs'] <= 5:
@@ -196,14 +203,42 @@ def train(
             # zero-out gradients
             optimizer.zero_grad()
             
-            # compute start and end logits respectively
-            start_logits, end_logits = model(
-                                             input_ids=b_input_ids,
-                                             attention_masks=b_attn_masks,
-                                             token_type_ids=b_token_type_ids,
-                                             input_lengths=b_input_lengths,
-            )
-            
+            if isinstance(n_aux_tasks, type(None)):
+                # compute start and end logits respectively
+                start_logits, end_logits = model(
+                                                 input_ids=b_input_ids,
+                                                 attention_masks=b_attn_masks,
+                                                 token_type_ids=b_token_type_ids,
+                                                 input_lengths=b_input_lengths,
+                )
+            elif isinstance(n_aux_tasks, int):
+                if n_aux_tasks == 1:
+                    ans_logits, sbj_logits = model(
+                                                   input_ids=b_input_ids,
+                                                   attention_masks=b_attn_masks,
+                                                   token_type_ids=b_token_type_ids,
+                                                   input_lengths=b_input_lengths,
+                )
+                    start_logits, end_logits = ans_logits
+                    
+                elif n_aux_tasks == 2:
+                    ans_logits, sbj_logits, domain_logits = model(
+                                                                  input_ids=b_input_ids,
+                                                                  attention_masks=b_attn_masks,
+                                                                  token_type_ids=b_token_type_ids,
+                                                                  input_lengths=b_input_lengths,
+                )
+                    start_logits, end_logits = ans_logits
+                    
+                elif n_aux_tasks == 3:
+                    ans_logits, sbj_logits, domain_logits, ds_logits = model(
+                                                                             input_ids=b_input_ids,
+                                                                             attention_masks=b_attn_masks,
+                                                                             token_type_ids=b_token_type_ids,
+                                                                             input_lengths=b_input_lengths,
+                )
+                    start_logits, end_logits = ans_logits                    
+                    
             # start and end loss must be computed separately
             start_loss = loss_func(start_logits, b_start_pos)
             end_loss = loss_func(end_logits, b_end_pos)
