@@ -8,8 +8,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from Encoder import *
-from Highway import Highway
+from models.modules.Encoder import *
+from models.modules.Highway import Highway
 
 # set device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

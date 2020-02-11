@@ -8,9 +8,9 @@ import torch
 
 from transformers import BertModel, BertPreTrainedModel
 
-from modules.Encoder import *
-from modules.Highway import Highway
-from modules.QAHeads import *
+from models.modules.Encoder import *
+from models.modules.Highway import Highway
+from models.modules.QAHeads import *
 
 # set random seeds to reproduce results
 np.random.seed(42)
