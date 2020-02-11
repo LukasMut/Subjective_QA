@@ -145,6 +145,11 @@ def train(
     
     # define loss function
     loss_func = nn.CrossEntropyLoss()
+    
+    if args['freeze_bert']:
+        if args['n_epochs'] <= 5:
+            # add an additional epoch for fine-tuning not only the heads but the entire model (+ BERT encoder)
+            args['n_epochs'] += 1
 
     for epoch in trange(args['n_epochs'],  desc="Epoch"):
 
