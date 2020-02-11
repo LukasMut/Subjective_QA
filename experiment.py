@@ -128,11 +128,11 @@ if __name__ == '__main__':
             
             # convert pd.DataFrames into list of dictionaries (as many dicts as examples)
             subjqa_data_train = convert_df_to_dict(
-                                                   subjqa_data_train,
+                                                   subjqa_data_train_df,
                                                    split='train',
             )
             subjqa_data_dev = convert_df_to_dict(
-                                                 subjqa_data_dev,
+                                                 subjqa_data_dev_df,
                                                  split='dev',
             )
             
