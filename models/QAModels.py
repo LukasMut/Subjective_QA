@@ -16,7 +16,10 @@ np.random.seed(42)
 random.seed(42)
 torch.manual_seed(42)
 
-# move model to GPU, if GPU is available
+# set device
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+"""
 is_cuda = torch.cuda.is_available()
 
 if is_cuda:
@@ -25,6 +28,7 @@ if is_cuda:
 else:
     device = torch.device("cpu")
     print("GPU not available, CPU used")
+"""
 
 class BertForQA(BertPreTrainedModel):
     

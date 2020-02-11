@@ -28,6 +28,9 @@ np.random.seed(42)
 random.seed(42)
 torch.manual_seed(42)
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+"""
 is_cuda = torch.cuda.is_available()
 
 if is_cuda:
@@ -36,26 +39,20 @@ if is_cuda:
 else:
     device = torch.device("cpu")
     print("GPU not available, CPU used")
-    
+"""
+
 def freeze_transformer_layers(
                               model,
                               model_name:str='bert',
+                              unfreeze:bool=False,
 ):
-    """
-    Args:
-        model (pretrained BERT transformer model)
-        model_name (str): name of the pretrained transformer model
-    Return:
-        QA model whose transformer layers are frozen (i.e., BERT weights won't be updated during backpropagation)
-    """
     model_names = ['roberta', 'bert',]
     model_name = model_name.lower()
     if model_name not in model_names:
         raise ValueError('Incorrect model name provided. Model name must be one of {}'.format(model_names))
     for n, p in model.named_parameters():
         if n.startswith(model_name):
-            # no gradient computation
-            p.requires_grad = False
+            p.requires_grad = True if unfreeze else False
     return model
 
 # sort sequences in decreasing order w.r.t. to orig. sequence length

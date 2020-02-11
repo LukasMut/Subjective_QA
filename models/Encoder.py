@@ -9,6 +9,10 @@ import torch.nn.functional as F
 
 from models.utils import to_cpu
 
+# set device
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+"""
 is_cuda = torch.cuda.is_available()
 
 if is_cuda:
@@ -17,7 +21,7 @@ if is_cuda:
 else:
     device = torch.device("cpu")
     print("GPU not available, CPU used")
-
+"""
 class EncoderLSTM(nn.Module):
     
     def __init__(

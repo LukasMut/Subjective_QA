@@ -4,6 +4,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+# set device
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+"""
 is_cuda = torch.cuda.is_available()
 
 if is_cuda:
@@ -12,6 +16,7 @@ if is_cuda:
 else:
     device = torch.device("cpu")
     print("GPU not available, CPU used")
+"""
 
 class Highway(nn.Module):
 

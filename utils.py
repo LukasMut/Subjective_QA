@@ -42,6 +42,20 @@ np.random.seed(42)
 random.seed(42)
 torch.manual_seed(42)
 
+# set device
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+"""
+is_cuda = torch.cuda.is_available()
+
+if is_cuda:
+    device = torch.device("cuda")
+    print("GPU is available")
+else:
+    device = torch.device("cpu")
+    print("GPU not available, CPU used")
+"""
+
 def get_file(
              subdir:str,
              source:str,
@@ -103,10 +117,10 @@ def get_data(
         else:
             domains = ['books', 'electronics', 'grocery', 'movies', 'restaurants', 'tripadvisor', 'all']
             assert isinstance(domain, str), 'domain must be one of {}'.format(domains)
-            secret_domain = 'trustyou'
+            hidden_domain = 'trustyou'
             file = get_file(subdir, source, domain, split)
             subjqa_df = pd.read_csv(file)
-            subjqa_df = subjqa_df[subjqa_df.name != secret_domain] if domain == 'all' else subjqa_df
+            subjqa_df = subjqa_df[subjqa_df.name != hidden_domain] if domain == 'all' else subjqa_df
             return subjqa_df
     else:
         raise Exception('You did not provide the correct subfolder name')

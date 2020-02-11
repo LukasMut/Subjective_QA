@@ -61,7 +61,7 @@ if __name__ == '__main__':
     print(args)
     print()
     
-    # move model and tensors to GPU, if GPU is available (device must be defined to do that)
+    # move model and tensors to GPU, if GPU is available (device must be defined)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     # set some crucial hyperparameters
