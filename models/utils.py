@@ -126,9 +126,9 @@ def train(
     
     if args["freeze_bert"]:
         model = freeze_transformer_layers(model)
-        print("-----------------------------------------------")
-        print("------ Pre-trained BERT model is frozen -------")
-        print("-----------------------------------------------")
+        print("--------------------------------------------------")
+        print("------ Pre-trained BERT weights are frozen -------")
+        print("--------------------------------------------------")
         print()
         
     # store loss and accuracy for plotting
@@ -142,7 +142,8 @@ def train(
     
     # path to save models
     model_path = args['model_dir'] 
-        
+    
+    # define loss function
     loss_func = nn.CrossEntropyLoss()
 
     for epoch in trange(args['n_epochs'],  desc="Epoch"):
@@ -150,6 +151,15 @@ def train(
         ### Training ###
 
         model.train()
+        
+        if args['freeze_bert'] and epoch == args['n_epochs'] - 1:
+            model = freeze_transformer_layers(model, unfreeze=True)
+            print("------------------------------------------------------")
+            print("------- Pre-trained BERT weights are unfrozen --------")
+            print("------------------------------------------------------")
+            print("------ Entire model will be trained for 1 epoch ------")
+            print("------------------------------------------------------")
+            print()
 
         tr_loss, correct_answers, batch_f1 = 0, 0, 0
         nb_tr_examples, nb_tr_steps = 0, 0
@@ -192,7 +202,6 @@ def train(
             # start and end loss must be computed separately
             start_loss = loss_func(start_logits, b_start_pos)
             end_loss = loss_func(end_logits, b_end_pos)
-            
             batch_loss = (start_loss + end_loss) / 2
             
             print("----------------------------------")
@@ -316,9 +325,12 @@ def train(
                 # start and end loss must be computed separately
                 start_loss = loss_func(start_logits_val, b_start_pos)
                 end_loss = loss_func(end_logits_val, b_end_pos)
-
                 batch_loss_val = (start_loss + end_loss) / 2
-                print("Current val loss: {}".format(total_loss))
+                
+                print("--------------------------------------")
+                print("----- Current val batch loss: {} -----".format(batch_loss_val))
+                print("--------------------------------------")
+                print()
                 
                 start_log_probs_val = to_cpu(F.log_softmax(start_logits_val, dim=1), detach=True, to_numpy=False)
                 end_log_probs_val = to_cpu(F.log_softmax(end_logits_val, dim=1), detach=True, to_numpy=False)
