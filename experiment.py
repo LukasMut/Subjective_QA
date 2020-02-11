@@ -1,9 +1,3 @@
-from __future__ import absolute_import, division, print_function
-
-import numpy as np
-import torch.nn as nn
-import torch.nn.functional as F
-
 import argparse
 import datetime
 import json
@@ -12,6 +6,10 @@ import random
 import re
 import torch 
 import transformers
+
+import numpy as np
+import torch.nn as nn
+import torch.nn.functional as F
 
 from collections import Counter, defaultdict
 from torch.optim import Adam, SGD, CosineAnnealingWarmRestarts
