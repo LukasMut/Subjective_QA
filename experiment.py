@@ -427,7 +427,7 @@ if __name__ == '__main__':
             
             subjqa_data_test = convert_df_to_dict(
                                                   subjqa_data_test,
-                                                  hidden_domain_indexes= hidden_domain_idx_test
+                                                  hidden_domain_indexes= hidden_domain_idx_test,
                                                   split='test',
             )
             
