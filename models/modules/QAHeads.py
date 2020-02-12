@@ -99,14 +99,18 @@ class LinearQAHead(nn.Module):
         if self.multitask and isinstance(self.n_aux_tasks, int):
             # we only need hidden states of last time step (summary of the sequence) (i.e., seq[batch_size, -1, hidden_size])
             sbj_logits = self.sbj_outputs(sequence_output[:, -1, :])
+            sbj_logits = sbj_logits.squeeze(-1)
             if self.n_aux_tasks == 1:
                 return outputs, sbj_logits
             elif self.n_aux_tasks == 2:
                 domain_logits = self.domain_outputs(sequence_output[:, -1, :])
+                domain_logits = domain_logits.squeeze(-1)
                 return outputs, sbj_logits, domain_logits
             elif self.n_aux_tasks == 3:
                 domain_logits = self.domain_outputs(sequence_output[:, -1, :])
                 ds_logits = self.ds_outputs(sequence_output[:, -1, :])
+                domain_logits = domain_logits.squeeze(-1)
+                ds_logits = ds_logits.squeeze(-1)
                 return outputs, sbj_logits, domain_logits, ds_logits
         else:
             return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)
@@ -176,6 +180,7 @@ class RecurrentQAHead(nn.Module):
         end_logits = end_logits.squeeze(-1)
 
         outputs = (start_logits, end_logits,) + bert_outputs[2:]
+        
         if (start_positions is not None) and (end_positions is not None):
             # If we are on multi-GPU, split add a dimension
             if len(start_positions.size()) > 1:
@@ -197,14 +202,18 @@ class RecurrentQAHead(nn.Module):
         if self.multitask and isinstance(self.n_aux_tasks, int):
             # we only need hidden states of last time step (summary of the sequence) (i.e., seq[batch_size, -1, hidden_size])
             sbj_logits = self.sbj_outputs(sequence_output[:, -1, :])
+            sbj_logits = sbj_logits.squeeze(-1)
             if self.n_aux_tasks == 1:
                 return outputs, sbj_logits
             elif self.n_aux_tasks == 2:
                 domain_logits = self.domain_outputs(sequence_output[:, -1, :])
+                domain_logits = domain_logits.squeeze(-1)
                 return outputs, sbj_logits, domain_logits
             elif self.n_aux_tasks == 3:
                 domain_logits = self.domain_outputs(sequence_output[:, -1, :])
                 ds_logits = self.ds_outputs(sequence_output[:, -1, :])
+                domain_logits = domain_logits.squeeze(-1)
+                ds_logits = ds_logits.squeeze(-1)
                 return outputs, sbj_logits, domain_logits, ds_logits
             else:
                 raise ValueError("Model cannot perform more than 3 auxiliary tasks along the main task.")
