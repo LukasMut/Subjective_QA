@@ -276,6 +276,8 @@ def train(
             start_loss = loss_func(start_logits, b_start_pos)
             end_loss = loss_func(end_logits, b_end_pos)
             qa_loss = (start_loss + end_loss) / 2
+            
+            # sum losses
             batch_loss += qa_loss + sbj_loss + domain_loss
             
             print("----------------------------------")
@@ -308,10 +310,6 @@ def train(
             batch_f1 += compute_f1_batch(true_answers, pred_answers)
                         
             # backpropagate error
-            
-            #TODO: figure out whether you have to backpropagate the error separately for start and end loss
-            #start_loss.backward()
-            #end_loss.backward()
             
             #TODO: figure out how to backpropagte errors for MTL
             #qa_loss.backward()
