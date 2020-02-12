@@ -71,7 +71,7 @@ if __name__ == '__main__':
     
     # classes for auxiliary tasks
     domains = ['books', 'tripadvisor', 'grocery', 'electronics', 'movies', 'restaurants', 'wikipedia']
-    qa_types = ['sbj', 'obj']
+    qa_types = ['obj', 'sbj']
     datasets = ['SQuAD', 'SubjQA']
     
     # define, whether we should inform model about question or answer type
@@ -82,7 +82,7 @@ if __name__ == '__main__':
     domain_to_idx = class_to_idx(domains)
     domain_weights = None
     
-    idx_to_qa_type = idx_to_class(qa_types)
+    idx_to_qa_types = idx_to_class(qa_types)
     qa_type_to_idx = class_to_idx(qa_types)
     qa_type_weights = None
     
