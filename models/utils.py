@@ -152,19 +152,19 @@ def train(
     # define loss function (Cross-Entropy is numerically more stable than LogSoftmax plus Negative-Log-Likelihood)
     qa_loss_func = nn.CrossEntropyLoss()
     
-    if isinstance(n_aux_tasks, int) and n_aux_tasks >= 1:
+    if isinstance(n_aux_tasks, int):
         
         # loss func for auxiliary task to inform model about subjectivity (binary classification)
         assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
-        assert len(qa_type_weights) == 1, 'For binary cross-entropy loss, we must provide a single weight for positive examples"
+        assert len(qa_type_weights) == 1, 'For binary cross-entropy loss, we must provide a single weight for positive examples'
         
         if n_aux_tasks == 1:
             sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
         
         # loss func for auxiliary task to inform model about different domains (multi-way classification)
         elif n_aux_tasks == 2:
-            assert isinstance(domain_weights, torch.Tensor), 'Tensor of class weights for different domains is not provided'
             sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
+            assert isinstance(domain_weights, torch.Tensor), 'Tensor of class weights for different domains is not provided'
             domain_loss_func = nn.CrossEntropyLoss(weight=domain_weights.to(device))
     
     if args['freeze_bert']:
