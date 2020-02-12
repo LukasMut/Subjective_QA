@@ -374,8 +374,8 @@ def train(
         model.eval()
         
         correct_answers_val, batch_f1_val = 0, 0
-        val_f1, val_loss = 0, 0
-        nb_val_steps = 0
+        val_f1 = 0
+        nb_val_steps, nb_val_examples = 0, 0
 
         for batch in val_dl:
             
@@ -452,7 +452,7 @@ def train(
 
         val_loss = val_loss / nb_val_steps
         val_exact_match = 100 * (correct_answers / n_tr_examples)
-        val_f1 = 100 * (batch_f1 / nb_tr_examples)
+        val_f1 = 100 * (batch_f1_val / nb_tr_examples)
         
         print("----------------------------------")
         print("---------- EPOCH {} ----------".format(epoch))
@@ -496,7 +496,7 @@ def test(
 
     correct_answers_test, batch_f1_test = 0, 0
     test_f1, test_loss = 0, 0
-    nb_test_steps = 0
+    nb_test_steps, nb_test_examples = 0, 0
 
     for batch in test_dl:
        
