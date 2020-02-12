@@ -631,7 +631,6 @@ if __name__ == '__main__':
                                                 tokenizer=bert_tokenizer,
                                                 test_dl=test_dl,
                                                 batch_size=batch_size,
-                                                n_tasks=args.n_tasks,
                                                 sort_batch=False,
             )
             
