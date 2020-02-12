@@ -241,9 +241,8 @@ def train(
                     # compute auxiliary loss (subjectivity loss)
                     if args['qa_type'] == 'question':
                         b_q_sbj = b_q_sbj.type_as(sbj_logits)
-                        print("Logits: {}".format(sbj_logits))
-                        print("True labels: {}".format(b_q_sbj))
                         sbj_loss = sbj_loss_func(sbj_logits, b_q_sbj)
+                        
                     elif args['qa_type'] == 'answer':
                         b_a_sbj = b_a_sbj.type_as(sbj_logits)
                         sbj_loss = sbj_loss_func(sbj_logits, b_a_sbj)
@@ -261,11 +260,11 @@ def train(
                     if args['qa_type'] == 'question':
                         b_q_sbj = b_q_sbj.type_as(sbj_logits)
                         sbj_loss = sbj_loss_func(sbj_logits, b_q_sbj)
+                        
                     elif args['qa_type'] == 'answer':
                         b_a_sbj = b_a_sbj.type_as(sbj_logits)
                         sbj_loss = sbj_loss_func(sbj_logits, b_a_sbj)
                     
-                    b_domains = b_domains.type_as(domain_logits)
                     domain_loss = domain_loss_func(domain_logits, b_domains)
                 
                 """
@@ -284,12 +283,17 @@ def train(
             end_loss = loss_func(end_logits, b_end_pos)
             qa_loss = (start_loss + end_loss) / 2
             
-            # sum losses
-            batch_loss += qa_loss + sbj_loss + domain_loss
+            # accumulate all losses
+            if isinstance(n_aux_tasks, type(None)):
+                batch_loss += qa_loss
+            elif n_aux_tasks == 1:
+                batch_loss += (qa_loss + sbj_loss) / 2
+            elif n_aux_tasks == 2:
+                batch_loss += (qa_loss + sbj_loss + domain_loss) / 3
             
-            print("----------------------------------")
-            print("----- Current batch loss: {} -----".format(batch_loss))
-            print("----------------------------------")
+            print("------------------------------------")
+            print("----- Current batch loss: {} -----".format(round(batch_loss, 3)))
+            print("------------------------------------")
             print()
 
             batch_losses.append(batch_loss.item())
@@ -343,8 +347,8 @@ def train(
             current_batch_acc = 100 * (correct_answers / nb_tr_examples)
             
             print("--------------------------------------------")
-            print("----- Current batch exact-match: {} % -----".format(current_batch_acc))
-            print("----- Current batch F1: {} % -----".format(current_batch_f1))
+            print("----- Current batch exact-match: {} % -----".format(round(current_batch_acc, 3)))
+            print("----- Current batch F1: {} % -----".format(round(current_batch_f1, 3)))
             print("--------------------------------------------")
             print()
         
@@ -354,9 +358,9 @@ def train(
         
         print("-------------------------------")
         print("---------- EPOCH {} ----------".format(epoch))
-        print("----- Train loss: {} -----".format(tr_loss/nb_tr_steps))
-        print("----- Train exact-match: {} % -----".format(train_exact_match))
-        print("----- Train F1: {} % -----".format(train_f1))
+        print("----- Train loss: {} -----".format(round(tr_loss/nb_tr_steps, 3)))
+        print("----- Train exact-match: {} % -----".format(round(train_exact_match, 3)))
+        print("----- Train F1: {} % -----".format(round(train_f1, 3)))
         print("-------------------------------")
         print()
 
@@ -412,9 +416,9 @@ def train(
                 end_loss = loss_func(end_logits_val, b_end_pos)
                 batch_loss_val = (start_loss + end_loss) / 2
                 
-                print("--------------------------------------")
-                print("----- Current val batch loss: {} -----".format(batch_loss_val))
-                print("--------------------------------------")
+                print("----------------------------------------")
+                print("----- Current val batch loss: {} -----".format(round(batch_loss_val, 3)))
+                print("----------------------------------------")
                 print()
                 
                 start_log_probs_val = to_cpu(F.log_softmax(start_logits_val, dim=1), detach=True, to_numpy=False)
@@ -450,12 +454,12 @@ def train(
         val_exact_match = 100 * (correct_answers / n_tr_examples)
         val_f1 = 100 * (batch_f1 / nb_tr_examples)
         
-        print("-------------------------------")
+        print("----------------------------------")
         print("---------- EPOCH {} ----------".format(epoch))
-        print("----- Val loss: {} -----".format(val_loss))
-        print("----- Val exact-match: {} % -----".format(val_exact_match))
-        print("----- Val F1: {} % -----".format(val_f1))
-        print("-------------------------------")
+        print("----- Val loss: {} -----".format(round(val_loss, 3)))
+        print("----- Val exact-match: {} % -----".format(round(val_exact_match, 3)))
+        print("----- Val F1: {} % -----".format(round(val_f1, 3)))
+        print("----------------------------------")
         print()
         
         if (epoch == 0) or (val_exact_match > val_accs[-1]):
