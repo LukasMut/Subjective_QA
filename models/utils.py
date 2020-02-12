@@ -490,6 +490,9 @@ def test(
 
     # set model to eval mode
     model.eval()
+    
+    # define loss function
+    loss_func = nn.CrossEntropyLoss()
 
     correct_answers_test, batch_f1_test = 0, 0
     test_f1, test_loss = 0, 0
