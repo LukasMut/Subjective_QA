@@ -869,7 +869,7 @@ def create_alternating_batches(
     # since we perfrom floor / integer division, we have to compute a window
     n_batch_total_range = [n_batches_total - 1, n_batches_total, n_batches_total + 1]
     print("Number of batches in combined dataset: {}".format(len(dataset_combined)))
-    print("Number of batches combined dataset should contain: {}".format(n_batches_total))
+    print("Number of batches combined dataset should consist of: {}".format(n_batches_total))
     print()
     assert len(dataset_combined) in n_batch_total_range, 'Dataset does not contain correct number of chunked examples'
     
