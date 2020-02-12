@@ -444,7 +444,7 @@ if __name__ == '__main__':
             if args.multitask:
                 assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
                 if args.n_aux_tasks == 2:
-                    squad_domains = [f.domain for f in squad_feature_train]
+                    squad_domains = [f.domain for f in squad_features_train]
                     subjqa_domains = [f.domain for f in subjqa_features_train]
                     domain_weights = get_class_weights(
                                                        subjqa_classes=subjqa_domains,
