@@ -850,13 +850,7 @@ def create_alternating_batches(
             chunked_dataset.append(dataset[idx: idx + batch_size])
             idx += batch_size
         return chunked_dataset
-    
-    # TODO: figure out, whether this step is actually necessary (do we want to shuffle dataset before chunking?)
-    if split == 'train':
-        # during training randomly sample examples (hence, shuffle the dataset)
-        np.random.shuffle(dataset_squad)
-        np.random.shuffle(dataset_subjqa)
-        
+            
     dataset_squad_chunked = chunk_dataset(
                                           dataset=dataset_squad,
                                           n_examples=n_squad_examples, 

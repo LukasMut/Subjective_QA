@@ -336,6 +336,7 @@ if __name__ == '__main__':
                                                                domain_to_idx=domain_to_idx,
                                                                dataset_to_idx=dataset_to_idx,
             )
+            np.random.shuffle(subjqa_features_train)
             
             subjqa_tensor_dataset_train = create_tensor_dataset(
                                                                 subjqa_features_train,
@@ -384,6 +385,7 @@ if __name__ == '__main__':
                                                              domain_to_idx=domain_to_idx,
                                                              dataset_to_idx=dataset_to_idx,
             )
+            np.random.shuffle(squad_features_train)
             
             squad_tensor_dataset_train = create_tensor_dataset(
                                                    squad_features_train,
