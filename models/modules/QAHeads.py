@@ -56,7 +56,7 @@ class LinearQAHead(nn.Module):
                 self.domain_outputs = nn.Linear(in_size, 7)
                 # SubjQA vs. SQuAD (binary classification whether seq belongs to SQuAD or SubjQA)
                 self.ds_outputs = nn.Linear(in_size, 2)
-            else:
+            elif self.n_aux_tasks > 3:
                 raise ValueError("Model cannot perform more than 3 auxiliary tasks.")
                     
     def forward(
@@ -145,7 +145,7 @@ class RecurrentQAHead(nn.Module):
                 self.domain_outputs = nn.Linear(in_size, 7)
                 # SubjQA vs. SQuAD (binary classification whether seq belongs to SQuAD or SubjQA)
                 self.ds_outputs = nn.Linear(in_size, 2)
-            else:
+            elif self.n_aux_tasks > 3:
                 raise ValueError("Model cannot perform more than 3 auxiliary tasks.")
 
     def forward(
