@@ -50,8 +50,10 @@ class BertForQA(BertPreTrainedModel):
         self.highway_connection = highway_connection
         self.multitask = multitask
         self.n_aux_tasks = n_aux_tasks
-        
+      
         assert isinstance(self.qa_head_name, str), "QA head must be defined, and has to be one of {'LinearQAHead', 'RecurrentQAHead'}"
+        if self.multitask: assert isinstance(self.n_aux_tasks, int), "If MTL setting, number of auxiliary tasks must be defined"
+
         
         if self.qa_head_name == 'LinearQAHead':
             self.qa_head = LinearQAHead(

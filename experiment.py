@@ -203,10 +203,12 @@ if __name__ == '__main__':
                                                        subjqa_classes=subjqa_domains,
                                                        idx_to_class=idx_to_domains,
                 ) 
+                
                 if qa_type == 'question':
                     subjqa_qa_types = [f.q_sbj for f in subjqa_features_train] 
                 elif qa_type == 'answer':
                     subjqa_qa_types = [f.a_sbj for f in subjqa_features_train]
+                
                 qa_type_weights = get_class_weights(
                                                     subjqa_classes=subjqa_qa_types,
                                                     idx_to_class=idx_to_qa_types,
@@ -417,12 +419,14 @@ if __name__ == '__main__':
                                                        idx_to_class=idx_to_domains,
                                                        squad_classes=squad_domains,
                 ) 
+                
                 if qa_type == 'question':
                     subjqa_qa_types = [f.q_sbj for f in subjqa_features_train] 
                     squad_qa_types = [f.q_sbj for f in squad_features_train] 
                 elif qa_type == 'answer':
                     subjqa_qa_types = [f.a_sbj for f in subjqa_features_train]
                     squad_qa_types = [f.a_sbj for f in squad_features_train]
+                
                 qa_type_weights = get_class_weights(
                                                     subjqa_classes=subjqa_qa_types,
                                                     idx_to_class=idx_to_qa_types,
