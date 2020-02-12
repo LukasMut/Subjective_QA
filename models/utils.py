@@ -592,10 +592,10 @@ def test(
     print()
     print("------------------------------------")
     print("------------ Inference ------------")
-    print("----- Test loss: {} -----".format(round(test_loss, 3)))
+    print("------- Test loss: {} -------".format(round(test_loss, 3)))
     print("----- Test exact-match: {} % -----".format(round(test_exact_match, 3)))
-    print("----- Test F1: {} % -----".format(round(test_f1, 3)))
+    print("------- Test F1: {} % -------".format(round(test_f1, 3)))
     print("------------------------------------")
     print()
    
-    return test_loss, test_acc, test_f1
+    return test_loss, test_exact_match, test_f1
