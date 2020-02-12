@@ -491,7 +491,7 @@ def test(
     nb_test_steps = 0
 
     for batch in test_dl:
-
+       
         batch_loss_test = 0
 
         # add batch to current device
@@ -499,6 +499,11 @@ def test(
 
         # unpack inputs from dataloader            
         b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_cls_indexes, _, _, _, _, _ = batch
+        
+        # if current batch_size is smaller than specified batch_size, skip batch
+        if b_input_ids.size(0) != batch_size:
+            questions_not_tested = b_input_ids.size(0)
+            continue
 
         if sort_batch:
             # sort sequences in batch in decreasing order w.r.t. to (original) sequence length

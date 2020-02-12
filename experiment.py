@@ -78,7 +78,7 @@ if __name__ == '__main__':
     qa_type = 'question'
     
     # create domain_to_idx, qa_type_to_idx and dataset_to_idx mappings (necessary for auxiliary tasks)
-    idx_to_domain = idx_to_class(domains)
+    idx_to_domains = idx_to_class(domains)
     domain_to_idx = class_to_idx(domains)
     domain_weights = None
     
