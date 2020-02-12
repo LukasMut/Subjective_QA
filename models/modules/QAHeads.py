@@ -47,7 +47,7 @@ class LinearQAHead(nn.Module):
         
         if self.multitask:
             # subjectivity output layer (must be present in every MTL setting)
-            self.sbj_outputs = nn.Linear(in_size, 2)
+            self.sbj_outputs = nn.Linear(in_size, 1)
             if self.n_aux_tasks == 2:
                 # 6 domains in SubjQA plus Wikipedia from SQuAD --> 7 classes
                 self.domain_outputs = nn.Linear(in_size, 7)
@@ -55,7 +55,7 @@ class LinearQAHead(nn.Module):
                 # 6 domains in SubjQA plus Wikipedia from SQuAD --> 7 classes
                 self.domain_outputs = nn.Linear(in_size, 7)
                 # SubjQA vs. SQuAD (binary classification whether seq belongs to SQuAD or SubjQA)
-                self.ds_outputs = nn.Linear(in_size, 2)
+                self.ds_outputs = nn.Linear(in_size, 1)
             elif self.n_aux_tasks > 3:
                 raise ValueError("Model cannot perform more than 3 auxiliary tasks.")
                     
@@ -97,15 +97,16 @@ class LinearQAHead(nn.Module):
             outputs = (total_loss,) + outputs
             
         if self.multitask and isinstance(self.n_aux_tasks, int):
-            sbj_logits = self.sbj_outputs(sequence_output)
+            # we only need hidden states of last time step (summary of the sequence) (i.e., seq[batch_size, -1, hidden_size])
+            sbj_logits = self.sbj_outputs(sequence_output[:, -1, :])
             if self.n_aux_tasks == 1:
                 return outputs, sbj_logits
             elif self.n_aux_tasks == 2:
-                domain_logits = self.domain_outputs(sequence_output)
+                domain_logits = self.domain_outputs(sequence_output[:, -1, :])
                 return outputs, sbj_logits, domain_logits
             elif self.n_aux_tasks == 3:
-                domain_logits = self.domain_outputs(sequence_output)
-                ds_logits = self.ds_outputs(sequence_output)
+                domain_logits = self.domain_outputs(sequence_output[:, -1, :])
+                ds_logits = self.ds_outputs(sequence_output[:, -1, :])
                 return outputs, sbj_logits, domain_logits, ds_logits
         else:
             return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)
@@ -136,7 +137,7 @@ class RecurrentQAHead(nn.Module):
         
         if self.multitask:
             # subjectivity output layer (must be present in every MTL setting)
-            self.sbj_outputs = nn.Linear(in_size, 2)
+            self.sbj_outputs = nn.Linear(in_size, 1)
             if self.n_aux_tasks == 2:
                 # 6 domains in SubjQA plus Wikipedia from SQuAD --> 7 classes
                 self.domain_outputs = nn.Linear(in_size, 7)
@@ -144,7 +145,7 @@ class RecurrentQAHead(nn.Module):
                 # 6 domains in SubjQA plus Wikipedia from SQuAD --> 7 classes
                 self.domain_outputs = nn.Linear(in_size, 7)
                 # SubjQA vs. SQuAD (binary classification whether seq belongs to SQuAD or SubjQA)
-                self.ds_outputs = nn.Linear(in_size, 2)
+                self.ds_outputs = nn.Linear(in_size, 1)
             elif self.n_aux_tasks > 3:
                 raise ValueError("Model cannot perform more than 3 auxiliary tasks.")
 
@@ -194,15 +195,16 @@ class RecurrentQAHead(nn.Module):
             outputs = (total_loss,) + outputs
         
         if self.multitask and isinstance(self.n_aux_tasks, int):
-            sbj_logits = self.sbj_outputs(sequence_output)
+            # we only need hidden states of last time step (summary of the sequence) (i.e., seq[batch_size, -1, hidden_size])
+            sbj_logits = self.sbj_outputs(sequence_output[:, -1, :])
             if self.n_aux_tasks == 1:
                 return outputs, sbj_logits
             elif self.n_aux_tasks == 2:
-                domain_logits = self.domain_outputs(sequence_output)
+                domain_logits = self.domain_outputs(sequence_output[:, -1, :])
                 return outputs, sbj_logits, domain_logits
             elif self.n_aux_tasks == 3:
-                domain_logits = self.domain_outputs(sequence_output)
-                ds_logits = self.ds_outputs(sequence_output)
+                domain_logits = self.domain_outputs(sequence_output[:, -1, :])
+                ds_logits = self.ds_outputs(sequence_output[:, -1, :])
                 return outputs, sbj_logits, domain_logits, ds_logits
             else:
                 raise ValueError("Model cannot perform more than 3 auxiliary tasks along the main task.")
