@@ -150,9 +150,9 @@ def train(
     model_path = args['model_dir'] 
     
     # define loss function (Cross-Entropy is numerically more stable than LogSoftmax plus Negative-Log-Likelihood)
-    loss_func = nn.CrossEntropyLoss()
+    qa_loss_func = nn.CrossEntropyLoss()
     
-    if isinstance(n_aux_tasks, int):
+    if isinstance(n_aux_tasks, int) and n_aux_tasks >= 1:
         
         # loss func for auxiliary task to inform model about subjectivity (binary classification)
         assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
@@ -279,8 +279,8 @@ def train(
                 """
                 
             # start and end loss must be computed separately
-            start_loss = loss_func(start_logits, b_start_pos)
-            end_loss = loss_func(end_logits, b_end_pos)
+            start_loss = qa_loss_func(start_logits, b_start_pos)
+            end_loss = qa_loss_func(end_logits, b_end_pos)
             qa_loss = (start_loss + end_loss) / 2
             
             # accumulate all losses
@@ -412,8 +412,8 @@ def train(
                 end_true_val = to_cpu(b_end_pos)
                 
                 # start and end loss must be computed separately
-                start_loss = loss_func(start_logits_val, b_start_pos)
-                end_loss = loss_func(end_logits_val, b_end_pos)
+                start_loss = qa_loss_func(start_logits_val, b_start_pos)
+                end_loss = qa_loss_func(end_logits_val, b_end_pos)
                 batch_loss_val = (start_loss + end_loss) / 2
                 
                 print("----------------------------------------")
@@ -568,16 +568,16 @@ def test(
             current_batch_acc = 100 * (correct_answers_test / nb_test_examples)
 
     test_loss = test_loss / nb_test_steps
-    test_exact_match = 100 * (correct_answers / n_tr_examples)
-    test_f1 = 100 * (batch_f1 / nb_tr_examples)
+    test_exact_match = 100 * (correct_answers_test / nb_test_examples)
+    test_f1 = 100 * (batch_f1_test / nb_test_examples)
     
     print()
-    print("-------------------------------")
+    print("------------------------------------")
     print("---------- Inference ----------")
-    print("----- Test loss: {} -----".format(test_loss))
-    print("----- Test exact-match: {} % -----".format(test_exact_match))
-    print("----- Test F1: {} % -----".format(test_f1))
-    print("-------------------------------")
+    print("----- Test loss: {} -----".format(round(test_loss, 3)))
+    print("----- Test exact-match: {} % -----".format(round(test_exact_match, 3)))
+    print("----- Test F1: {} % -----".format(round(test_f1, 3)))
+    print("------------------------------------")
     print()
    
     return test_loss, test_acc, test_f1
