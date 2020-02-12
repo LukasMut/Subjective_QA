@@ -614,6 +614,8 @@ if __name__ == '__main__':
                 # test (simple) BERT-QA-model fine-tuned on SQuAD without (prior)task-specific fine-tuning on SubjQA
                 model = BertForQuestionAnswering.from_pretrained(pretrained_weights)
                 model_name = 'bert_pretrained_squad_no_fine_tuning'
+                # set model to device
+                model.to(device)
             else:
                 model = BertForQA.from_pretrained(
                                                   pretrained_weights,
@@ -623,7 +625,10 @@ if __name__ == '__main__':
                                                   multitask=args.multitask,
                                                   n_aux_taks=args.n_aux_tasks,
                 )
+                # load fine-tuned model
                 model.load_state_dict(torch.load(args.sd + '/%s' % (model_name)))
+                # set model to device
+                model.to(device)
                                                                  
             
             test_loss, test_acc, test_f1 = test(
