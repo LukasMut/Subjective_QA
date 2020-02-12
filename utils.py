@@ -802,7 +802,7 @@ def get_class_weights(
         
     class_weights = {c: 1 - (v / n_total) for c, v in class_distrib.items()}
     class_weights = [class_weights[c] for _, c in idx_to_class.items()]
-    return class_weights
+    return torch.tensor(class_weights)
 
 def idx_to_class(classes:list): return dict(enumerate(classes))
 def class_to_idx(classes:list): return {c: i for i, c in enumerate(classes)}
