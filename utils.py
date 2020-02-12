@@ -783,6 +783,8 @@ def get_class_weights(
                       subjqa_classes:list,
                       idx_to_class:dict,
                       squad_classes=None,
+                      binary:bool=False,
+
 ):
     n_total_subjqa = len(subjqa_classes)
     class_distrib_subjqa = {idx_to_class[l]: freq for l, freq in Counter(subjqa_classes).items()}
@@ -799,10 +801,20 @@ def get_class_weights(
     else:
         n_total = n_total_subjqa
         class_distrib = class_distrib_subjqa
-        
-    class_weights = {c: 1 - (v / n_total) for c, v in class_distrib.items()}
-    class_weights = [class_weights[c] for _, c in idx_to_class.items()]
-    return torch.tensor(class_weights)
+    
+    if binary:
+        # for binary cross-entropy we just need to compute weight for positive class
+        class_weight = class_distrib['obj'] / class_distrib['sbj']
+        print("Subjective questions will be weighted {} higher than objective questions".format(class_weight))
+        print()
+        return torch.tensor(class_weight, dtype=torch.float)
+    else:
+        class_weights = {c: 1 - (v / n_total) for c, v in class_distrib.items()}
+        print("Domain weights: {}".format(class_weights))
+        print()
+        # sort weights in the correct order (as will be presented to the model)
+        class_weights = [class_weights[c] for _, c in idx_to_class.items()]
+        return torch.tensor(class_weights, dtype=torch.float)
 
 def idx_to_class(classes:list): return dict(enumerate(classes))
 def class_to_idx(classes:list): return {c: i for i, c in enumerate(classes)}

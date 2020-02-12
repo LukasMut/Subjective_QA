@@ -157,15 +157,15 @@ def train(
         # loss func for auxiliary task to inform model about subjectivity (binary classification)
         if n_aux_tasks == 1:
             assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
-            sbj_loss_func = nn.BCEWithLogitsLoss(weight=qa_type_weights)
+            sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
         
         # loss func for auxiliary task to inform model about subjectivity (binary classification)
         # loss func for auxiliary task to inform model about different domains (multi-way classification)
         elif n_aux_tasks == 2:
             assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
             assert isinstance(domain_weights, torch.Tensor), 'Tensor of class weights for different domains is not provided'
-            sbj_loss_func = nn.BCEWithLogitsLoss(weight=qa_type_weights)
-            domain_loss_func = nn.CrossEntropyLoss(weight=domain_weights)
+            sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
+            domain_loss_func = nn.CrossEntropyLoss(weight=domain_weights.to(device))
     
     if args['freeze_bert']:
         if args['n_epochs'] <= 5:
@@ -238,10 +238,14 @@ def train(
                 )
                     start_logits, end_logits = ans_logits
                     
-                    # compute auxiliary loss
+                    # compute auxiliary loss (subjectivity loss)
                     if args['qa_type'] == 'question':
+                        b_q_sbj = b_q_sbj.type_as(sbj_logits)
+                        print("Logits: {}".format(sbj_logits))
+                        print("True labels: {}".format(b_q_sbj))
                         sbj_loss = sbj_loss_func(sbj_logits, b_q_sbj)
                     elif args['qa_type'] == 'answer':
+                        b_a_sbj = b_a_sbj.type_as(sbj_logits)
                         sbj_loss = sbj_loss_func(sbj_logits, b_a_sbj)
                     
                 elif n_aux_tasks == 2:
@@ -255,10 +259,13 @@ def train(
                     
                     # compute auxiliary losses
                     if args['qa_type'] == 'question':
+                        b_q_sbj = b_q_sbj.type_as(sbj_logits)
                         sbj_loss = sbj_loss_func(sbj_logits, b_q_sbj)
                     elif args['qa_type'] == 'answer':
+                        b_a_sbj = b_a_sbj.type_as(sbj_logits)
                         sbj_loss = sbj_loss_func(sbj_logits, b_a_sbj)
-                        
+                    
+                    b_domains = b_domains.type_as(domain_logits)
                     domain_loss = domain_loss_func(domain_logits, b_domains)
                 
                 """

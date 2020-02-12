@@ -212,6 +212,7 @@ if __name__ == '__main__':
                 qa_type_weights = get_class_weights(
                                                     subjqa_classes=subjqa_qa_types,
                                                     idx_to_class=idx_to_qa_types,
+                                                    binary=True,
                 ) 
                 
         elif args.finetuning == 'SQuAD':
@@ -338,6 +339,7 @@ if __name__ == '__main__':
             )
             np.random.shuffle(subjqa_features_train)
             
+            """
             subjqa_tensor_dataset_train = create_tensor_dataset(
                                                                 subjqa_features_train,
                                                                 evaluate=False,
@@ -347,6 +349,7 @@ if __name__ == '__main__':
                                                               subjqa_features_dev,
                                                               evaluate=False,
             )
+            """
             
             # load SQuAD data
             squad_data_train = get_data(
@@ -386,7 +389,7 @@ if __name__ == '__main__':
                                                              dataset_to_idx=dataset_to_idx,
             )
             np.random.shuffle(squad_features_train)
-            
+            """
             squad_tensor_dataset_train = create_tensor_dataset(
                                                                squad_features_train,
                                                                evaluate=False,
@@ -396,7 +399,23 @@ if __name__ == '__main__':
                                                              squad_features_dev,
                                                              evaluate=False,
             )
-              
+            """
+            squad_features_train.extend(subjqa_features_train)
+            squad_features_dev.extend(subjqa_features_dev)
+            combined_features_train = squad_features_train
+            combined_features_dev = squad_features_dev
+            
+            combined_tensor_dataset_train = create_tensor_dataset(
+                                                                  combined_features_train,
+                                                                  evaluate=False,
+            )
+            
+            combined_tensor_dataset_dev = create_tensor_dataset(
+                                                                  combined_features_dev,
+                                                                  evaluate=False,
+            )
+            
+            """
             train_dl = AlternatingBatchGenerator(
                                                  squad_tensor_dataset_train,
                                                  subjqa_tensor_dataset_train,
@@ -410,7 +429,18 @@ if __name__ == '__main__':
                                                batch_size=batch_size,
                                                split='eval',
             )
-            
+            """
+            train_dl = create_batches(
+                                      dataset=combined_tensor_dataset_train,
+                                      batch_size=batch_size,
+                                      split='train',
+            )
+
+            val_dl = create_batches(
+                                    dataset=combined_tensor_dataset_dev,
+                                    batch_size=batch_size,
+                                    split='eval',
+            )
             if args.multitask:
                 assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
                 if args.n_aux_tasks == 2:
@@ -433,6 +463,7 @@ if __name__ == '__main__':
                                                     subjqa_classes=subjqa_qa_types,
                                                     idx_to_class=idx_to_qa_types,
                                                     squad_classes=squad_qa_types,
+                                                    binary=True,
                 )   
         
         # initialise QA model

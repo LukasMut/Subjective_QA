@@ -99,6 +99,7 @@ class LinearQAHead(nn.Module):
         if self.multitask and isinstance(self.n_aux_tasks, int):
             # we only need hidden states of last time step (summary of the sequence) (i.e., seq[batch_size, -1, hidden_size])
             sbj_logits = self.sbj_outputs(sequence_output[:, -1, :])
+            # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
             sbj_logits = sbj_logits.squeeze(-1)
             if self.n_aux_tasks == 1:
                 return outputs, sbj_logits
@@ -202,6 +203,7 @@ class RecurrentQAHead(nn.Module):
         if self.multitask and isinstance(self.n_aux_tasks, int):
             # we only need hidden states of last time step (summary of the sequence) (i.e., seq[batch_size, -1, hidden_size])
             sbj_logits = self.sbj_outputs(sequence_output[:, -1, :])
+            # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
             sbj_logits = sbj_logits.squeeze(-1)
             if self.n_aux_tasks == 1:
                 return outputs, sbj_logits
