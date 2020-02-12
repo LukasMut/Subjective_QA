@@ -867,6 +867,9 @@ def create_alternating_batches(
         np.random.shuffle(dataset_squad_chunked)
     dataset_combined = dataset_squad_chunked
     
+    print("Number of batches in combined dataset: {}".format(len(dataset_combined)))
+    print("Number of batches combined dataset should contain: {}".format(n_batches_total))
+    print()
     assert len(dataset_combined) == n_batches_total, 'Dataset does not contain correct number of chunked examples'
     
     for batch in dataset_combined:

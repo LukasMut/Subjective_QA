@@ -388,13 +388,13 @@ if __name__ == '__main__':
             np.random.shuffle(squad_features_train)
             
             squad_tensor_dataset_train = create_tensor_dataset(
-                                                   squad_features_train,
-                                                   evaluate=False,
+                                                               squad_features_train,
+                                                               evaluate=False,
             )
 
             squad_tensor_dataset_dev = create_tensor_dataset(
-                                                 squad_features_dev,
-                                                 evaluate=False,
+                                                             squad_features_dev,
+                                                             evaluate=False,
             )
               
             train_dl = AlternatingBatchGenerator(
@@ -405,8 +405,8 @@ if __name__ == '__main__':
             )
 
             val_dl = AlternatingBatchGenerator(
-                                               squad_tensor_dataset_train,
-                                               subjqa_tensor_dataset_train,
+                                               squad_tensor_dataset_dev,
+                                               subjqa_tensor_dataset_dev,
                                                batch_size=batch_size,
                                                split='eval',
             )
