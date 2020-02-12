@@ -481,6 +481,7 @@ def test(
           test_dl,
           batch_size:int,
           sort_batch:bool=False,
+          not_finetuned:bool=False,
 ):
     n_iters = len(test_dl)
     n_examples = n_iters * batch_size
@@ -521,13 +522,21 @@ def test(
             )
 
         with torch.no_grad():
+            
+            if not_finetuned:
+                start_logits_test, end_logits_test = model(
+                                                           input_ids=b_input_ids,
+                                                           attention_mask=b_attn_masks,
+                                                           token_type_ids=b_token_type_ids,
+                )
 
-            start_logits_test, end_logits_test = model(
-                                                     input_ids=b_input_ids,
-                                                     attention_masks=b_attn_masks,
-                                                     token_type_ids=b_token_type_ids,
-                                                     input_lengths=b_input_lengths,
-            )
+            else:  
+                start_logits_test, end_logits_test = model(
+                                                         input_ids=b_input_ids,
+                                                         attention_masks=b_attn_masks,
+                                                         token_type_ids=b_token_type_ids,
+                                                         input_lengths=b_input_lengths,
+                )
 
             start_true_test = to_cpu(b_start_pos)
             end_true_test = to_cpu(b_end_pos)

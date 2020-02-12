@@ -632,6 +632,7 @@ if __name__ == '__main__':
                                                 test_dl=test_dl,
                                                 batch_size=batch_size,
                                                 sort_batch=False,
+                                                not_finetuned=args.not_finetund,
             )
             
             test_results = dict()
