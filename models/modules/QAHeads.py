@@ -40,27 +40,24 @@ class LinearQAHead(nn.Module):
         self.n_labels = n_labels_qa
         self.qa_outputs = nn.Linear(in_size, self.n_labels)
         self.multitask = multitask
-        self.n_aux_tasks=n_aux_tasks
+        self.n_aux_tasks = n_aux_tasks
         
         if highway_block:
             self.highway = Highway(in_size)
         
         if self.multitask:
-            if isinstance(self.n_aux_tasks, int):
-                # subjectivity output layer (must be present in every MTL setting)
-                self.sbj_outputs == nn.Linear(in_size, 2)
-                if self.n_aux_tasks == 2:
-                    # 6 domains in SubjQA plus Wikipedia from SQuAD --> 7 classes
-                    self.domain_outputs = nn.Linear(in_size, 7)
-                elif self.n_aux_tasks == 3:
-                    # 6 domains in SubjQA plus Wikipedia from SQuAD --> 7 classes
-                    self.domain_outputs = nn.Linear(in_size, 7)
-                    # SubjQA vs. SQuAD (binary classification whether seq belongs to SQuAD or SubjQA)
-                    self.ds_outputs = nn.Linear(in_size, 2)
-                else:
-                    raise ValueError("Model cannot perform more than 3 auxiliary tasks.")
+            # subjectivity output layer (must be present in every MTL setting)
+            self.sbj_outputs = nn.Linear(in_size, 2)
+            if self.n_aux_tasks == 2:
+                # 6 domains in SubjQA plus Wikipedia from SQuAD --> 7 classes
+                self.domain_outputs = nn.Linear(in_size, 7)
+            elif self.n_aux_tasks == 3:
+                # 6 domains in SubjQA plus Wikipedia from SQuAD --> 7 classes
+                self.domain_outputs = nn.Linear(in_size, 7)
+                # SubjQA vs. SQuAD (binary classification whether seq belongs to SQuAD or SubjQA)
+                self.ds_outputs = nn.Linear(in_size, 2)
             else:
-                raise TypeError("Number of auxiliary tasks must be defined in a MTL setting.")
+                raise ValueError("Model cannot perform more than 3 auxiliary tasks.")
                     
     def forward(
                 self,
@@ -138,21 +135,18 @@ class RecurrentQAHead(nn.Module):
         self.n_aux_tasks = n_aux_tasks
         
         if self.multitask:
-            if isinstance(self.n_aux_tasks, int):
-                # subjectivity output layer (must be present in every MTL setting)
-                self.sbj_outputs == nn.Linear(in_size, 2)
-                if self.n_aux_tasks == 2:
-                    # 6 domains in SubjQA plus Wikipedia from SQuAD --> 7 classes
-                    self.domain_outputs = nn.Linear(in_size, 7)
-                elif self.n_aux_tasks == 3:
-                    # 6 domains in SubjQA plus Wikipedia from SQuAD --> 7 classes
-                    self.domain_outputs = nn.Linear(in_size, 7)
-                    # SubjQA vs. SQuAD (binary classification whether seq belongs to SQuAD or SubjQA)
-                    self.ds_outputs = nn.Linear(in_size, 2)
-                else:
-                    raise ValueError("Model cannot perform more than 3 auxiliary tasks.")
+            # subjectivity output layer (must be present in every MTL setting)
+            self.sbj_outputs = nn.Linear(in_size, 2)
+            if self.n_aux_tasks == 2:
+                # 6 domains in SubjQA plus Wikipedia from SQuAD --> 7 classes
+                self.domain_outputs = nn.Linear(in_size, 7)
+            elif self.n_aux_tasks == 3:
+                # 6 domains in SubjQA plus Wikipedia from SQuAD --> 7 classes
+                self.domain_outputs = nn.Linear(in_size, 7)
+                # SubjQA vs. SQuAD (binary classification whether seq belongs to SQuAD or SubjQA)
+                self.ds_outputs = nn.Linear(in_size, 2)
             else:
-                raise TypeError("Number of auxiliary tasks must be defined in a MTL setting.")
+                raise ValueError("Model cannot perform more than 3 auxiliary tasks.")
 
     def forward(
                 self,
