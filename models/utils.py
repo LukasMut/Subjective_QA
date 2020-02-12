@@ -578,6 +578,12 @@ def test(
 
             current_batch_f1 = 100 * (batch_f1_test / nb_test_examples)
             current_batch_acc = 100 * (correct_answers_test / nb_test_examples)
+            
+            print("--------------------------------------------")
+            print("----- Current batch exact-match: {} % -----".format(round(current_batch_acc, 3)))
+            print("----- Current batch F1: {} % -----".format(round(current_batch_f1, 3)))
+            print("--------------------------------------------")
+            print()
 
     test_loss = test_loss / nb_test_steps
     test_exact_match = 100 * (correct_answers_test / nb_test_examples)
