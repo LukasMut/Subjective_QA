@@ -866,11 +866,12 @@ def create_alternating_batches(
         # we don't want to present SQuAD and SubjQA examples to the model always in alternation (otherwise, MTL won't work)
         np.random.shuffle(dataset_squad_chunked)
     dataset_combined = dataset_squad_chunked
-    
+    # since we perfrom floor / integer division, we have to compute a window
+    n_batch_total_range = [n_batches_total - 1, n_batches_total, n_batches_total + 1]
     print("Number of batches in combined dataset: {}".format(len(dataset_combined)))
     print("Number of batches combined dataset should contain: {}".format(n_batches_total))
     print()
-    assert len(dataset_combined) == n_batches_total, 'Dataset does not contain correct number of chunked examples'
+    assert len(dataset_combined) in n_batch_total_range, 'Dataset does not contain correct number of chunked examples'
     
     for batch in dataset_combined:
         yield batch
