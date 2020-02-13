@@ -48,14 +48,18 @@ class LinearQAHead(nn.Module):
         if self.multitask:
             # subjectivity output layer (must be present in every MTL setting)
             self.sbj_outputs = nn.Linear(in_size, 1)
+
             if self.n_aux_tasks == 2:
                 # 6 domains in SubjQA plus Wikipedia from SQuAD --> 7 classes
                 self.domain_outputs = nn.Linear(in_size, 7)
+
             elif self.n_aux_tasks == 3:
                 # 6 domains in SubjQA plus Wikipedia from SQuAD --> 7 classes
                 self.domain_outputs = nn.Linear(in_size, 7)
-                # SubjQA vs. SQuAD (binary classification whether seq belongs to SQuAD or SubjQA)
+                # TODO: figure out, whether this task is useful at all
+                # SubjQA vs. SQuAD (binary classification whether question-context sequence belongs to SQuAD or SubjQA)
                 self.ds_outputs = nn.Linear(in_size, 1)
+
             elif self.n_aux_tasks > 3:
                 raise ValueError("Model cannot perform more than 3 auxiliary tasks.")
                     
@@ -69,7 +73,7 @@ class LinearQAHead(nn.Module):
         sequence_output = bert_outputs[0]
         
         if hasattr(self, 'highway'):
-            # pass output of BERT through highway-connection (for better information flow)
+            # pass BERT representations through highway-connection (for better information flow)
             sequence_output = self.highway(sequence_output)
         
         logits = self.qa_outputs(sequence_output)
@@ -97,19 +101,21 @@ class LinearQAHead(nn.Module):
             outputs = (total_loss,) + outputs
             
         if self.multitask and isinstance(self.n_aux_tasks, int):
-            # we only need hidden states of last time step (summary of the sequence) (i.e., seq[batch_size, -1, hidden_size])
-            sbj_logits = self.sbj_outputs(sequence_output[:, -1, :])
+            sbj_logits = self.sbj_outputs(sequence_output)
             # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
             sbj_logits = sbj_logits.squeeze(-1)
+
             if self.n_aux_tasks == 1:
                 return outputs, sbj_logits
+
             elif self.n_aux_tasks == 2:
-                domain_logits = self.domain_outputs(sequence_output[:, -1, :])
+                domain_logits = self.domain_outputs(sequence_output)
                 domain_logits = domain_logits.squeeze(-1)
                 return outputs, sbj_logits, domain_logits
+
             elif self.n_aux_tasks == 3:
-                domain_logits = self.domain_outputs(sequence_output[:, -1, :])
-                ds_logits = self.ds_outputs(sequence_output[:, -1, :])
+                domain_logits = self.domain_outputs(sequence_output)
+                ds_logits = self.ds_outputs(sequence_output)
                 domain_logits = domain_logits.squeeze(-1)
                 ds_logits = ds_logits.squeeze(-1)
                 return outputs, sbj_logits, domain_logits, ds_logits
@@ -143,14 +149,18 @@ class RecurrentQAHead(nn.Module):
         if self.multitask:
             # subjectivity output layer (must be present in every MTL setting)
             self.sbj_outputs = nn.Linear(in_size, 1)
+
             if self.n_aux_tasks == 2:
                 # 6 domains in SubjQA plus Wikipedia from SQuAD --> 7 classes
                 self.domain_outputs = nn.Linear(in_size, 7)
+
             elif self.n_aux_tasks == 3:
                 # 6 domains in SubjQA plus Wikipedia from SQuAD --> 7 classes
                 self.domain_outputs = nn.Linear(in_size, 7)
-                # SubjQA vs. SQuAD (binary classification whether seq belongs to SQuAD or SubjQA)
+                # TODO: figure out, whether this task is useful at all
+                # SubjQA vs. SQuAD (binary classification whether question-context sequence belongs to SQuAD or SubjQA)
                 self.ds_outputs = nn.Linear(in_size, 1)
+
             elif self.n_aux_tasks > 3:
                 raise ValueError("Model cannot perform more than 3 auxiliary tasks.")
 
@@ -165,11 +175,12 @@ class RecurrentQAHead(nn.Module):
         sequence_output = bert_outputs[0]
         hidden_lstm = self.lstm_encoder.init_hidden(sequence_output.shape[0])
         
-        # pass bert hidden representations through Bi-LSTM to compute temporal dependencies and global interactions
+        # pass BERT representations through Bi-LSTM to compute temporal dependencies and global interactions
         sequence_output, _ = self.lstm_encoder(sequence_output, seq_lengths, hidden_lstm)
         
         if hasattr(self, 'highway'):
             # pass output of Bi-LSTM through highway-connection (for better information flow)
+            # TODO: figure out, whether we should pass sequence_output[:, -1, :] to Highway layer or sequence_output
             sequence_output = self.highway(sequence_output)
         
         # compute classification of answer span
@@ -205,18 +216,22 @@ class RecurrentQAHead(nn.Module):
             sbj_logits = self.sbj_outputs(sequence_output[:, -1, :])
             # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
             sbj_logits = sbj_logits.squeeze(-1)
+
             if self.n_aux_tasks == 1:
                 return outputs, sbj_logits
+
             elif self.n_aux_tasks == 2:
                 domain_logits = self.domain_outputs(sequence_output[:, -1, :])
                 domain_logits = domain_logits.squeeze(-1)
                 return outputs, sbj_logits, domain_logits
+
             elif self.n_aux_tasks == 3:
                 domain_logits = self.domain_outputs(sequence_output[:, -1, :])
                 ds_logits = self.ds_outputs(sequence_output[:, -1, :])
                 domain_logits = domain_logits.squeeze(-1)
                 ds_logits = ds_logits.squeeze(-1)
                 return outputs, sbj_logits, domain_logits, ds_logits
+
             else:
                 raise ValueError("Model cannot perform more than 3 auxiliary tasks along the main task.")
         else:
