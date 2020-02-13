@@ -813,7 +813,10 @@ def get_class_weights(
         print("Domain weights: {}".format(class_weights))
         print()
         # sort weights in the correct order (as will be presented to the model)
-        class_weights = [class_weights[c] for _, c in idx_to_class.items()]
+        if isinstance(squad_classes, type(None)):
+            class_weights = [class_weights[c] for _, c in idx_to_class.items() if c != 'wikipedia']
+        else:
+             class_weights = [class_weights[c] for _, c in idx_to_class.items()]
         return torch.tensor(class_weights, dtype=torch.float)
 
 def idx_to_class(classes:list): return dict(enumerate(classes))
