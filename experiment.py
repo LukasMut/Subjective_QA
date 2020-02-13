@@ -49,7 +49,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_epochs', type=int, default=5,
             help='Set number of epochs model should train for. Should be a higher number, if we fine-tune on SubjQA only.')
     parser.add_argument('--optim', type=str, default='AdamW',
-            help='Define optimizer. Must be one of {AdamW, Adam, SGD}.')
+            help='Define optimizer. Must be one of {AdamW, Adam, SGD, SGDCos}.')
     parser.add_argument('--sd', type=str, default='',
             help='set model save directory for QA model.')
     parser.add_argument('--not_finetuned', action='store_true',
@@ -521,22 +521,27 @@ if __name__ == '__main__':
             )
             scheduler = None
         
-        elif args.optim == 'SGD':
+        elif (args.optim == 'SGD' or args.optim == 'SGDCos'):
             
             optimizer = SGD(
                             model.parameters(),
                             lr=hypers['lr_sgd_cos'], 
                             momentum=0.9,
             )
-            # TODO: figure out, whether cosine-annealing is useful for SGD with momentum when optimizing a BERT-QA model
-            scheduler = None #CosineAnnealingWarmRestarts(
-                             #                       optimizer,
-                             #                       T_0=10,
-                             #                       T_mult=2,
-            #)
+            if args.optim == 'SGDCos':
+                
+                # TODO: figure out, whether cosine-annealing is useful for SGD with momentum when optimizing a BERT-QA model
+                # NOTE: Both T_0 and T_mult are picked according to the params in the orig. paper
+                scheduler = CosineAnnealingWarmRestarts(
+                                                        optimizer,
+                                                        T_0=10,
+                                                        T_mult=2,
+                )
+            elif args.optim == 'SGD':
+                scheduler = None
         
         else:
-            raise ValueError("Optimizer must be one of {AdamW, Adam, SGD}.")
+            raise ValueError("Optimizer must be one of {AdamW, Adam, SGD, SGDCos}.")
                     
         batch_losses, train_losses, train_accs, train_f1s, val_losses, val_accs, val_f1s, model = train(
                                                                                                         model=model,
