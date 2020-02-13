@@ -40,3 +40,4 @@ data/SubjQA/trustyou/cached_dev_bert-large-cased-whole-word-masking_384
 data/SubjQA/trustyou/cached_train_bert-large-cased-whole-word-masking-finetuned-squad_384
 *.pyc
 *.png
+.ipynb_checkpoints/debugging-checkpoint.ipynb
