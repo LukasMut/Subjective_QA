@@ -459,8 +459,8 @@ def train(
                 current_batch_acc = 100 * (correct_answers_val / nb_val_examples)
 
         val_loss = val_loss / nb_val_steps
-        val_exact_match = 100 * (correct_answers / n_tr_examples)
-        val_f1 = 100 * (batch_f1_val / nb_tr_examples)
+        val_exact_match = 100 * (correct_answers / nb_val_examples)
+        val_f1 = 100 * (batch_f1_val / nb_val_examples)
         
         print("----------------------------------")
         print("---------- EPOCH {} ----------".format(epoch))
@@ -479,6 +479,9 @@ def train(
         
         if epoch > 0 and early_stopping:
             if (val_accs[-2] > val_accs[-1]) and (val_f1s[-2] > val_f1s[-1]):
+                print("------------------------------------------")
+                print("----- Early stopping after {} epochs -----".format(epoch))
+                print("------------------------------------------")
                 break
        
     return batch_losses, train_losses, train_accs, train_f1s, val_losses, val_accs, val_f1s, model
