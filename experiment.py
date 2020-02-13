@@ -36,6 +36,8 @@ if __name__ == '__main__':
             help='If train, then train model on train set(s); if test, then evaluate model on SubjQA test set.')
     parser.add_argument('--multitask', action='store_true',
             help='If provided, MTL instead of STL setting.')
+    parser.add_argument('--adversarial', action='store_true',
+            help='If provided, adversarial training instead of classic training. Only necessary, if MTL setting.')
     parser.add_argument('--n_aux_tasks', type=int, default=None,
             help='Define number of auxiliary tasks QA model should perform during training. Only necessary, if MTL setting.')
     parser.add_argument('--qa_head', type=str, default='linear',
@@ -111,11 +113,12 @@ if __name__ == '__main__':
         
     else:
         raise ValueError('Pretrained weights must be loaded from an uncased or cased BERT model.')
-                    
+
+    adversarial = 'adversarial' if args.adversarial else 'classic'
     qa_head_name = 'RecurrentQAHead' if args.qa_head == 'recurrent' else 'LinearQAHead'
     highway = 'Highway' if args.highway_connection else ''
     train_method = 'multitask' + '_' + str(args.n_aux_tasks) if args.multitask else 'singletask'
-    model_name = 'BERT' + '_' + args.bert_weights + '_' + qa_head_name + '_' + highway + '_' + train_method + '_' + args.optim
+    model_name = 'BERT' + '_' + args.bert_weights + '_' + qa_head_name + '_' + highway + '_' + train_method + '_' + args.optim + '_' + adversarial
     model_name = model_name.lower()
     
     if args.version == 'train':
@@ -481,6 +484,7 @@ if __name__ == '__main__':
                                           max_seq_length=max_seq_length,
                                           highway_connection=args.highway_connection,
                                           multitask=args.multitask,
+                                          adversarial=args.adversarial,
                                           n_aux_tasks=args.n_aux_tasks,
                                           n_domain_labels=n_domain_labels,
         )
@@ -637,8 +641,7 @@ if __name__ == '__main__':
                                                   qa_head_name=qa_head_name,
                                                   max_seq_length=max_seq_length,
                                                   highway_connection=args.highway_connection,
-                                                  multitask=args.multitask,
-                                                  n_aux_taks=args.n_aux_tasks,
+                                                  multitask=False,
                 )
                 # load fine-tuned model
                 model.load_state_dict(torch.load(args.sd + '/%s' % (model_name)))

@@ -9,6 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from models.modules.Encoder import *
+from models.modules.GradReverse import *
 from models.modules.Highway import Highway
 
 # set device
@@ -35,18 +36,21 @@ class LinearQAHead(nn.Module):
                  multitask:bool=False,
                  n_aux_tasks=None,
                  n_domain_labels=None,
+                 adversarial:bool=False,
     ):
         
         super(LinearQAHead, self).__init__()
         self.n_labels = n_labels_qa
         self.qa_outputs = nn.Linear(in_size, self.n_labels)
         self.multitask = multitask
-        self.n_aux_tasks = n_aux_tasks
+        self.n_aux_tasks = n_aux_task
         
         if highway_block:
             self.highway = Highway(in_size)
         
         if self.multitask:
+            # define, whether we want to perform adversarial training with a gradient reversal layer between feature extractor and classifiers
+            self.adversarial = adversarial
             # subjectivity output layer (must be present in every MTL setting)
             self.sbj_outputs = nn.Linear(in_size, 1)
 
@@ -105,6 +109,11 @@ class LinearQAHead(nn.Module):
             outputs = (total_loss,) + outputs
             
         if self.multitask and isinstance(self.n_aux_tasks, int):
+
+            if self.adversarial:
+                # reverse gradients to learn question / answer type invariant features
+                sequence_output = grad_reverse(sequence_output)
+
             sbj_logits = self.sbj_outputs(sequence_output)
             # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
             sbj_logits = sbj_logits.squeeze(-1)
@@ -138,6 +147,7 @@ class RecurrentQAHead(nn.Module):
                  multitask:bool=False,
                  n_aux_tasks=None,
                  n_domain_labels=None,
+                 adversarial:bool=False,
     ):
         
         super(RecurrentQAHead, self).__init__()
@@ -152,6 +162,8 @@ class RecurrentQAHead(nn.Module):
         self.n_aux_tasks = n_aux_tasks
         
         if self.multitask:
+            # define, whether we want to perform adversarial training with a gradient reversal layer between feature extractor and classifiers
+            self.adversarial = adversarial
             # subjectivity output layer (must be present in every MTL setting)
             self.sbj_outputs = nn.Linear(in_size, 1)
 
@@ -221,6 +233,11 @@ class RecurrentQAHead(nn.Module):
             outputs = (total_loss,) + outputs
         
         if self.multitask and isinstance(self.n_aux_tasks, int):
+
+            if self.adversarial:
+                # reverse gradients to learn question / answer type invariant features
+                sequence_output = grad_reverse(sequence_output)
+                
             # we only need hidden states of last time step (summary of the sequence) (i.e., seq[batch_size, -1, hidden_size])
             sbj_logits = self.sbj_outputs(sequence_output[:, -1, :])
             # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
