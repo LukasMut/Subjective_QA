@@ -71,10 +71,10 @@ if __name__ == '__main__':
     
     # classes for auxiliary tasks
     if args.finetuning == 'combined':
-        domains = ['books', 'tripadvisor', 'grocery', 'electronics', 'movies', 'restaurants']
+        domains = ['books', 'tripadvisor', 'grocery', 'electronics', 'movies', 'restaurants', 'wikipedia']
         n_domain_labels = len(domains)
     elif args.finetuning == 'SubjQA':
-        domains = ['books', 'tripadvisor', 'grocery', 'electronics', 'movies', 'restaurants', 'wikipedia']
+        domains = ['books', 'tripadvisor', 'grocery', 'electronics', 'movies', 'restaurants']
         n_domain_labels = len(domains)
     elif args.finetuning == 'SQuAD':
         n_domain_labels = None

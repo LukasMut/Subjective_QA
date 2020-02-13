@@ -129,6 +129,7 @@ def train(
 ):
     n_iters = len(train_dl)
     n_examples = n_iters * batch_size
+    n_max_epochs = 4
     
     if args["freeze_bert"]:
         model = freeze_transformer_layers(model)
@@ -170,9 +171,9 @@ def train(
             domain_loss_func = nn.CrossEntropyLoss(weight=domain_weights.to(device))
     
     if args['freeze_bert'] and (args['dataset'] == 'SubjQA' or args['dataset'] == 'combined'):
-        if args['n_epochs'] <= 5:
+        if args['n_epochs'] <= 3:
             # add an additional epoch for fine-tuning (not only the heads but) the entire model (+ BERT encoder)
-            args['n_epochs'] += (6 - args['n_epochs'])
+            args['n_epochs'] += (n_max_epochs - args['n_epochs'])
 
     for epoch in trange(args['n_epochs'],  desc="Epoch"):
 
@@ -364,12 +365,12 @@ def train(
             print()
                     
         train_loss = tr_loss / nb_tr_steps
-        train_exact_match = 100 * (correct_answers / n_tr_examples)
+        train_exact_match = 100 * (correct_answers / nb_tr_examples)
         train_f1 = 100 * (batch_f1 / nb_tr_examples)
         
         print("-------------------------------")
         print("---------- EPOCH {} ----------".format(epoch))
-        print("----- Train loss: {} -----".format(round(tr_loss/nb_tr_steps, 3)))
+        print("----- Train loss: {} -----".format(round(tr_loss / nb_tr_steps, 3)))
         print("----- Train exact-match: {} % -----".format(round(train_exact_match, 3)))
         print("----- Train F1: {} % -----".format(round(train_f1, 3)))
         print("-------------------------------")
