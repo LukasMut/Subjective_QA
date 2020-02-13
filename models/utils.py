@@ -170,7 +170,7 @@ def train(
     if args['freeze_bert'] and (args['dataset'] == 'SubjQA' or args['dataset'] == 'combined'):
         if args['n_epochs'] <= 5:
             # add an additional epoch for fine-tuning (not only the heads but) the entire model (+ BERT encoder)
-            args['n_epochs'] += 6 - args['n_epochs']
+            args['n_epochs'] += (6 - args['n_epochs'])
 
     for epoch in trange(args['n_epochs'],  desc="Epoch"):
 
@@ -179,7 +179,7 @@ def train(
         model.train()
         
         # if last epoch
-        if args['freeze_bert'] and epoch == args['n_epochs'] - 1:
+        if epoch == args['n_epochs'] - 1 and (args['dataset'] == 'SubjQA' or args['dataset'] == 'combined'):
             model = freeze_transformer_layers(model, unfreeze=True)
             print("------------------------------------------------------")
             print("------- Pre-trained BERT weights are unfrozen --------")
