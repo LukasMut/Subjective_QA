@@ -181,7 +181,7 @@ def train(
 
         model.train()
         
-        # if last epoch
+        # if last training epoch
         if epoch == args['n_epochs'] - 1 and (args['dataset'] == 'SubjQA' or args['dataset'] == 'combined'):
             model = freeze_transformer_layers(model, unfreeze=True)
             print("------------------------------------------------------------")
