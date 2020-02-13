@@ -489,11 +489,12 @@ if __name__ == '__main__':
         }
 
         hypers["n_epochs"] = args.n_epochs
-        hypers["freeze_bert"] = True if args.finetuning == 'SQuAD' or args.finetuning == 'combined' else False
+        hypers["freeze_bert"] = True
         hypers["optim"] = args.optim
         hypers["model_dir"] = args.sd
         hypers["model_name"] = model_name
         hypers["qa_type"] = qa_type
+        hypers["dataset"] = args.finetuning
         
         if args.optim == 'AdamW':
             

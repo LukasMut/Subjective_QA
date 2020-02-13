@@ -167,10 +167,10 @@ def train(
             assert isinstance(domain_weights, torch.Tensor), 'Tensor of class weights for different domains is not provided'
             domain_loss_func = nn.CrossEntropyLoss(weight=domain_weights.to(device))
     
-    if args['freeze_bert']:
+    if args['freeze_bert'] and (args['dataset'] == 'SubjQA' or args['dataset'] == 'combined'):
         if args['n_epochs'] <= 5:
             # add an additional epoch for fine-tuning (not only the heads but) the entire model (+ BERT encoder)
-            args['n_epochs'] += 1
+            args['n_epochs'] += 6 - args['n_epochs']
 
     for epoch in trange(args['n_epochs'],  desc="Epoch"):
 
@@ -178,6 +178,7 @@ def train(
 
         model.train()
         
+        # if last epoch
         if args['freeze_bert'] and epoch == args['n_epochs'] - 1:
             model = freeze_transformer_layers(model, unfreeze=True)
             print("------------------------------------------------------")
