@@ -164,7 +164,7 @@ def train(
         if n_aux_tasks == 1:
             sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
         
-        # loss func for auxiliary task to inform model about different domains (multi-way classification)
+        # loss func for auxiliary task to inform model about different review / context domains (multi-way classification)
         elif n_aux_tasks == 2:
             sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
             assert isinstance(domain_weights, torch.Tensor), 'Tensor of class weights for different domains is not provided'
@@ -184,11 +184,11 @@ def train(
         # if last epoch
         if epoch == args['n_epochs'] - 1 and (args['dataset'] == 'SubjQA' or args['dataset'] == 'combined'):
             model = freeze_transformer_layers(model, unfreeze=True)
-            print("------------------------------------------------------")
-            print("------- Pre-trained BERT weights are unfrozen --------")
-            print("------------------------------------------------------")
-            print("------ Entire model will be trained for 1 epoch ------")
-            print("------------------------------------------------------")
+            print("------------------------------------------------------------")
+            print("---------- Pre-trained BERT weights are unfrozen -----------")
+            print("------------------------------------------------------------")
+            print("------ Entire model will be trained for single epoch -------")
+            print("------------------------------------------------------------")
             print()
 
         tr_loss, correct_answers, batch_f1 = 0, 0, 0
