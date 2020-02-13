@@ -129,7 +129,7 @@ def train(
 ):
     n_iters = len(train_dl)
     n_examples = n_iters * batch_size
-    n_max_epochs = 4
+    max_epochs = 4
     
     if args["freeze_bert"]:
         model = freeze_transformer_layers(model)
@@ -173,7 +173,7 @@ def train(
     if args['freeze_bert'] and (args['dataset'] == 'SubjQA' or args['dataset'] == 'combined'):
         if args['n_epochs'] <= 3:
             # add an additional epoch for fine-tuning (not only the heads but) the entire model (+ BERT encoder)
-            args['n_epochs'] += (n_max_epochs - args['n_epochs'])
+            args['n_epochs'] += (max_epochs - args['n_epochs'])
 
     for epoch in trange(args['n_epochs'],  desc="Epoch"):
 
@@ -193,7 +193,6 @@ def train(
 
         tr_loss, correct_answers, batch_f1 = 0, 0, 0
         nb_tr_examples, nb_tr_steps = 0, 0
-        hidden_lstm = None
         
         # number of steps == number of updates per epoch
         for i, batch in enumerate(tqdm(train_dl, desc="Step")):
@@ -228,21 +227,20 @@ def train(
             
             if isinstance(n_aux_tasks, type(None)):
                 # compute start and end logits respectively
-                start_logits, end_logits, hidden = model(
-                                                         input_ids=b_input_ids,
-                                                         attention_masks=b_attn_masks,
-                                                         token_type_ids=b_token_type_ids,
-                                                         input_lengths=b_input_lengths,
-                                                         hidden_lstm=hidden_lstm,
+                start_logits, end_logits = model(
+                                                 input_ids=b_input_ids,
+                                                 attention_masks=b_attn_masks,
+                                                 token_type_ids=b_token_type_ids,
+                                                 input_lengths=b_input_lengths,
                 )
+                
             elif isinstance(n_aux_tasks, int):
                 if n_aux_tasks == 1:
-                    ans_logits, sbj_logits, hidden = model(
-                                                           input_ids=b_input_ids,
-                                                           attention_masks=b_attn_masks,
-                                                           token_type_ids=b_token_type_ids,
-                                                           input_lengths=b_input_lengths,
-                                                           hidden_lstm=hidden_lstm,
+                    ans_logits, sbj_logits = model(
+                                                   input_ids=b_input_ids,
+                                                   attention_masks=b_attn_masks,
+                                                   token_type_ids=b_token_type_ids,
+                                                   input_lengths=b_input_lengths,
                 )
                     start_logits, end_logits = ans_logits
                     
@@ -256,12 +254,11 @@ def train(
                         sbj_loss = sbj_loss_func(sbj_logits, b_a_sbj)
                     
                 elif n_aux_tasks == 2:
-                    ans_logits, sbj_logits, domain_logits, hidden = model(
-                                                                          input_ids=b_input_ids,
-                                                                          attention_masks=b_attn_masks,
-                                                                          token_type_ids=b_token_type_ids,
-                                                                          input_lengths=b_input_lengths,
-                                                                          hidden_lstm=hidden_lstm,
+                    ans_logits, sbj_logits, domain_logits = model(
+                                                                  input_ids=b_input_ids,
+                                                                  attention_masks=b_attn_masks,
+                                                                  token_type_ids=b_token_type_ids,
+                                                                  input_lengths=b_input_lengths,
                 )
                     start_logits, end_logits = ans_logits
                     
@@ -286,9 +283,6 @@ def train(
                 )
                     start_logits, end_logits = ans_logits                    
                 """
-           
-            # BiLSTMs are initialised with the final hidden states of the previous batch (only relevant for recurrent QAHeads)
-            hidden_lstm = hidden
             
             # start and end loss must be computed separately
             start_loss = qa_loss_func(start_logits, b_start_pos)
@@ -298,8 +292,10 @@ def train(
             # accumulate all losses
             if isinstance(n_aux_tasks, type(None)):
                 batch_loss += qa_loss
+                
             elif n_aux_tasks == 1:
                 batch_loss += (qa_loss + sbj_loss) / 2
+                
             elif n_aux_tasks == 2:
                 batch_loss += (qa_loss + sbj_loss + domain_loss) / 3
             

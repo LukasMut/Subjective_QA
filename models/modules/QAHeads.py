@@ -56,7 +56,7 @@ class LinearQAHead(nn.Module):
                 self.domain_outputs = nn.Linear(in_size, self.n_domain_labels)
 
             elif self.n_aux_tasks == 3:
-                assert isinstance(n_domain_labels, int), 'If model is to perform two auxiliary tasks, domain labels must be provided'
+                assert isinstance(n_domain_labels, int), 'If model is to perform three auxiliary tasks, domain labels must be provided'
                 self.n_domain_labels = n_domain_labels
                 self.domain_outputs = nn.Linear(in_size, self.n_domain_labels)
                 
@@ -72,7 +72,6 @@ class LinearQAHead(nn.Module):
                 bert_outputs:torch.Tensor, 
                 start_positions=None,
                 end_positions=None,
-                hidden=None,
     ):
         
         sequence_output = bert_outputs[0]
@@ -111,21 +110,21 @@ class LinearQAHead(nn.Module):
             sbj_logits = sbj_logits.squeeze(-1)
 
             if self.n_aux_tasks == 1:
-                return outputs, sbj_logits, hidden
+                return outputs, sbj_logits
 
             elif self.n_aux_tasks == 2:
                 domain_logits = self.domain_outputs(sequence_output)
                 domain_logits = domain_logits.squeeze(-1)
-                return outputs, sbj_logits, domain_logits, hidden
+                return outputs, sbj_logits, domain_logits
 
             elif self.n_aux_tasks == 3:
                 domain_logits = self.domain_outputs(sequence_output)
                 ds_logits = self.ds_outputs(sequence_output)
                 domain_logits = domain_logits.squeeze(-1)
                 ds_logits = ds_logits.squeeze(-1)
-                return outputs, sbj_logits, domain_logits, ds_logits, hidden
+                return outputs, sbj_logits, domain_logits, ds_logits
         else:
-            return outputs, hidden  # (loss), start_logits, end_logits, (hidden_states), (attentions)
+            return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)
         
         
 class RecurrentQAHead(nn.Module):
@@ -179,13 +178,11 @@ class RecurrentQAHead(nn.Module):
                 seq_lengths:torch.Tensor,
                 start_positions=None,
                 end_positions=None,
-                hidden_lstm=None,
     ):
         
         sequence_output = bert_outputs[0]
 
-        if isinstance(hidden_lstm, type(None)):
-            hidden_lstm = self.lstm_encoder.init_hidden(sequence_output.shape[0])
+        hidden_lstm = self.lstm_encoder.init_hidden(sequence_output.shape[0])
         
         # pass BERT representations through Bi-LSTM to compute temporal dependencies and global interactions
         sequence_output, hidden_lstm = self.lstm_encoder(sequence_output, seq_lengths, hidden_lstm)
@@ -230,21 +227,21 @@ class RecurrentQAHead(nn.Module):
             sbj_logits = sbj_logits.squeeze(-1)
 
             if self.n_aux_tasks == 1:
-                return outputs, sbj_logits, hidden_lstm
+                return outputs, sbj_logits #, hidden_lstm
 
             elif self.n_aux_tasks == 2:
                 domain_logits = self.domain_outputs(sequence_output[:, -1, :])
                 domain_logits = domain_logits.squeeze(-1)
-                return outputs, sbj_logits, domain_logits, hidden_lstm
+                return outputs, sbj_logits, domain_logits #, hidden_lstm
 
             elif self.n_aux_tasks == 3:
                 domain_logits = self.domain_outputs(sequence_output[:, -1, :])
                 ds_logits = self.ds_outputs(sequence_output[:, -1, :])
                 domain_logits = domain_logits.squeeze(-1)
                 ds_logits = ds_logits.squeeze(-1)
-                return outputs, sbj_logits, domain_logits, ds_logits, hidden_lstm
+                return outputs, sbj_logits, domain_logits, ds_logits #, hidden_lstm
 
             else:
                 raise ValueError("Model cannot perform more than 3 auxiliary tasks along the main task.")
         else:
-            return outputs, hidden_lstm  # (loss), start_logits, end_logits, (hidden_states), (attentions)
+            return outputs #, hidden_lstm  # (loss), start_logits, end_logits, (hidden_states), (attentions)

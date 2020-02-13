@@ -47,7 +47,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=32,
             help='Define mini-batch size.')
     parser.add_argument('--n_epochs', type=int, default=3,
-            help='Set number of epochs model should train for. Should be a higher number, if we fine-tune on SubjQA only.')
+            help='Set number of epochs model should be fine-tuned for. Should be a higher number, if we fine-tune on SubjQA only.')
     parser.add_argument('--optim', type=str, default='AdamW',
             help='Define optimizer. Must be one of {AdamW, Adam, SGD, SGDCos}.')
     parser.add_argument('--sd', type=str, default='',
