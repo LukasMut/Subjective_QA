@@ -41,6 +41,7 @@ class BertForQA(BertPreTrainedModel):
                  highway_connection:bool=False,
                  multitask:bool=False,
                  n_aux_tasks=None,
+                 n_domain_labels=None,
     ):
         
         super(BertForQA, self).__init__(config)
@@ -50,6 +51,7 @@ class BertForQA(BertPreTrainedModel):
         self.highway_connection = highway_connection
         self.multitask = multitask
         self.n_aux_tasks = n_aux_tasks
+        self.n_domain_labels = n_domain_labels
       
         assert isinstance(self.qa_head_name, str), "QA head must be defined, and has to be one of {'LinearQAHead', 'RecurrentQAHead'}"
         if self.multitask: assert isinstance(self.n_aux_tasks, int), "If MTL setting, number of auxiliary tasks must be defined"
@@ -62,6 +64,7 @@ class BertForQA(BertPreTrainedModel):
                                         highway_block=self.highway_connection,
                                         multitask=self.multitask,
                                         n_aux_tasks=self.n_aux_tasks,
+                                        n_domain_labels=self.n_domain_labels,
             )
             
         elif self.qa_head_name == 'RecurrentQAHead':
@@ -72,6 +75,7 @@ class BertForQA(BertPreTrainedModel):
                                            highway_block=self.highway_connection,
                                            multitask=self.multitask,
                                            n_aux_tasks=self.n_aux_tasks,
+                                           n_domain_labels=self.n_domain_labels,
             )
             
     def forward(

@@ -34,6 +34,7 @@ class LinearQAHead(nn.Module):
                  highway_block:bool=False,
                  multitask:bool=False,
                  n_aux_tasks=None,
+                 n_domain_labels=None,
     ):
         
         super(LinearQAHead, self).__init__()
@@ -50,12 +51,15 @@ class LinearQAHead(nn.Module):
             self.sbj_outputs = nn.Linear(in_size, 1)
 
             if self.n_aux_tasks == 2:
-                # 6 domains in SubjQA plus Wikipedia from SQuAD --> 7 classes
-                self.domain_outputs = nn.Linear(in_size, 7)
+                assert isinstance(n_domain_labels, int), 'If model is to perform two auxiliary tasks, domain labels must be provided'
+                self.n_domain_labels = n_domain_labels
+                self.domain_outputs = nn.Linear(in_size, self.n_domain_labels)
 
             elif self.n_aux_tasks == 3:
-                # 6 domains in SubjQA plus Wikipedia from SQuAD --> 7 classes
-                self.domain_outputs = nn.Linear(in_size, 7)
+                assert isinstance(n_domain_labels, int), 'If model is to perform two auxiliary tasks, domain labels must be provided'
+                self.n_domain_labels = n_domain_labels
+                self.domain_outputs = nn.Linear(in_size, self.n_domain_labels)
+                
                 # TODO: figure out, whether this task is useful at all
                 # SubjQA vs. SQuAD (binary classification whether question-context sequence belongs to SQuAD or SubjQA)
                 self.ds_outputs = nn.Linear(in_size, 1)
@@ -134,6 +138,7 @@ class RecurrentQAHead(nn.Module):
                  highway_block:bool=False,
                  multitask:bool=False,
                  n_aux_tasks=None,
+                 n_domain_labels=None,
     ):
         
         super(RecurrentQAHead, self).__init__()
@@ -152,12 +157,15 @@ class RecurrentQAHead(nn.Module):
             self.sbj_outputs = nn.Linear(in_size, 1)
 
             if self.n_aux_tasks == 2:
-                # 6 domains in SubjQA plus Wikipedia from SQuAD --> 7 classes
-                self.domain_outputs = nn.Linear(in_size, 7)
+                assert isinstance(n_domain_labels, int), 'If model is to perform two auxiliary tasks, domain labels must be provided'
+                self.n_domain_labels = n_domain_labels
+                self.domain_outputs = nn.Linear(in_size, self.n_domain_labels)
 
             elif self.n_aux_tasks == 3:
-                # 6 domains in SubjQA plus Wikipedia from SQuAD --> 7 classes
-                self.domain_outputs = nn.Linear(in_size, 7)
+                assert isinstance(n_domain_labels, int), 'If model is to perform two auxiliary tasks, domain labels must be provided'
+                self.n_domain_labels = n_domain_labels
+                self.domain_outputs = nn.Linear(in_size, self.n_domain_labels)
+                
                 # TODO: figure out, whether this task is useful at all
                 # SubjQA vs. SQuAD (binary classification whether question-context sequence belongs to SQuAD or SubjQA)
                 self.ds_outputs = nn.Linear(in_size, 1)

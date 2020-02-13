@@ -156,7 +156,9 @@ def train(
         
         # loss func for auxiliary task to inform model about subjectivity (binary classification)
         assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
-        assert len(qa_type_weights) == 1, 'For binary cross-entropy loss, we must provide a single weight for positive examples'
+        #assert len(qa_type_weights) == 1, 'For binary cross-entropy loss, we must provide a single weight for positive examples'
+        print("Weights for subjective QAs: {}".format(qa_type_weights))
+        print()
         
         if n_aux_tasks == 1:
             sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))

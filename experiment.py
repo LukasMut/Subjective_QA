@@ -70,7 +70,15 @@ if __name__ == '__main__':
     batch_size = args.batch_size
     
     # classes for auxiliary tasks
-    domains = ['books', 'tripadvisor', 'grocery', 'electronics', 'movies', 'restaurants', 'wikipedia']
+    if args.finetuning == 'combined':
+        domains = ['books', 'tripadvisor', 'grocery', 'electronics', 'movies', 'restaurants']
+        n_domain_labels = len(domains)
+    elif args.finetuning == 'SubjQA':
+        domains = ['books', 'tripadvisor', 'grocery', 'electronics', 'movies', 'restaurants', 'wikipedia']
+        n_domain_labels = len(domains)
+    elif args.finetuning == 'SQuAD':
+        n_domain_labels = None
+    
     qa_types = ['obj', 'sbj']
     datasets = ['SQuAD', 'SubjQA'] # not sure, whether this auxiliary task is actually useful
     
@@ -474,6 +482,7 @@ if __name__ == '__main__':
                                           highway_connection=args.highway_connection,
                                           multitask=args.multitask,
                                           n_aux_tasks=args.n_aux_tasks,
+                                          n_domain_labels=n_domain_labels,
         )
 
         # set model to device
