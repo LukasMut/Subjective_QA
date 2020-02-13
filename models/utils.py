@@ -292,7 +292,7 @@ def train(
                 batch_loss += (qa_loss + sbj_loss + domain_loss) / 3
             
             print("------------------------------------")
-            print("----- Current batch loss: {} -----".format(round(batch_loss, 3)))
+            print("----- Current batch loss: {} -----".format(round(batch_loss.item(), 3)))
             print("------------------------------------")
             print()
 
@@ -417,7 +417,7 @@ def train(
                 batch_loss_val = (start_loss + end_loss) / 2
                 
                 print("----------------------------------------")
-                print("----- Current val batch loss: {} -----".format(round(batch_loss_val, 3)))
+                print("----- Current val batch loss: {} -----".format(round(batch_loss_val.item(), 3)))
                 print("----------------------------------------")
                 print()
                 
