@@ -46,7 +46,7 @@ if __name__ == '__main__':
             help='If cased, load pretrained weights from BERT cased model; if uncased, load pretrained weights from BERT uncased model.')
     parser.add_argument('--batch_size', type=int, default=32,
             help='Define mini-batch size.')
-    parser.add_argument('--n_epochs', type=int, default=5,
+    parser.add_argument('--n_epochs', type=int, default=3,
             help='Set number of epochs model should train for. Should be a higher number, if we fine-tune on SubjQA only.')
     parser.add_argument('--optim', type=str, default='AdamW',
             help='Define optimizer. Must be one of {AdamW, Adam, SGD, SGDCos}.')
