@@ -85,6 +85,7 @@ class BertForQA(BertPreTrainedModel):
                 input_lengths=None,
                 start_positions=None,
                 end_positions=None,
+                hidden_lstm=None,
     ):
         # TODO: figure out, why position IDs are necessary and how we can provide them
         # NOTE: token_type_ids == segment_ids
@@ -102,10 +103,12 @@ class BertForQA(BertPreTrainedModel):
                                 seq_lengths=input_lengths,
                                 start_positions=start_positions,
                                 end_positions=end_positions,
+                                hidden_lstm=hidden_lstm,
             )
         elif self.qa_head_name == 'LinearQAHead':
             return self.qa_head(
                                 bert_outputs=bert_outputs,
                                 start_positions=start_positions,
                                 end_positions=end_positions,
+                                hidden=None,
             )

@@ -68,6 +68,7 @@ class LinearQAHead(nn.Module):
                 bert_outputs:torch.Tensor, 
                 start_positions=None,
                 end_positions=None,
+                hidden=None,
     ):
         
         sequence_output = bert_outputs[0]
@@ -106,21 +107,21 @@ class LinearQAHead(nn.Module):
             sbj_logits = sbj_logits.squeeze(-1)
 
             if self.n_aux_tasks == 1:
-                return outputs, sbj_logits
+                return outputs, sbj_logits, hidden
 
             elif self.n_aux_tasks == 2:
                 domain_logits = self.domain_outputs(sequence_output)
                 domain_logits = domain_logits.squeeze(-1)
-                return outputs, sbj_logits, domain_logits
+                return outputs, sbj_logits, domain_logits, hidden
 
             elif self.n_aux_tasks == 3:
                 domain_logits = self.domain_outputs(sequence_output)
                 ds_logits = self.ds_outputs(sequence_output)
                 domain_logits = domain_logits.squeeze(-1)
                 ds_logits = ds_logits.squeeze(-1)
-                return outputs, sbj_logits, domain_logits, ds_logits
+                return outputs, sbj_logits, domain_logits, ds_logits, hidden
         else:
-            return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)
+            return outputs, hidden  # (loss), start_logits, end_logits, (hidden_states), (attentions)
         
         
 class RecurrentQAHead(nn.Module):
@@ -170,13 +171,16 @@ class RecurrentQAHead(nn.Module):
                 seq_lengths:torch.Tensor,
                 start_positions=None,
                 end_positions=None,
+                hidden_lstm=None,
     ):
         
         sequence_output = bert_outputs[0]
-        hidden_lstm = self.lstm_encoder.init_hidden(sequence_output.shape[0])
+
+        if isinstance(hidden_lstm, type(None)):
+            hidden_lstm = self.lstm_encoder.init_hidden(sequence_output.shape[0])
         
         # pass BERT representations through Bi-LSTM to compute temporal dependencies and global interactions
-        sequence_output, _ = self.lstm_encoder(sequence_output, seq_lengths, hidden_lstm)
+        sequence_output, hidden_lstm = self.lstm_encoder(sequence_output, seq_lengths, hidden_lstm)
         
         if hasattr(self, 'highway'):
             # pass output of Bi-LSTM through highway-connection (for better information flow)
@@ -218,21 +222,21 @@ class RecurrentQAHead(nn.Module):
             sbj_logits = sbj_logits.squeeze(-1)
 
             if self.n_aux_tasks == 1:
-                return outputs, sbj_logits
+                return outputs, sbj_logits, hidden_lstm
 
             elif self.n_aux_tasks == 2:
                 domain_logits = self.domain_outputs(sequence_output[:, -1, :])
                 domain_logits = domain_logits.squeeze(-1)
-                return outputs, sbj_logits, domain_logits
+                return outputs, sbj_logits, domain_logits, hidden_lstm
 
             elif self.n_aux_tasks == 3:
                 domain_logits = self.domain_outputs(sequence_output[:, -1, :])
                 ds_logits = self.ds_outputs(sequence_output[:, -1, :])
                 domain_logits = domain_logits.squeeze(-1)
                 ds_logits = ds_logits.squeeze(-1)
-                return outputs, sbj_logits, domain_logits, ds_logits
+                return outputs, sbj_logits, domain_logits, ds_logits, hidden_lstm
 
             else:
                 raise ValueError("Model cannot perform more than 3 auxiliary tasks along the main task.")
         else:
-            return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)
+            return outputs, hidden_lstm  # (loss), start_logits, end_logits, (hidden_states), (attentions)

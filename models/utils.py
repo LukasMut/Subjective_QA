@@ -190,6 +190,7 @@ def train(
 
         tr_loss, correct_answers, batch_f1 = 0, 0, 0
         nb_tr_examples, nb_tr_steps = 0, 0
+        hidden_lstm = None
         
         # number of steps == number of updates per epoch
         for i, batch in enumerate(tqdm(train_dl, desc="Step")):
@@ -224,19 +225,21 @@ def train(
             
             if isinstance(n_aux_tasks, type(None)):
                 # compute start and end logits respectively
-                start_logits, end_logits = model(
-                                                 input_ids=b_input_ids,
-                                                 attention_masks=b_attn_masks,
-                                                 token_type_ids=b_token_type_ids,
-                                                 input_lengths=b_input_lengths,
+                start_logits, end_logits, hidden = model(
+                                                         input_ids=b_input_ids,
+                                                         attention_masks=b_attn_masks,
+                                                         token_type_ids=b_token_type_ids,
+                                                         input_lengths=b_input_lengths,
+                                                         hidden_lstm=hidden_lstm,
                 )
             elif isinstance(n_aux_tasks, int):
                 if n_aux_tasks == 1:
-                    ans_logits, sbj_logits = model(
-                                                   input_ids=b_input_ids,
-                                                   attention_masks=b_attn_masks,
-                                                   token_type_ids=b_token_type_ids,
-                                                   input_lengths=b_input_lengths,
+                    ans_logits, sbj_logits, hidden = model(
+                                                           input_ids=b_input_ids,
+                                                           attention_masks=b_attn_masks,
+                                                           token_type_ids=b_token_type_ids,
+                                                           input_lengths=b_input_lengths,
+                                                           hidden_lstm=hidden_lstm,
                 )
                     start_logits, end_logits = ans_logits
                     
@@ -250,11 +253,12 @@ def train(
                         sbj_loss = sbj_loss_func(sbj_logits, b_a_sbj)
                     
                 elif n_aux_tasks == 2:
-                    ans_logits, sbj_logits, domain_logits = model(
-                                                                  input_ids=b_input_ids,
-                                                                  attention_masks=b_attn_masks,
-                                                                  token_type_ids=b_token_type_ids,
-                                                                  input_lengths=b_input_lengths,
+                    ans_logits, sbj_logits, domain_logits, hidden = model(
+                                                                          input_ids=b_input_ids,
+                                                                          attention_masks=b_attn_masks,
+                                                                          token_type_ids=b_token_type_ids,
+                                                                          input_lengths=b_input_lengths,
+                                                                          hidden_lstm=hidden_lstm,
                 )
                     start_logits, end_logits = ans_logits
                     
@@ -279,7 +283,10 @@ def train(
                 )
                     start_logits, end_logits = ans_logits                    
                 """
-                
+           
+            # BiLSTMs are initialised with the final hidden states of the previous batch (only relevant for recurrent QAHeads)
+            hidden_lstm = hidden
+            
             # start and end loss must be computed separately
             start_loss = qa_loss_func(start_logits, b_start_pos)
             end_loss = qa_loss_func(end_logits, b_end_pos)
@@ -353,7 +360,7 @@ def train(
             print("----- Current batch F1: {} % -----".format(round(current_batch_f1, 3)))
             print("--------------------------------------------")
             print()
-        
+                    
         train_loss = tr_loss / nb_tr_steps
         train_exact_match = 100 * (correct_answers / n_tr_examples)
         train_f1 = 100 * (batch_f1 / nb_tr_examples)
