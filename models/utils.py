@@ -190,8 +190,9 @@ def train(
 
         tr_loss, correct_answers, batch_f1 = 0, 0, 0
         nb_tr_examples, nb_tr_steps = 0, 0
-
-        for i, batch in enumerate(tqdm(train_dl, desc="Iteration")):
+        
+        # number of steps == number of updates per epoch
+        for i, batch in enumerate(tqdm(train_dl, desc="Step")):
             
             batch_loss, qa_loss, sbj_loss, domain_loss = 0, 0, 0, 0 
 
