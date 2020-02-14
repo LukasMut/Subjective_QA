@@ -47,11 +47,11 @@ else:
 def soft_to_hard(probas:torch.Tensor): return torch.tensor(list(map(lambda p: 1 if p > 0.5 else 0, to_cpu(probas, detach=True))), dtype=torch.double)
 
 def accuracy(probas:torch.Tensor, y_true:torch.Tensor, task:str):
-    y_pred = soft_to_hard(probas) if task == 'binary' else torch.argmax(probas, dim=1) 
-    return (y_pred == to_cpu(y_true, to_numpy=False)).float().mean()
+    y_pred = soft_to_hard(probas) if task == 'binary' else torch.argmax(to_cpu(probas, to_numpy=False), dim=1) 
+    return (y_pred == to_cpu(y_true, to_numpy=False)).float().mean().item()
 
 def f1(probas:torch.Tensor, y_true:torch.Tensor, task:str, avg:str='macro'):
-    y_pred = soft_to_hard(probas) if task == 'binary' else torch.argmax(probas, dim=1)
+    y_pred = soft_to_hard(probas) if task == 'binary' else torch.argmax(to_cpu(probas, detach=True, to_numpy=False), dim=1)
     return f1_score(to_cpu(y_true), y_pred.numpy(), average=avg)
 
 def freeze_transformer_layers(
@@ -177,12 +177,14 @@ def train(
         if n_aux_tasks == 1:
           # TODO: figure out, whether we need pos_weights for adversarial setting
           sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
+          train_accs_sbj, train_f1s_sbj = [], []
         
         # loss func for auxiliary task to inform model about different review / context domains (multi-way classification)
         elif n_aux_tasks == 2:
             sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
             assert isinstance(domain_weights, torch.Tensor), 'Tensor of class weights for different domains is not provided'
             domain_loss_func = nn.CrossEntropyLoss(weight=domain_weights.to(device))
+            train_accs_domain, train_f1s_domain = [], []
     
     if args['dataset'] == 'SubjQA' or args['dataset'] == 'combined':
       if args['freeze_bert']:
@@ -396,8 +398,8 @@ def train(
                 batch_acc_domain += accuracy(probas=F.log_softmax(domain_logits, dim=1), y_true=b_domains, task='multi-way')  
                 batch_f1_domain += f1(probas=F.log_softmax(domain_logits, dim=1), y_true=b_domains, task='multi-way')
 
-                current_batch_acc_domain = 100 * (batch_acc_domain / nb_tr_examples)
-                current_batch_f1_domain = 100 * (batch_f1_domain / nb_tr_examples)
+                current_batch_acc_domain = 100 * batch_acc_domain
+                current_batch_f1_domain = 100 * batch_f1_domain
 
                 print("--------------------------------------------")
                 print("----- Current batch domain acc: {} % -----".format(round(current_batch_acc_domain, 3)))
@@ -405,8 +407,8 @@ def train(
                 print("--------------------------------------------")
                 print()
 
-              current_batch_acc_sbj = 100 * (batch_acc_sbj / nb_tr_examples)
-              current_batch_f1_sbj = 100 * (batch_f1_sbj / nb_tr_examples)
+              current_batch_acc_sbj = 100 * batch_acc_sbj
+              current_batch_f1_sbj = 100 * batch_f1_sbj
 
               print("--------------------------------------------")
               print("----- Current batch sbj acc: {} % -----".format(round(current_batch_acc_sbj, 3)))
@@ -429,13 +431,19 @@ def train(
 
         if isinstance(n_aux_tasks, int):
            
-           train_acc_sbj = 100 * (batch_acc_sbj / nb_tr_examples)
-           train_f1_sbj = 100 * (batch_f1_sbj / nb_tr_examples)
+           train_acc_sbj = 100 * (batch_acc_sbj / nb_tr_steps)
+           train_f1_sbj = 100 * (batch_f1_sbj / nb_tr_steps)
+
+           train_accs_sbj.append(train_acc_sbj)
+           train_f1_sbj.append(train_f1_sbj)
 
            if n_aux_tasks == 2:
 
-              train_acc_domain = 100 * (batch_acc_domain / nb_tr_examples)
-              train_f1_domain = 100 * (batch_f1_domain / nb_tr_examples)
+              train_acc_domain = 100 * (batch_acc_domain / nb_tr_steps)
+              train_f1_domain = 100 * (batch_f1_domain / nb_tr_steps)
+
+              train_accs_domain.append(train_acc_domain)
+              train_f1s_domain.append(train_f1_domain)
 
               print("------------------------------------")
               print("----- Train domain acc: {} % -----".format(round(train_acc_domain, 3)))
