@@ -48,7 +48,7 @@ def soft_to_hard(probas:torch.Tensor): return torch.tensor(list(map(lambda p: 1 
 
 def accuracy(probas:torch.Tensor, y_true:torch.Tensor, task:str):
     y_pred = soft_to_hard(probas) if task == 'binary' else torch.argmax(probas, dim=1) 
-    return (y_pred == to_cpu(y_true, numpy=False)).float().mean()
+    return (y_pred == to_cpu(y_true, to_numpy=False)).float().mean()
 
 def f1(probas:torch.Tensor, y_true:torch.Tensor, task:str, avg:str='macro'):
     y_pred = soft_to_hard(probas) if task == 'binary' else torch.argmax(out, dim=1)
@@ -206,8 +206,11 @@ def train(
             print("------------------------------------------------------------")
             print()
 
-        batch_acc_sbj, batch_f1_sbj = 0, 0
-        batch_acc_domain, batch_f1_domain = 0, 0
+        if isinstance(n_aux_tasks, int):
+          batch_acc_sbj, batch_f1_sbj = 0, 0
+          if n_aux_tasks == 2:
+            batch_acc_domain, batch_f1_domain = 0, 0
+
         correct_answers, batch_f1 = 0, 0
         tr_loss = 0
         nb_tr_examples, nb_tr_steps = 0, 0
@@ -416,6 +419,14 @@ def train(
         train_exact_match = 100 * (correct_answers / nb_tr_examples)
         train_f1 = 100 * (batch_f1 / nb_tr_examples)
 
+        print("------------------------------------")
+        print("---------- EPOCH {} ----------".format(epoch))
+        print("----- Train loss: {} -----".format(round(tr_loss / nb_tr_steps, 3)))
+        print("----- Train exact-match: {} % -----".format(round(train_exact_match, 3)))
+        print("----- Train F1: {} % -----".format(round(train_f1, 3)))
+        print("------------------------------------")
+        print()
+
         if isinstance(n_aux_tasks, int):
            
            train_acc_sbj = 100 * (batch_acc_sbj / nb_tr_examples)
@@ -426,13 +437,17 @@ def train(
               train_acc_domain = 100 * (batch_acc_domain / nb_tr_examples)
               train_f1_domain = 100 * (batch_f1_domain / nb_tr_examples)
 
-        print("-------------------------------")
-        print("---------- EPOCH {} ----------".format(epoch))
-        print("----- Train loss: {} -----".format(round(tr_loss / nb_tr_steps, 3)))
-        print("----- Train exact-match: {} % -----".format(round(train_exact_match, 3)))
-        print("----- Train F1: {} % -----".format(round(train_f1, 3)))
-        print("-------------------------------")
-        print()
+              print("------------------------------------")
+              print("----- Train domain acc: {} % -----".format(round(train_acc_domain, 3)))
+              print("----- Train domain F1: {} % -----".format(round(train_f1_domain, 3)))
+              print("------------------------------------")
+              print()
+
+           print("------------------------------------")
+           print("----- Train sbj acc: {} % -----".format(round(train_acc_sbj, 3)))
+           print("----- Train sbj F1: {} % -----".format(round(train_f1_sbj, 3)))
+           print("------------------------------------")
+           print()
 
         train_losses.append(train_loss)
         train_accs.append(train_exact_match)
@@ -456,6 +471,10 @@ def train(
 
             # unpack inputs from dataloader            
             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_cls_indexes, _, _, _, _, _ = batch
+
+             # if current batch_size is smaller than specified batch_size, skip batch
+            if b_input_ids.size(0) != batch_size:
+                continue
             
             if args["sort_batch"]:
                 # sort sequences in batch in decreasing order w.r.t. to (original) sequence length
@@ -532,7 +551,7 @@ def train(
         print("----------------------------------")
         print()
         
-        if (epoch == 0) or (val_exact_match > val_accs[-1]):
+        if epoch == 0 or val_exact_match > val_accs[-1]:
             torch.save(model.state_dict(), model_path + '/%s' % (args['model_name']))
         
         val_losses.append(val_loss)
