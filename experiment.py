@@ -72,33 +72,36 @@ if __name__ == '__main__':
     batch_size = args.batch_size
     
     # classes for auxiliary tasks
-    if args.finetuning == 'combined':
+    if args.finetuning == 'combined' or args.finetuning == 'SubjQA':
+        
         domains = ['books', 'tripadvisor', 'grocery', 'electronics', 'movies', 'restaurants', 'wikipedia']
+        
+        if args.finetuning == 'SubjQA':
+            domains = domains[:-1]
+       
+       qa_types = ['obj', 'sbj']
+       datasets = ['SQuAD', 'SubjQA'] # not sure, whether this auxiliary task is actually useful
+    
+        # define, whether we should inform model about question or answer type
+        qa_type = 'question'
+        
+        # create domain_to_idx, qa_type_to_idx and dataset_to_idx mappings (necessary for auxiliary tasks)
+        idx_to_domains = idx_to_class(domains)
+        domain_to_idx = class_to_idx(domains)
+        domain_weights = None
+        
+        idx_to_qa_types = idx_to_class(qa_types)
+        qa_type_to_idx = class_to_idx(qa_types)
+        qa_type_weights = None
+        
+        idx_to_dataset = idx_to_class(datasets)
+        dataset_to_idx = class_to_idx(datasets)
+        dataset_weights = None
+
         n_domain_labels = len(domains)
-    elif args.finetuning == 'SubjQA':
-        domains = ['books', 'tripadvisor', 'grocery', 'electronics', 'movies', 'restaurants']
-        n_domain_labels = len(domains)
+
     elif args.finetuning == 'SQuAD':
         n_domain_labels = None
-    
-    qa_types = ['obj', 'sbj']
-    datasets = ['SQuAD', 'SubjQA'] # not sure, whether this auxiliary task is actually useful
-    
-    # define, whether we should inform model about question or answer type
-    qa_type = 'question'
-    
-    # create domain_to_idx, qa_type_to_idx and dataset_to_idx mappings (necessary for auxiliary tasks)
-    idx_to_domains = idx_to_class(domains)
-    domain_to_idx = class_to_idx(domains)
-    domain_weights = None
-    
-    idx_to_qa_types = idx_to_class(qa_types)
-    qa_type_to_idx = class_to_idx(qa_types)
-    qa_type_weights = None
-    
-    idx_to_dataset = idx_to_class(datasets)
-    dataset_to_idx = class_to_idx(datasets)
-    dataset_weights = None
     
     # TODO: figure out, whether we should use pretrained weights from 'bert-base-cased' or 'bert-base-uncased' model
     if args.bert_weights == 'cased':
