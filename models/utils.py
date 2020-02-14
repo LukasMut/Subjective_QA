@@ -1,4 +1,6 @@
 __all__ = [
+           'accuracy',
+           'f1',
            'freeze_transformer_layers',
            'sort_batch',
            'get_answers',
@@ -18,6 +20,7 @@ import torch
 import transformers
 
 from collections import Counter, defaultdict
+from sklearn.metrics import f1_score
 from tqdm import trange, tqdm
 from transformers import BertTokenizer, BertModel, BertForQuestionAnswering
 
@@ -40,6 +43,16 @@ else:
     device = torch.device("cpu")
     print("GPU not available, CPU used")
 """
+
+def soft_to_hard(probas:torch.Tensor): return torch.tensor(list(map(lambda p: 1 if p > 0.5 else 0, to_cpu(probas, detach=True))), dtype=torch.double)
+
+def accuracy(probas:torch.Tensor, y_true:torch.Tensor, task:str):
+    y_pred = soft_to_hard(probas) if task == 'binary' else torch.argmax(probas, dim=1) 
+    return (y_pred == to_cpu(y_true, numpy=False)).float().mean()
+
+def f1(probas:torch.Tensor, y_true:torch.Tensor, task:str, avg:str='macro'):
+    y_pred = soft_to_hard(probas) if task == 'binary' else torch.argmax(out, dim=1)
+    return f1_score(to_cpu(y_true), y_pred.numpy(), average=avg)
 
 def freeze_transformer_layers(
                               model,
@@ -193,6 +206,8 @@ def train(
             print("------------------------------------------------------------")
             print()
 
+        batch_acc_sbj, batch_f1_sbj = 0, 0
+        batch_acc_domain, batch_f1_domain = 0, 0
         correct_answers, batch_f1 = 0, 0
         tr_loss = 0
         nb_tr_examples, nb_tr_steps = 0, 0
@@ -362,11 +377,55 @@ def train(
             print("----- Current batch F1: {} % -----".format(round(current_batch_f1, 3)))
             print("--------------------------------------------")
             print()
+
+
+            if isinstance(n_aux_tasks, int):
+
+              if args['qa_type'] == 'question':
+                batch_acc_sbj += accuracy(probas=torch.sigmoid(sbj_logits), y_true=b_q_sbj, task='binary')
+                batch_f1_sbj += f1(probas=torch.sigmoid(sbj_logits), y_true=b_q_sbj, task='binary')
+                
+              elif args['qa_type'] == 'answer':
+                batch_acc_sbj += accuracy(probas=torch.sigmoid(sbj_logits), y_true=b_a_sbj, task='binary')  
+                batch_f1_sbj += f1(probas=torch.sigmoid(sbj_logits), y_true=b_a_sbj, task='binary')
+
+              if n_aux_tasks == 2:
+                batch_acc_domain += accuracy(probas=F.log_softmax(domain_logits, dim=1), y_true=b_domains, task='multi-way')  
+                batch_f1_domain += f1(probas=F.log_softmax(domain_logits, dim=1), y_true=b_domains, task='multi-way')
+
+                current_batch_acc_domain = 100 * (batch_acc_domain / nb_tr_examples)
+                current_batch_f1_domain = 100 * (batch_f1_domain / nb_tr_examples)
+
+                print("--------------------------------------------")
+                print("----- Current batch domain acc: {} % -----".format(round(current_batch_acc_domain, 3)))
+                print("----- Current batch domain F1: {} % -----".format(round(current_batch_f1_domain, 3)))
+                print("--------------------------------------------")
+                print()
+
+              current_batch_acc_sbj = 100 * (batch_acc_sbj / nb_tr_examples)
+              current_batch_f1_sbj = 100 * (batch_f1_sbj / nb_tr_examples)
+
+              print("--------------------------------------------")
+              print("----- Current batch sbj acc: {} % -----".format(round(current_batch_acc_sbj, 3)))
+              print("----- Current batch sbj F1: {} % -----".format(round(current_batch_f1_sbj, 3)))
+              print("--------------------------------------------")
+              print()
                     
         train_loss = tr_loss / nb_tr_steps
+
         train_exact_match = 100 * (correct_answers / nb_tr_examples)
         train_f1 = 100 * (batch_f1 / nb_tr_examples)
-        
+
+        if isinstance(n_aux_tasks, int):
+           
+           train_acc_sbj = 100 * (batch_acc_sbj / nb_tr_examples)
+           train_f1_sbj = 100 * (batch_f1_sbj / nb_tr_examples)
+
+           if n_aux_tasks == 2:
+
+              train_acc_domain = 100 * (batch_acc_domain / nb_tr_examples)
+              train_f1_domain = 100 * (batch_f1_domain / nb_tr_examples)
+
         print("-------------------------------")
         print("---------- EPOCH {} ----------".format(epoch))
         print("----- Train loss: {} -----".format(round(tr_loss / nb_tr_steps, 3)))
