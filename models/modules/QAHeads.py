@@ -279,7 +279,7 @@ class RecurrentQAHead(nn.Module):
                 sequence_output = grad_reverse(sequence_output)
 
             # we only need hidden states of last time step (summary of the sequence) (i.e., seq[batch_size, -1, hidden_size])
-            sbj_out = F.prelu(self.dropout(self.fc_sbj_1(sequence_output[:, -1, :])))
+            sbj_out = F.relu(self.dropout(self.fc_sbj_1(sequence_output[:, -1, :])))
             sbj_logits = self.fc_sbj_2(sbj_out)
             
             # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
