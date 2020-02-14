@@ -35,38 +35,53 @@ class LinearQAHead(nn.Module):
                  highway_block:bool=False,
                  multitask:bool=False,
                  n_aux_tasks=None,
+                 aux_dropout:float=0.25,
                  n_domain_labels=None,
                  adversarial:bool=False,
     ):
         
         super(LinearQAHead, self).__init__()
         self.n_labels = n_labels_qa
-        self.qa_outputs = nn.Linear(in_size, self.n_labels)
         self.multitask = multitask
         self.n_aux_tasks = n_aux_task
-        
+        self.aux_dropout = aux_dropout
+
         if highway_block:
             self.highway = Highway(in_size)
+
+        # fully-connected QA output layer
+        self.fc_qa = nn.Linear(in_size, self.n_labels)
         
         if self.multitask:
-            # define, whether we want to perform adversarial training with a gradient reversal layer between feature extractor and classifiers
+            # define, whether we want to perform adversarial training with a GRL between feature extractor and classifiers
             self.adversarial = adversarial
-            # subjectivity output layer (must be present in every MTL setting)
-            self.sbj_outputs = nn.Linear(in_size, 1)
+
+            # define dropout layer for auxiliary classification tasks
+            self.dropout = nn.Dropout(p = self.aux_dropout)
+            
+            # fully-connected subjectivity output layers (must be present in every MTL setting)
+            self.fc_sbj_1 = nn.Linear(in_size, in_size // 2)
+            self.fc_sbj_2 = nn.Linear(in_size // 2, 1)
 
             if self.n_aux_tasks == 2:
                 assert isinstance(n_domain_labels, int), 'If model is to perform two auxiliary tasks, domain labels must be provided'
                 self.n_domain_labels = n_domain_labels
-                self.domain_outputs = nn.Linear(in_size, self.n_domain_labels)
+
+                # fully-connected review domain output layers (second auxiliary task)
+                self.fc_domain_1 = nn.Linear(in_size, in_size // 2)
+                self.fc_domain_2 = nn.Linear(in_size // 2, self.n_domain_labels)
 
             elif self.n_aux_tasks == 3:
                 assert isinstance(n_domain_labels, int), 'If model is to perform three auxiliary tasks, domain labels must be provided'
                 self.n_domain_labels = n_domain_labels
-                self.domain_outputs = nn.Linear(in_size, self.n_domain_labels)
-                
-                # TODO: figure out, whether this task is useful at all
+
+                self.fc_domain_1 = nn.Linear(in_size, in_size // 2)
+                self.fc_domain_2 = nn.Linear(in_size // 2, self.n_domain_labels)
+
+                # TODO: figure out, whether third auxiliary task is useful at all
                 # SubjQA vs. SQuAD (binary classification whether question-context sequence belongs to SQuAD or SubjQA)
-                self.ds_outputs = nn.Linear(in_size, 1)
+                self.fc_ds_1 = nn.Linear(in_size, in_size // 2)
+                self.fc_ds_2 = nn.Linear(in_size // 2, 1)
 
             elif self.n_aux_tasks > 3:
                 raise ValueError("Model cannot perform more than 3 auxiliary tasks.")
@@ -111,10 +126,12 @@ class LinearQAHead(nn.Module):
         if self.multitask and isinstance(self.n_aux_tasks, int):
 
             if self.adversarial:
-                # reverse gradients to learn question / answer type invariant features
+                # reverse gradients to learn qa-type / domain-invariant features
                 sequence_output = grad_reverse(sequence_output)
 
-            sbj_logits = self.sbj_outputs(sequence_output)
+            sbj_out = F.relu(self.dropout(self.fc_sbj_1(sequence_output)))
+            sbj_logits = self.fc_sbj_2(sbj_out)
+            
             # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
             sbj_logits = sbj_logits.squeeze(-1)
 
@@ -122,15 +139,23 @@ class LinearQAHead(nn.Module):
                 return outputs, sbj_logits
 
             elif self.n_aux_tasks == 2:
-                domain_logits = self.domain_outputs(sequence_output)
+
+                domain_out = F.relu(self.dropout(self.fc_domain_1(sequence_output)))
+                domain_logits = self.fc_domain_2(domain_out)
                 domain_logits = domain_logits.squeeze(-1)
+
                 return outputs, sbj_logits, domain_logits
 
             elif self.n_aux_tasks == 3:
-                domain_logits = self.domain_outputs(sequence_output)
-                ds_logits = self.ds_outputs(sequence_output)
+
+                domain_out = F.relu(self.dropout(self.fc_domain_1(sequence_output)))
+                domain_logits = self.fc_domain_2(domain_out)
                 domain_logits = domain_logits.squeeze(-1)
-                ds_logits = ds_logits.squeeze(-1)
+
+                ds_out = F.relu(self.dropout(self.fc_ds_1(sequence_output)))
+                ds_logits = self.fc_ds_2(domain_out)
+                ds_logits = domain_logits.squeeze(-1)
+
                 return outputs, sbj_logits, domain_logits, ds_logits
         else:
             return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)
@@ -146,40 +171,55 @@ class RecurrentQAHead(nn.Module):
                  highway_block:bool=False,
                  multitask:bool=False,
                  n_aux_tasks=None,
+                 aux_dropout:float=0.25,
                  n_domain_labels=None,
                  adversarial:bool=False,
     ):
         
         super(RecurrentQAHead, self).__init__()
         self.n_labels = n_labels_qa
+        self.multitask = multitask
+        self.n_aux_tasks = n_aux_tasks
+        self.aux_dropout = aux_dropout
+
         self.lstm_encoder = EncoderLSTM(max_seq_length)
         
         if highway_block:
             self.highway = Highway(in_size)
             
-        self.qa_outputs = nn.Linear(in_size, self.n_labels)
-        self.multitask = multitask
-        self.n_aux_tasks = n_aux_tasks
+        # fully-connected QA output layer
+        self.fc_qa = nn.Linear(in_size, self.n_labels)
         
         if self.multitask:
-            # define, whether we want to perform adversarial training with a gradient reversal layer between feature extractor and classifiers
+            # define, whether we want to perform adversarial training with a GRL between feature extractor and classifiers
             self.adversarial = adversarial
-            # subjectivity output layer (must be present in every MTL setting)
-            self.sbj_outputs = nn.Linear(in_size, 1)
+
+            # define dropout layer for auxiliary classification tasks
+            self.dropout = nn.Dropout(p = self.aux_dropout)
+            
+            # fully-connected subjectivity output layers (must be present in every MTL setting)
+            self.fc_sbj_1 = nn.Linear(in_size, in_size // 2)
+            self.fc_sbj_2 = nn.Linear(in_size // 2, 1)
 
             if self.n_aux_tasks == 2:
                 assert isinstance(n_domain_labels, int), 'If model is to perform two auxiliary tasks, domain labels must be provided'
                 self.n_domain_labels = n_domain_labels
-                self.domain_outputs = nn.Linear(in_size, self.n_domain_labels)
+
+                # fully-connected review domain output layers (second auxiliary task)
+                self.fc_domain_1 = nn.Linear(in_size, in_size // 2)
+                self.fc_domain_2 = nn.Linear(in_size // 2, self.n_domain_labels)
 
             elif self.n_aux_tasks == 3:
-                assert isinstance(n_domain_labels, int), 'If model is to perform two auxiliary tasks, domain labels must be provided'
+                assert isinstance(n_domain_labels, int), 'If model is to perform three auxiliary tasks, domain labels must be provided'
                 self.n_domain_labels = n_domain_labels
-                self.domain_outputs = nn.Linear(in_size, self.n_domain_labels)
-                
-                # TODO: figure out, whether this task is useful at all
-                # SubjQA vs. SQuAD (binary classification whether question-context sequence belongs to SQuAD or SubjQA)
-                self.ds_outputs = nn.Linear(in_size, 1)
+
+                self.fc_domain_1 = nn.Linear(in_size, in_size // 2)
+                self.fc_domain_2 = nn.Linear(in_size // 2, self.n_domain_labels)
+
+                # TODO: figure out, whether third auxiliary task is at all usefull
+                # SubjQA vs. SQuAD (binary classification whether question-review sequence belongs to SQuAD or SubjQA)
+                self.fc_ds_1 = nn.Linear(in_size, in_size // 2)
+                self.fc_ds_2 = nn.Linear(in_size // 2, 1)
 
             elif self.n_aux_tasks > 3:
                 raise ValueError("Model cannot perform more than 3 auxiliary tasks.")
@@ -200,12 +240,12 @@ class RecurrentQAHead(nn.Module):
         sequence_output, hidden_lstm = self.lstm_encoder(sequence_output, seq_lengths, hidden_lstm)
         
         if hasattr(self, 'highway'):
-            # pass output of Bi-LSTM through highway-connection (for better information flow)
-            # TODO: figure out, whether we should pass sequence_output[:, -1, :] to Highway layer or sequence_output
+            # pass output of Bi-LSTM through a highway-connection (for better information flow)
+            # TODO: figure out, whether we should pass sequence_output[:, -1, :] to Highway layer or simply sequence_output
             sequence_output = self.highway(sequence_output)
         
         # compute classification of answer span
-        logits = self.qa_outputs(sequence_output)
+        logits = self.fc_qa(sequence_output)
         
         # split logits into chunks for start and end of answer span respectively
         start_logits, end_logits = logits.split(1, dim=-1)
@@ -235,11 +275,13 @@ class RecurrentQAHead(nn.Module):
         if self.multitask and isinstance(self.n_aux_tasks, int):
 
             if self.adversarial:
-                # reverse gradients to learn question / answer type invariant features
+                # reverse gradients to learn qa-type / domain-invariant features
                 sequence_output = grad_reverse(sequence_output)
-                
+
             # we only need hidden states of last time step (summary of the sequence) (i.e., seq[batch_size, -1, hidden_size])
-            sbj_logits = self.sbj_outputs(sequence_output[:, -1, :])
+            sbj_out = F.prelu(self.dropout(self.fc_sbj_1(sequence_output[:, -1, :])))
+            sbj_logits = self.fc_sbj_2(sbj_out)
+            
             # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
             sbj_logits = sbj_logits.squeeze(-1)
 
@@ -247,18 +289,23 @@ class RecurrentQAHead(nn.Module):
                 return outputs, sbj_logits #, hidden_lstm
 
             elif self.n_aux_tasks == 2:
-                domain_logits = self.domain_outputs(sequence_output[:, -1, :])
+
+                domain_out = F.relu(self.dropout(self.fc_domain_1(sequence_output[:, -1, :])))
+                domain_logits = self.fc_domain_2(domain_out)
                 domain_logits = domain_logits.squeeze(-1)
+
                 return outputs, sbj_logits, domain_logits #, hidden_lstm
 
             elif self.n_aux_tasks == 3:
-                domain_logits = self.domain_outputs(sequence_output[:, -1, :])
-                ds_logits = self.ds_outputs(sequence_output[:, -1, :])
-                domain_logits = domain_logits.squeeze(-1)
-                ds_logits = ds_logits.squeeze(-1)
-                return outputs, sbj_logits, domain_logits, ds_logits #, hidden_lstm
 
-            else:
-                raise ValueError("Model cannot perform more than 3 auxiliary tasks along the main task.")
+                domain_out = F.relu(self.dropout(self.fc_domain_1(sequence_output[:, -1, :])))
+                domain_logits = self.fc_domain_2(domain_out)
+                domain_logits = domain_logits.squeeze(-1)
+
+                ds_out = F.relu(self.dropout(self.fc_ds_1(sequence_output[:, -1, :])))
+                ds_logits = self.fc_ds_2(domain_out)
+                ds_logits = domain_logits.squeeze(-1)
+
+                return outputs, sbj_logits, domain_logits, ds_logits #, hidden_lstm
         else:
             return outputs #, hidden_lstm  # (loss), start_logits, end_logits, (hidden_states), (attentions)

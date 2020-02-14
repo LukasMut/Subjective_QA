@@ -6,29 +6,18 @@ __all__ = [
 import torch
 import torch.nn as nn
 
-#TODO: figure out which of the two versions should be used (do we need scale for our purposes)?
-class GRL(Function):
-    @staticmethod
-    def forward(ctx, x):
-        return x.view_as(x)
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        return grad_output.neg()
-
-def grad_reverse(x):
-    return GRL.apply(x)
-
 class GRL(torch.autograd.Function):
-    scale = 1.0
+    lambd = 1.0
     @staticmethod
     def forward(ctx, x):
+        # identity function
         return x.view_as(x)
 
     @staticmethod
     def backward(ctx, grad_output):
-        return GRL.scale * grad_output.neg()
+        # reverse the gradients and scale by the constant lambda
+        return GRL.lambd * grad_output.neg()
     
-def grad_reverse(x, scale=1.0):
-    GRL.scale = scale
+def grad_reverse(x, lambd=1.0):
+    GRL.lambd = lambd
     return GRL.apply(x)
