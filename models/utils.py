@@ -398,8 +398,8 @@ def train(
                 batch_acc_domain += accuracy(probas=F.log_softmax(domain_logits, dim=1), y_true=b_domains, task='multi-way')  
                 batch_f1_domain += f1(probas=F.log_softmax(domain_logits, dim=1), y_true=b_domains, task='multi-way')
 
-                current_batch_acc_domain = 100 * batch_acc_domain
-                current_batch_f1_domain = 100 * batch_f1_domain
+                current_batch_acc_domain = 100 * (batch_acc_domain / nb_tr_steps)
+                current_batch_f1_domain = 100 * (batch_f1_domain / nb_tr_steps)
 
                 print("--------------------------------------------")
                 print("----- Current batch domain acc: {} % -----".format(round(current_batch_acc_domain, 3)))
@@ -407,8 +407,8 @@ def train(
                 print("--------------------------------------------")
                 print()
 
-              current_batch_acc_sbj = 100 * batch_acc_sbj
-              current_batch_f1_sbj = 100 * batch_f1_sbj
+              current_batch_acc_sbj = 100 * (batch_acc_sbj / nb_tr_steps)
+              current_batch_f1_sbj = 100 * (batch_f1_sbj / nb_tr_steps)
 
               print("--------------------------------------------")
               print("----- Current batch sbj acc: {} % -----".format(round(current_batch_acc_sbj, 3)))
