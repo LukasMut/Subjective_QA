@@ -99,7 +99,7 @@ class LinearQAHead(nn.Module):
             # pass BERT representations through highway-connection (for better information flow)
             sequence_output = self.highway(sequence_output)
         
-        logits = self.qa_outputs(sequence_output)
+        logits = self.fc_qa(sequence_output)
         start_logits, end_logits = logits.split(1, dim=-1)
         start_logits = start_logits.squeeze(-1)
         end_logits = end_logits.squeeze(-1)
