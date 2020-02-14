@@ -191,7 +191,8 @@ def train(
             print("------------------------------------------------------------")
             print()
 
-        tr_loss, correct_answers, batch_f1 = 0, 0, 0
+        correct_answers, batch_f1 = 0, 0
+        tr_loss = 0
         nb_tr_examples, nb_tr_steps = 0, 0
         
         # number of steps == number of updates per epoch
@@ -382,7 +383,7 @@ def train(
         model.eval()
         
         correct_answers_val, batch_f1_val = 0, 0
-        val_f1 = 0
+        val_loss = 0
         nb_val_steps, nb_val_examples = 0, 0
 
         for batch in val_dl:
@@ -459,7 +460,7 @@ def train(
                 current_batch_acc = 100 * (correct_answers_val / nb_val_examples)
 
         val_loss = val_loss / nb_val_steps
-        val_exact_match = 100 * (correct_answers / nb_val_examples)
+        val_exact_match = 100 * (correct_answers_val / nb_val_examples)
         val_f1 = 100 * (batch_f1_val / nb_val_examples)
         
         print("----------------------------------")
