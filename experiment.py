@@ -79,8 +79,8 @@ if __name__ == '__main__':
         if args.finetuning == 'SubjQA':
             domains = domains[:-1]
        
-       qa_types = ['obj', 'sbj']
-       datasets = ['SQuAD', 'SubjQA'] # not sure, whether this auxiliary task is actually useful
+        qa_types = ['obj', 'sbj']
+        datasets = ['SQuAD', 'SubjQA'] # not sure, whether this auxiliary task is actually useful
     
         # define, whether we should inform model about question or answer type
         qa_type = 'question'
