@@ -51,7 +51,7 @@ def accuracy(probas:torch.Tensor, y_true:torch.Tensor, task:str):
     return (y_pred == to_cpu(y_true, to_numpy=False)).float().mean()
 
 def f1(probas:torch.Tensor, y_true:torch.Tensor, task:str, avg:str='macro'):
-    y_pred = soft_to_hard(probas) if task == 'binary' else torch.argmax(out, dim=1)
+    y_pred = soft_to_hard(probas) if task == 'binary' else torch.argmax(probas, dim=1)
     return f1_score(to_cpu(y_true), y_pred.numpy(), average=avg)
 
 def freeze_transformer_layers(
