@@ -43,7 +43,7 @@ class LinearQAHead(nn.Module):
         super(LinearQAHead, self).__init__()
         self.n_labels = n_labels_qa
         self.multitask = multitask
-        self.n_aux_tasks = n_aux_task
+        self.n_aux_tasks = n_aux_tasks
         self.aux_dropout = aux_dropout
 
         if highway_block:
