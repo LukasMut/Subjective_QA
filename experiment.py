@@ -68,7 +68,7 @@ if __name__ == '__main__':
     # set some crucial hyperparameters
     max_seq_length = 512 # BERT cannot deal with sequences, where T > 512
     doc_stride = 200
-    max_query_length = 50
+    max_query_length = 100
     batch_size = args.batch_size
     
     # classes for auxiliary tasks
