@@ -10,7 +10,7 @@ class GRL(torch.autograd.Function):
     lambd = 1.0
     @staticmethod
     def forward(ctx, x):
-        # identity function
+        # identity tranform (i.e., copy source data into the destination data without any change)
         return x.view_as(x)
 
     @staticmethod
