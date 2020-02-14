@@ -435,7 +435,7 @@ def train(
            train_f1_sbj = 100 * (batch_f1_sbj / nb_tr_steps)
 
            train_accs_sbj.append(train_acc_sbj)
-           train_f1_sbj.append(train_f1_sbj)
+           train_f1s_sbj.append(train_f1_sbj)
 
            if n_aux_tasks == 2:
 
