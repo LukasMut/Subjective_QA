@@ -162,7 +162,8 @@ def train(
         print()
         
         if n_aux_tasks == 1:
-            sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
+          # TODO: figure out, whether we need pos_weights for adversarial setting
+          sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
         
         # loss func for auxiliary task to inform model about different review / context domains (multi-way classification)
         elif n_aux_tasks == 2:
@@ -170,10 +171,11 @@ def train(
             assert isinstance(domain_weights, torch.Tensor), 'Tensor of class weights for different domains is not provided'
             domain_loss_func = nn.CrossEntropyLoss(weight=domain_weights.to(device))
     
-    if args['freeze_bert'] and (args['dataset'] == 'SubjQA' or args['dataset'] == 'combined'):
+    if args['dataset'] == 'SubjQA' or args['dataset'] == 'combined':
+      if args['freeze_bert']:
         if args['n_epochs'] <= 3:
-            # add an additional epoch for fine-tuning (not only the heads but) the entire model (+ BERT encoder)
-            args['n_epochs'] += (max_epochs - args['n_epochs'])
+          # add an additional epoch for fine-tuning (not only the heads but) the entire model (+ BERT encoder)
+          args['n_epochs'] += (max_epochs - args['n_epochs'])
 
     for epoch in trange(args['n_epochs'],  desc="Epoch"):
 
@@ -472,18 +474,19 @@ def train(
         print()
         
         if (epoch == 0) or (val_exact_match > val_accs[-1]):
-            torch.save(model.state_dict(), model_path + '/%s' % (args.model_name))
+            torch.save(model.state_dict(), model_path + '/%s' % (args['model_name']))
         
         val_losses.append(val_loss)
         val_accs.append(val_exact_match)
         val_f1s.append(val_f1)
         
-        if epoch > 0 and early_stopping:
-            if (val_accs[-2] > val_accs[-1]) and (val_f1s[-2] > val_f1s[-1]):
-                print("------------------------------------------")
-                print("----- Early stopping after {} epochs -----".format(epoch))
-                print("------------------------------------------")
-                break
+        if args['dataset'] == 'SQuAD':
+          if epoch > 0 and early_stopping:
+              if (val_accs[-2] > val_accs[-1]) and (val_f1s[-2] > val_f1s[-1]):
+                  print("------------------------------------------")
+                  print("----- Early stopping after {} epochs -----".format(epoch))
+                  print("------------------------------------------")
+                  break
        
     return batch_losses, train_losses, train_accs, train_f1s, val_losses, val_accs, val_f1s, model
 
