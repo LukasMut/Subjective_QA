@@ -111,11 +111,12 @@ if __name__ == '__main__':
     else:
         raise ValueError('Pretrained weights must be loaded from an uncased or cased BERT model.')
 
+    dataset = args.finetuning
     adversarial = 'adversarial' if args.adversarial else 'classic'
     qa_head_name = 'RecurrentQAHead' if args.qa_head == 'recurrent' else 'LinearQAHead'
     highway = 'Highway' if args.highway_connection else ''
     train_method = 'multitask' + '_' + str(args.n_aux_tasks) if args.multitask else 'singletask'
-    model_name = 'BERT' + '_' + args.bert_weights + '_' + qa_head_name + '_' + highway + '_' + train_method + '_' + args.optim + '_' + adversarial
+    model_name = 'BERT' + '_' + args.bert_weights + '_' + qa_head_name + '_' + highway + '_' + train_method + '_' + args.optim + '_' + adversarial + '_' + dataset
     model_name = model_name.lower()
     
     if args.version == 'train':
