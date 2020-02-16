@@ -58,14 +58,30 @@ def freeze_transformer_layers(
                               model,
                               model_name:str='bert',
                               unfreeze:bool=False,
+                              k:int=12,
 ):
     model_names = ['roberta', 'bert',]
     model_name = model_name.lower()
     if model_name not in model_names:
         raise ValueError('Incorrect model name provided. Model name must be one of {}'.format(model_names))
+
     for n, p in model.named_parameters():
         if n.startswith(model_name):
-            p.requires_grad = True if unfreeze else False
+            if unfreeze:
+                transformer_layer = model_name + '.encoder.layer.'
+                pooling_layer = model_name + '.pooler.'
+                if re.search(r'' + transformer_layer, n):
+                    try:
+                        layer_no = int(n[len(transformer_layer): len(transformer_layer) + 2])
+                        if layer_no > k:
+                            p.requires_grad = True
+                    except ValueError:
+                        continue
+                elif re.search(r'' + pooling_layer, n):
+                    p.requires_grad =True
+            else:
+                p.requires_grad = False
+                
     return model
 
 # sort sequences in decreasing order w.r.t. to orig. sequence length
@@ -200,12 +216,14 @@ def train(
         
         # if last training epoch
         if epoch == args['n_epochs'] - 1 and (args['dataset'] == 'SubjQA' or args['dataset'] == 'combined'):
-            model = freeze_transformer_layers(model, unfreeze=True)
-            print("------------------------------------------------------------")
-            print("---------- Pre-trained BERT weights are unfrozen -----------")
-            print("------------------------------------------------------------")
-            print("------ Entire model will be trained for single epoch -------")
-            print("------------------------------------------------------------")
+            m = 24
+            k = 12
+            model = freeze_transformer_layers(model, unfreeze=True, k=k)
+            print("------------------------------------------------------------------------------------------")
+            print("---------- Pre-trained BERT weights of top {} transformer layers are unfrozen -----------".format(m-k))
+            print("------------------------------------------------------------------------------------------")
+            print("---------------------- Entire model will be trained for single epoch ----------------------")
+            print("-------------------------------------------------------------------------------------------")
             print()
 
         if isinstance(n_aux_tasks, int):
