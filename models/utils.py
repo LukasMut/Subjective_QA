@@ -568,7 +568,7 @@ def train(
         
         if args['dataset'] == 'SQuAD':
           if epoch > 0 and early_stopping:
-              if (val_accs[-2] > val_accs[-1]) and (val_f1s[-2] > val_f1s[-1]):
+              if (val_f1s[-2] > val_f1s[-1]) and (val_accs[-2] > val_accs[-1]):
                   print("------------------------------------------")
                   print("----- Early stopping after {} epochs -----".format(epoch + 1))
                   print("------------------------------------------")
