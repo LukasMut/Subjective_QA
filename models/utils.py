@@ -139,10 +139,10 @@ def train(
           n_aux_tasks=None,
           qa_type_weights=None,
           domain_weights=None,
+          max_epochs:int=6,
 ):
     n_iters = len(train_dl)
     n_examples = n_iters * batch_size
-    max_epochs = 4
     
     if args["freeze_bert"]:
         model = freeze_transformer_layers(model)
