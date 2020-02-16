@@ -52,7 +52,7 @@ if __name__ == '__main__':
             help='Set number of epochs model should be fine-tuned for. Should be a higher number, if we fine-tune on SubjQA only.')
     parser.add_argument('--optim', type=str, default='AdamW',
             help='Define optimizer. Must be one of {AdamW, Adam, SGD, SGDCos}.')
-    parser.add_argument('--sd', type=str, default='',
+    parser.add_argument('--sd', type=str, default='saved_models',
             help='set model save directory for QA model.')
     parser.add_argument('--not_finetuned', action='store_true',
             help='If provided, test pre-trained BERT large model, fine-tuned on SQuAD, on SubjQA (no prior task-specific fine-tuning)')

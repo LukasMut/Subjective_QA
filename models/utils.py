@@ -422,7 +422,7 @@ def train(
         train_f1 = 100 * (batch_f1 / nb_tr_examples)
 
         print("------------------------------------")
-        print("---------- EPOCH {} ----------".format(epoch))
+        print("---------- EPOCH {} ----------".format(epoch + 1))
         print("----- Train loss: {} -----".format(round(tr_loss / nb_tr_steps, 3)))
         print("----- Train exact-match: {} % -----".format(round(train_exact_match, 3)))
         print("----- Train F1: {} % -----".format(round(train_f1, 3)))
@@ -552,7 +552,7 @@ def train(
         val_f1 = 100 * (batch_f1_val / nb_val_examples)
         
         print("----------------------------------")
-        print("---------- EPOCH {} ----------".format(epoch))
+        print("---------- EPOCH {} ----------".format(epoch + 1))
         print("----- Val loss: {} -----".format(round(val_loss, 3)))
         print("----- Val exact-match: {} % -----".format(round(val_exact_match, 3)))
         print("----- Val F1: {} % -----".format(round(val_f1, 3)))
@@ -570,7 +570,7 @@ def train(
           if epoch > 0 and early_stopping:
               if (val_accs[-2] > val_accs[-1]) and (val_f1s[-2] > val_f1s[-1]):
                   print("------------------------------------------")
-                  print("----- Early stopping after {} epochs -----".format(epoch))
+                  print("----- Early stopping after {} epochs -----".format(epoch + 1))
                   print("------------------------------------------")
                   break
        
