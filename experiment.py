@@ -51,13 +51,13 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=32,
             help='Define mini-batch size.')
     parser.add_argument('--n_epochs', type=int, default=5,
-            help='Set number of epochs model should be fine-tuned for. Should be a higher number, if we fine-tune on SubjQA only.')
+            help='Set number of epochs model should be fine-tuned for. If we fine-tune on SubjQA or combined, an additional epoch will be added.')
     parser.add_argument('--optim', type=str, default='AdamW',
             help='Define optimizer. Must be one of {AdamW, Adam, SGD, SGDCos}.')
     parser.add_argument('--sd', type=str, default='saved_models',
             help='Set model save directory for QA model.')
     parser.add_argument('--not_finetuned', action='store_true',
-            help='If provided, test pre-trained BERT large model, fine-tuned on SQuAD, on SubjQA (no prior task-specific fine-tuning)')
+            help='If provided, test pre-trained BERT large model on SubjQA (no prior task-specific fine-tuning); only possible in test version.')
     args = parser.parse_args()
     
     # see whether arg.parser works correctly
@@ -599,7 +599,7 @@ if __name__ == '__main__':
             
             subjqa_data_test = convert_df_to_dict(
                                                   subjqa_data_test_df,
-                                                  hidden_domain_indexes= hidden_domain_idx_test,
+                                                  hidden_domain_indexes=hidden_domain_idx_test,
                                                   split='test',
             )
             

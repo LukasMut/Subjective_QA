@@ -228,6 +228,7 @@ def train(
 
         if isinstance(n_aux_tasks, int):
           batch_acc_sbj, batch_f1_sbj = 0, 0
+          
           if n_aux_tasks == 2:
             batch_acc_domain, batch_f1_domain = 0, 0
 
@@ -434,14 +435,13 @@ def train(
               print("--------------------------------------------")
               print()
                     
-        train_loss = tr_loss / nb_tr_steps
-
+        tr_loss /= nb_tr_steps
         train_exact_match = 100 * (correct_answers / nb_tr_examples)
         train_f1 = 100 * (batch_f1 / nb_tr_examples)
 
         print("------------------------------------")
         print("---------- EPOCH {} ----------".format(epoch + 1))
-        print("----- Train loss: {} -----".format(round(tr_loss / nb_tr_steps, 3)))
+        print("----- Train loss: {} -----".format(round(tr_loss, 3)))
         print("----- Train exact-match: {} % -----".format(round(train_exact_match, 3)))
         print("----- Train F1: {} % -----".format(round(train_f1, 3)))
         print("------------------------------------")
@@ -565,7 +565,7 @@ def train(
                 current_batch_f1 = 100 * (batch_f1_val / nb_val_examples)
                 current_batch_acc = 100 * (correct_answers_val / nb_val_examples)
 
-        val_loss = val_loss / nb_val_steps
+        val_loss /= nb_val_steps
         val_exact_match = 100 * (correct_answers_val / nb_val_examples)
         val_f1 = 100 * (batch_f1_val / nb_val_examples)
         
@@ -629,7 +629,6 @@ def test(
         
         # if current batch_size is smaller than specified batch_size, skip batch
         if b_input_ids.size(0) != batch_size:
-            questions_not_tested = b_input_ids.size(0)
             continue
 
         if sort_batch:
