@@ -52,7 +52,7 @@ if __name__ == '__main__':
             help='Define mini-batch size.')
     parser.add_argument('--n_epochs', type=int, default=5,
             help='Set number of epochs model should be fine-tuned for. If we fine-tune on SubjQA or combined, an additional epoch will be added.')
-    parser.add_argument('--optim', type=str, default='AdamW',
+    parser.add_argument('--optim', type=str, default='Adam',
             help='Define optimizer. Must be one of {AdamW, Adam, SGD, SGDCos}.')
     parser.add_argument('--sd', type=str, default='saved_models',
             help='Set model save directory for QA model.')
@@ -541,7 +541,7 @@ if __name__ == '__main__':
             
             optimizer = SGD(
                             model.parameters(),
-                            lr=hypers['lr_sgd_cos'], 
+                            lr=hypers['lr_sgd_cos'] if args.optim == 'SGDCos' else hypers['lr_sgd'], 
                             momentum=0.9,
             )
             if args.optim == 'SGDCos':

@@ -168,7 +168,7 @@ class RecurrentQAHead(nn.Module):
                  max_seq_length:int=512,
                  in_size:int=1024,
                  n_labels_qa:int=2,
-                 n_recurrent_layers:int=2,
+                 n_recurrent_layers:int=1,
                  highway_block:bool=False,
                  decoder:bool=False,
                  multitask:bool=False,
@@ -183,16 +183,17 @@ class RecurrentQAHead(nn.Module):
         self.multitask = multitask
         self.n_aux_tasks = n_aux_tasks
         self.aux_dropout = aux_dropout
-        self.n_recurrent_layers = n_recurrent_layers # number of recurrent layers should be 1 or 2
+        self.n_recurrent_layers = n_recurrent_layers # set number of recurrent layers to 1 or 2 (more are not necessary and computationally inefficient)
+        self.rnn_version = 'GRU'
 
-        self.lstm_encoder = BiLSTM(max_seq_length, n_layers=self.n_recurrent_layers)
+        self.rnn_encoder = BiLSTM(max_seq_length, n_layers=self.n_recurrent_layers) if self.rnn_version == 'LSTM' else BiGRU(max_seq_length, n_layers=self.n_recurrent_layers)
         
         if highway_block:
             # highway bridge in-between BiLSTMs
             self.highway = Highway(in_size)
 
         if decoder:
-            self.lstm_decoder = BiLSTM(max_seq_length, n_layers=self.n_recurrent_layers)
+            self.rnn_decoder = BiLSTM(max_seq_length, n_layers=self.n_recurrent_layers) if self.rnn_version == 'LSTM' else BiGRU(max_seq_length, n_layers=self.n_recurrent_layers)
             
         # fully-connected QA output layer
         self.fc_qa = nn.Linear(in_size, self.n_labels)
@@ -241,18 +242,18 @@ class RecurrentQAHead(nn.Module):
         
         sequence_output = bert_outputs[0]
 
-        hidden_lstm = self.lstm_encoder.init_hidden(sequence_output.shape[0])
+        hidden_rnn = self.rnn_encoder.init_hidden(sequence_output.shape[0])
         
         # pass BERT representations through Bi-LSTM to compute temporal dependencies and global interactions
-        sequence_output, hidden_lstm = self.lstm_encoder(sequence_output, seq_lengths, hidden_lstm)
+        sequence_output, hidden_rnn = self.rnn_encoder(sequence_output, seq_lengths, hidden_rnn)
         
         if hasattr(self, 'highway'):
             # pass output of Bi-LSTM through a Highway connection (for better information flow)
             # TODO: figure out, whether we should pass "sequence_output[:, -1, :]" to Highway layer or simply "sequence_output"
             sequence_output = self.highway(sequence_output)
 
-        if hasattr(self, 'lstm_decoder'):
-            sequence_output, hidden_lstm = self.lstm_decoder(sequence_output, seq_lengths, hidden_lstm)
+        if hasattr(self, 'rnn_decoder'):
+            sequence_output, hidden_rnn = self.rnn_decoder(sequence_output, seq_lengths, hidden_rnn)
         
         # compute classification of answer span
         logits = self.fc_qa(sequence_output)
@@ -296,7 +297,7 @@ class RecurrentQAHead(nn.Module):
             sbj_logits = sbj_logits.squeeze(-1)
 
             if self.n_aux_tasks == 1:
-                return outputs, sbj_logits #, hidden_lstm
+                return outputs, sbj_logits #, hidden_rnn
 
             elif self.n_aux_tasks == 2:
 
@@ -304,7 +305,7 @@ class RecurrentQAHead(nn.Module):
                 domain_logits = self.fc_domain_2(domain_out)
                 domain_logits = domain_logits.squeeze(-1)
 
-                return outputs, sbj_logits, domain_logits #, hidden_lstm
+                return outputs, sbj_logits, domain_logits #, hidden_rnn
 
             elif self.n_aux_tasks == 3:
 
@@ -316,6 +317,6 @@ class RecurrentQAHead(nn.Module):
                 ds_logits = self.fc_ds_2(domain_out)
                 ds_logits = domain_logits.squeeze(-1)
 
-                return outputs, sbj_logits, domain_logits, ds_logits #, hidden_lstm
+                return outputs, sbj_logits, domain_logits, ds_logits #, hidden_rnn
         else:
-            return outputs #, hidden_lstm  # (loss), start_logits, end_logits, (hidden_states), (attentions)
+            return outputs #, hidden_rnn  # (loss), start_logits, end_logits, (hidden_states), (attentions)
