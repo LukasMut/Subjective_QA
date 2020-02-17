@@ -246,7 +246,7 @@ class RecurrentQAHead(nn.Module):
         
         if hasattr(self, 'highway'):
             # pass output of Bi-LSTM through a Highway connection (for better information flow)
-            # TODO: figure out, whether we should pass sequence_output[:, -1, :] to Highway layer or simply sequence_output
+            # TODO: figure out, whether we should pass "sequence_output[:, -1, :]" to Highway layer or simply "sequence_output"
             sequence_output = self.highway(sequence_output)
 
         if hasattr(self, 'lstm_decoder'):

@@ -633,7 +633,7 @@ if __name__ == '__main__':
             )
             
             if args.not_finetuned:
-                # test (simple) BERT-QA-model fine-tuned on SQuAD without (prior)task-specific fine-tuning on SubjQA
+                # test (simple) BERT-QA-model fine-tuned on SQuAD without (prior) task-specific fine-tuning on SubjQA
                 model = BertForQuestionAnswering.from_pretrained(pretrained_weights)
                 model_name = 'bert_pretrained_squad_no_fine_tuning'
                 # set model to device

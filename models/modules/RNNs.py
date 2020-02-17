@@ -33,7 +33,7 @@ class BiLSTM(nn.Module):
                  bidir:bool=True,
     ):
         
-        super(EncoderLSTM, self).__init__()
+        super(BiLSTM, self).__init__()
         self.in_size = in_size # dimensionality of BERT-large attention heads (i.e, 1024)
         self.hidden_size = in_size // 2  # if hidden_size = in_size // 2 -> in_size for classification head is in_size due to bidir
         self.n_layers = n_layers
@@ -87,7 +87,7 @@ class BiGRU(nn.Module):
                  bidir:bool=True,
     ):
         
-        super(EncoderGRU, self).__init__()
+        super(BiGRU, self).__init__()
         self.in_size = in_size # dimensionality of BERT-large attention heads (i.e, 1024)
         self.hidden_size = in_size // 2 # if hidden_size = in_size // 2 -> in_size for classification head is in_size due to bidir
         self.n_layers = n_layers
