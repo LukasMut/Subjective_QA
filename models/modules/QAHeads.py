@@ -190,7 +190,7 @@ class RecurrentQAHead(nn.Module):
             self.highway = Highway(in_size)
 
         if decoder:
-            self.n_decoder_layers = 1
+            self.n_decoder_layers = 1 # n_decoder_layers should be 1 or 2
             self.lstm_decoder = BiLSTM(max_seq_length, n_layers=self.n_decoder_layers)
             
         # fully-connected QA output layer
@@ -251,7 +251,7 @@ class RecurrentQAHead(nn.Module):
             sequence_output = self.highway(sequence_output)
 
         if hasattr(self, 'lstm_decoder'):
-            hidden_lstm = hidden_lstm[-2:, :, :] if self.n_decoder_layers == 1 else hidden_lstm
+            hidden_lstm = (h[-2:, :, :] if self.n_decoder_layers == 1 else h for h in hidden_lstm)
             sequence_output, hidden_lstm = self.lstm_decoder(sequence_output, seq_lengths, hidden_lstm)
         
         # compute classification of answer span
