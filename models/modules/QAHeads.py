@@ -244,11 +244,11 @@ class RecurrentQAHead(nn.Module):
 
         hidden_rnn = self.rnn_encoder.init_hidden(sequence_output.shape[0])
         
-        # pass BERT representations through Bi-LSTM to compute temporal dependencies and global interactions
+        # pass BERT representations through Bi-LSTM or Bi-GRU to compute temporal dependencies and global interactions
         sequence_output, hidden_rnn = self.rnn_encoder(sequence_output, seq_lengths, hidden_rnn)
         
         if hasattr(self, 'highway'):
-            # pass output of Bi-LSTM through a Highway connection (for better information flow)
+            # pass output of Bi-LSTM or Bi-GRU through a Highway connection (for better information flow)
             # TODO: figure out, whether we should pass "sequence_output[:, -1, :]" to Highway layer or simply "sequence_output"
             sequence_output = self.highway(sequence_output)
 
