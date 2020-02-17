@@ -1,6 +1,6 @@
 __all__ = [
-           'EncoderLSTM',
-           'EncoderGRU',
+           'BiLSTM',
+           'BiGRU',
 ]
 
 import torch

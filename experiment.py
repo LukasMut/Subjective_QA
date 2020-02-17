@@ -45,7 +45,7 @@ if __name__ == '__main__':
     parser.add_argument('--highway_connection', action='store_true',
             help='If provided, put Highway connection in between BERT OR BiLSTM encoder and fc linear output head.')
     parser.add_argument('--decoder', action='store_true',
-            help='If provided, put BiLSTM or BiGRU in between Highway bridge and fc linear output layers; requires BiLSTM-Encoder and Highway bridge.'
+            help='If provided, put BiLSTM or BiGRU in between Highway bridge and fc linear output layers; requires BiLSTM-Encoder and Highway bridge.')
     parser.add_argument('--bert_weights', type=str, default='cased',
             help='If cased, load pre-trained weights from BERT cased model; if uncased, load pre-trained weights from BERT uncased model.')
     parser.add_argument('--batch_size', type=int, default=32,
@@ -120,7 +120,7 @@ if __name__ == '__main__':
     train_method = 'multitask' + '_' + str(args.n_aux_tasks) if args.multitask else 'singletask'
     adversarial = 'adversarial' if args.adversarial else 'classic'
     
-    model_name = 'BERT' + '_' + args.bert_weights + '_' + encoding + '_' + highway + '_' + decoder + '_' train_method + '_' + args.optim + '_' + adversarial + '_' + dataset
+    model_name = 'BERT' + '_' + args.bert_weights + '_' + encoding + '_' + highway + '_' + decoder + '_' + train_method + '_' + args.optim + '_' + adversarial + '_' + dataset
     model_name = model_name.lower()
     
     if args.version == 'train':
@@ -483,7 +483,7 @@ if __name__ == '__main__':
         model = BertForQA.from_pretrained(
                                           pretrained_weights,
                                           max_seq_length = max_seq_length,
-                                          encoder = True if encoding = 'recurrent' else False,
+                                          encoder = True if encoding == 'recurrent' else False,
                                           highway_connection = args.highway_connection,
                                           decoder = args.decoder,
                                           multitask = args.multitask,
@@ -642,7 +642,7 @@ if __name__ == '__main__':
                 model = BertForQA.from_pretrained(
                                                   pretrained_weights,
                                                   max_seq_length = max_seq_length,
-                                                  encoder = True if encoding = 'recurrent' else False,
+                                                  encoder = True if encoding == 'recurrent' else False,
                                                   highway_connection = args.highway_connection,
                                                   decoder = args.decoder,
                 )

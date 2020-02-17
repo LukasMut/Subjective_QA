@@ -36,7 +36,7 @@ class BertForQA(BertPreTrainedModel):
                  max_seq_length:int=512,
                  encoder:bool=False,
                  highway_connection:bool=False,
-                 decoder=bool:False,
+                 decoder:bool=False,
                  multitask:bool=False,
                  adversarial:bool=False,
                  n_aux_tasks=None,
