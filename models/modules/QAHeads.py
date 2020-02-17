@@ -96,8 +96,7 @@ class LinearQAHead(nn.Module):
         sequence_output = bert_outputs[0]
         
         if hasattr(self, 'highway'):
-            # pass BERT representations through highway-connection (for better information flow)
-            sequence_output = self.highway(sequence_output)
+            sequence_output = self.highway(sequence_output) # pass BERT representations through highway-connection (for better information flow)
         
         logits = self.fc_qa(sequence_output)
         start_logits, end_logits = logits.split(1, dim=-1)
@@ -184,13 +183,12 @@ class RecurrentQAHead(nn.Module):
         self.n_aux_tasks = n_aux_tasks
         self.aux_dropout = aux_dropout
         self.n_recurrent_layers = n_recurrent_layers # set number of recurrent layers to 1 or 2 (more are not necessary and computationally inefficient)
-        self.rnn_version = 'GRU'
+        self.rnn_version = 'LSTM'
 
         self.rnn_encoder = BiLSTM(max_seq_length, n_layers=self.n_recurrent_layers) if self.rnn_version == 'LSTM' else BiGRU(max_seq_length, n_layers=self.n_recurrent_layers)
         
         if highway_block:
-            # highway bridge in-between BiLSTMs
-            self.highway = Highway(in_size)
+            self.highway = Highway(in_size) # highway bridge in-between bidirectional RNNs
 
         if decoder:
             self.rnn_decoder = BiLSTM(max_seq_length, n_layers=self.n_recurrent_layers) if self.rnn_version == 'LSTM' else BiGRU(max_seq_length, n_layers=self.n_recurrent_layers)
@@ -244,7 +242,7 @@ class RecurrentQAHead(nn.Module):
 
         hidden_rnn = self.rnn_encoder.init_hidden(sequence_output.shape[0])
         
-        # pass BERT representations through Bi-LSTM or Bi-GRU to compute temporal dependencies and global interactions
+        # pass BERT representations through Bi-LSTM or Bi-GRU to compute both temporal dependencies and global interactions among feature representations
         sequence_output, hidden_rnn = self.rnn_encoder(sequence_output, seq_lengths, hidden_rnn)
         
         if hasattr(self, 'highway'):
