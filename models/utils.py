@@ -160,8 +160,8 @@ def train(
     
     if args["freeze_bert"]:
       L = 24 # total number of transformer layers in pre-trained BERT model (L = 24 for BERT large, L = 12 for BERT base)
-      k = 3 / 4 # for fine-tuning BERT attention, leave L * k transformer layers frozen
-      l = int(L * k) # after training the task-specific RNN and linear output layers, unfreeze the top L - l BERT transformer layers for a single epoch
+      k = 4 / 4 # for fine-tuning BERT attention, leave L * k transformer layers frozen
+      l = int(L * k) - 1 # after training the task-specific RNN and linear output layers, unfreeze the top L - l BERT transformer layers for a single epoch
       model_name = 'bert'
       model = freeze_transformer_layers(model, model_name=model_name)
       print("--------------------------------------------------")
@@ -220,7 +220,7 @@ def train(
         if epoch == args['n_epochs'] - 1 and (args['dataset'] == 'SubjQA' or args['dataset'] == 'combined'):
             model = freeze_transformer_layers(model, unfreeze=True, l=l)
             print("------------------------------------------------------------------------------------------")
-            print("---------- Pre-trained BERT weights of top {} transformer layers are unfrozen -----------".format(L - l))
+            print("---------- Pre-trained BERT weights of top {} transformer layers are unfrozen -----------".format(L - (l + 1)))
             print("------------------------------------------------------------------------------------------")
             print("---------------------- Entire model will be trained for single epoch ----------------------")
             print("-------------------------------------------------------------------------------------------")
@@ -228,7 +228,7 @@ def train(
 
         if isinstance(n_aux_tasks, int):
           batch_acc_sbj, batch_f1_sbj = 0, 0
-          
+
           if n_aux_tasks == 2:
             batch_acc_domain, batch_f1_domain = 0, 0
 
