@@ -175,7 +175,6 @@ class RecurrentQAHead(nn.Module):
                  n_domain_labels=None,
                  adversarial:bool=False,
     ):
-        
         super(RecurrentQAHead, self).__init__()
         self.n_labels = n_labels_qa
         self.multitask = multitask
