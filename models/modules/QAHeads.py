@@ -168,6 +168,7 @@ class RecurrentQAHead(nn.Module):
                  max_seq_length:int=512,
                  in_size:int=1024,
                  n_labels_qa:int=2,
+                 n_recurrent_layers:int=2,
                  highway_block:bool=False,
                  decoder:bool=False,
                  multitask:bool=False,
@@ -182,16 +183,16 @@ class RecurrentQAHead(nn.Module):
         self.multitask = multitask
         self.n_aux_tasks = n_aux_tasks
         self.aux_dropout = aux_dropout
+        self.n_recurrent_layers = n_recurrent_layers # number of recurrent layers should be 1 or 2
 
-        self.lstm_encoder = BiLSTM(max_seq_length, n_layers=2)
+        self.lstm_encoder = BiLSTM(max_seq_length, n_layers=self.n_recurrent_layers)
         
         if highway_block:
             # highway bridge in-between BiLSTMs
             self.highway = Highway(in_size)
 
         if decoder:
-            self.n_decoder_layers = 1 # n_decoder_layers should be 1 or 2
-            self.lstm_decoder = BiLSTM(max_seq_length, n_layers=self.n_decoder_layers)
+            self.lstm_decoder = BiLSTM(max_seq_length, n_layers=self.n_recurrent_layers)
             
         # fully-connected QA output layer
         self.fc_qa = nn.Linear(in_size, self.n_labels)
@@ -251,7 +252,6 @@ class RecurrentQAHead(nn.Module):
             sequence_output = self.highway(sequence_output)
 
         if hasattr(self, 'lstm_decoder'):
-            hidden_lstm = (h[-2:, :, :] if self.n_decoder_layers == 1 else h for h in hidden_lstm)
             sequence_output, hidden_lstm = self.lstm_decoder(sequence_output, seq_lengths, hidden_lstm)
         
         # compute classification of answer span
