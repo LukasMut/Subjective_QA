@@ -7,9 +7,6 @@ import random
 import torch
 
 from transformers import BertModel, BertPreTrainedModel
-
-from models.modules.Encoder import *
-from models.modules.Highway import Highway
 from models.modules.QAHeads import *
 
 # set random seeds to reproduce results
@@ -36,9 +33,10 @@ class BertForQA(BertPreTrainedModel):
     def __init__(
                  self,
                  config,
-                 qa_head_name:str,
                  max_seq_length:int=512,
+                 encoder:bool=False,
                  highway_connection:bool=False,
+                 decoder=bool:False,
                  multitask:bool=False,
                  adversarial:bool=False,
                  n_aux_tasks=None,
@@ -47,19 +45,30 @@ class BertForQA(BertPreTrainedModel):
         
         super(BertForQA, self).__init__(config)
         self.bert = BertModel(config)
-        self.qa_head_name = qa_head_name
         self.max_seq_length = max_seq_length
+        self.encoder = encoder
         self.highway_connection = highway_connection
+        self.decoder = decoder
         self.multitask = multitask
         self.adversarial = adversarial
         self.n_aux_tasks = n_aux_tasks
         self.n_domain_labels = n_domain_labels
         
-        assert isinstance(self.qa_head_name, str), "QA head must be defined, and has to be one of {'LinearQAHead', 'RecurrentQAHead'}"
         if self.multitask: assert isinstance(self.n_aux_tasks, int), "If MTL setting, number of auxiliary tasks must be defined"
-
         
-        if self.qa_head_name == 'LinearQAHead':
+        if self.encoder:
+            self.qa_head = RecurrentQAHead(
+                                           max_seq_length=self.max_seq_length,
+                                           in_size=config.hidden_size,
+                                           n_labels_qa=config.num_labels,
+                                           highway_block=self.highway_connection,
+                                           multitask=self.multitask,
+                                           decoder=self.decoder,
+                                           n_aux_tasks=self.n_aux_tasks,
+                                           n_domain_labels=self.n_domain_labels,
+                                           adversarial=self.adversarial,
+                                           )
+        else:
             self.qa_head = LinearQAHead(
                                         in_size=config.hidden_size,
                                         n_labels_qa=config.num_labels,
@@ -68,19 +77,7 @@ class BertForQA(BertPreTrainedModel):
                                         n_aux_tasks=self.n_aux_tasks,
                                         n_domain_labels=self.n_domain_labels,
                                         adversarial=self.adversarial,
-            )
-            
-        elif self.qa_head_name == 'RecurrentQAHead':
-            self.qa_head = RecurrentQAHead(
-                                           max_seq_length=self.max_seq_length,
-                                           in_size=config.hidden_size,
-                                           n_labels_qa=config.num_labels,
-                                           highway_block=self.highway_connection,
-                                           multitask=self.multitask,
-                                           n_aux_tasks=self.n_aux_tasks,
-                                           n_domain_labels=self.n_domain_labels,
-                                           adversarial=self.adversarial,
-            )
+                                        )
             
     def forward(
                 self,
@@ -104,14 +101,14 @@ class BertForQA(BertPreTrainedModel):
                             head_mask=head_mask
       )
       
-        if self.qa_head_name == 'RecurrentQAHead':
+        if self.encoder:
             return self.qa_head(
                                 bert_outputs=bert_outputs,
                                 seq_lengths=input_lengths,
                                 start_positions=start_positions,
                                 end_positions=end_positions,
             )
-        elif self.qa_head_name == 'LinearQAHead':
+        else:
             return self.qa_head(
                                 bert_outputs=bert_outputs,
                                 start_positions=start_positions,

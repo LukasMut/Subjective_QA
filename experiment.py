@@ -40,12 +40,14 @@ if __name__ == '__main__':
             help='If provided, adversarial training instead of classic training. Only necessary, if MTL setting.')
     parser.add_argument('--n_aux_tasks', type=int, default=None,
             help='Define number of auxiliary tasks QA model should perform during training. Only necessary, if MTL setting.')
-    parser.add_argument('--qa_head', type=str, default='linear',
-            help='If linear, put fc linear head on top of BERT; if recurrent, put BiLSTM encoder plus fc linear head on top of BERT.')
+    parser.add_argument('--encoder', action='store_true',
+            help='If provided, use BiLSTM encoder to compute global interactions before passing feature representations to fc output layers.')
     parser.add_argument('--highway_connection', action='store_true',
-            help='If provided, put highway connection in between BERT OR BiLSTM encoder and fc linear output head.')
+            help='If provided, put Highway connection in between BERT OR BiLSTM encoder and fc linear output head.')
+    parser.add_argument('--decoder', action='store_true',
+            help='If provided, put BiLSTM or BiGRU in between Highway bridge and fc linear output layers; requires BiLSTM-Encoder and Highway bridge.'
     parser.add_argument('--bert_weights', type=str, default='cased',
-            help='If cased, load pretrained weights from BERT cased model; if uncased, load pretrained weights from BERT uncased model.')
+            help='If cased, load pre-trained weights from BERT cased model; if uncased, load pre-trained weights from BERT uncased model.')
     parser.add_argument('--batch_size', type=int, default=32,
             help='Define mini-batch size.')
     parser.add_argument('--n_epochs', type=int, default=5,
@@ -53,7 +55,7 @@ if __name__ == '__main__':
     parser.add_argument('--optim', type=str, default='AdamW',
             help='Define optimizer. Must be one of {AdamW, Adam, SGD, SGDCos}.')
     parser.add_argument('--sd', type=str, default='saved_models',
-            help='set model save directory for QA model.')
+            help='Set model save directory for QA model.')
     parser.add_argument('--not_finetuned', action='store_true',
             help='If provided, test pre-trained BERT large model, fine-tuned on SQuAD, on SubjQA (no prior task-specific fine-tuning)')
     args = parser.parse_args()
@@ -112,11 +114,13 @@ if __name__ == '__main__':
         raise ValueError('Pretrained weights must be loaded from an uncased or cased BERT model.')
 
     dataset = args.finetuning
-    adversarial = 'adversarial' if args.adversarial else 'classic'
-    qa_head_name = 'RecurrentQAHead' if args.qa_head == 'recurrent' else 'LinearQAHead'
+    encoding = 'recurrent' if args.encoder else 'linear'
     highway = 'Highway' if args.highway_connection else ''
+    decoder = 'BiLSTM' if args.decoder else ''
     train_method = 'multitask' + '_' + str(args.n_aux_tasks) if args.multitask else 'singletask'
-    model_name = 'BERT' + '_' + args.bert_weights + '_' + qa_head_name + '_' + highway + '_' + train_method + '_' + args.optim + '_' + adversarial + '_' + dataset
+    adversarial = 'adversarial' if args.adversarial else 'classic'
+    
+    model_name = 'BERT' + '_' + args.bert_weights + '_' + encoding + '_' + highway + '_' + decoder + '_' train_method + '_' + args.optim + '_' + adversarial + '_' + dataset
     model_name = model_name.lower()
     
     if args.version == 'train':
@@ -478,13 +482,14 @@ if __name__ == '__main__':
         # initialise QA model
         model = BertForQA.from_pretrained(
                                           pretrained_weights,
-                                          qa_head_name=qa_head_name,
-                                          max_seq_length=max_seq_length,
-                                          highway_connection=args.highway_connection,
-                                          multitask=args.multitask,
-                                          adversarial=args.adversarial,
-                                          n_aux_tasks=args.n_aux_tasks,
-                                          n_domain_labels=n_domain_labels,
+                                          max_seq_length = max_seq_length,
+                                          encoder = True if encoding = 'recurrent' else False,
+                                          highway_connection = args.highway_connection,
+                                          decoder = args.decoder,
+                                          multitask = args.multitask,
+                                          adversarial = args.adversarial,
+                                          n_aux_tasks = args.n_aux_tasks,
+                                          n_domain_labels = n_domain_labels,
         )
 
         # set model to device
@@ -636,10 +641,10 @@ if __name__ == '__main__':
             else:
                 model = BertForQA.from_pretrained(
                                                   pretrained_weights,
-                                                  qa_head_name=qa_head_name,
-                                                  max_seq_length=max_seq_length,
-                                                  highway_connection=args.highway_connection,
-                                                  multitask=False,
+                                                  max_seq_length = max_seq_length,
+                                                  encoder = True if encoding = 'recurrent' else False,
+                                                  highway_connection = args.highway_connection,
+                                                  decoder = args.decoder,
                 )
                 # load fine-tuned model
                 model.load_state_dict(torch.load(args.sd + '/%s' % (model_name)))

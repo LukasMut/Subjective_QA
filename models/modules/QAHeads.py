@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from models.modules.Encoder import *
+from models.modules.RNNs import *
 from models.modules.GradReverse import *
 from models.modules.Highway import Highway
 
@@ -126,7 +126,7 @@ class LinearQAHead(nn.Module):
         if self.multitask and isinstance(self.n_aux_tasks, int):
 
             if self.adversarial:
-                # reverse gradients to learn qa-type / domain-invariant features
+                # reverse gradients to learn qa-type / domain-invariant features (i.e., semi-supervised domain-adaptation)
                 sequence_output = grad_reverse(sequence_output)
 
             sbj_out = F.relu(self.dropout(self.fc_sbj_1(sequence_output)))
@@ -169,6 +169,7 @@ class RecurrentQAHead(nn.Module):
                  in_size:int=1024,
                  n_labels_qa:int=2,
                  highway_block:bool=False,
+                 decoder:bool=False,
                  multitask:bool=False,
                  n_aux_tasks=None,
                  aux_dropout:float=0.25,
@@ -182,10 +183,14 @@ class RecurrentQAHead(nn.Module):
         self.n_aux_tasks = n_aux_tasks
         self.aux_dropout = aux_dropout
 
-        self.lstm_encoder = EncoderLSTM(max_seq_length)
+        self.lstm_encoder = BiLSTM(max_seq_length, n_layers=2)
         
         if highway_block:
+            # highway bridge in-between BiLSTMs
             self.highway = Highway(in_size)
+
+        if decoder:
+            self.lstm_decoder = BiLSTM(max_seq_length, n_layers=1)
             
         # fully-connected QA output layer
         self.fc_qa = nn.Linear(in_size, self.n_labels)
@@ -240,9 +245,12 @@ class RecurrentQAHead(nn.Module):
         sequence_output, hidden_lstm = self.lstm_encoder(sequence_output, seq_lengths, hidden_lstm)
         
         if hasattr(self, 'highway'):
-            # pass output of Bi-LSTM through a highway-connection (for better information flow)
+            # pass output of Bi-LSTM through a Highway connection (for better information flow)
             # TODO: figure out, whether we should pass sequence_output[:, -1, :] to Highway layer or simply sequence_output
             sequence_output = self.highway(sequence_output)
+
+        if hasattr(self, 'lstm_decoder'):
+            sequence_output, hidden_lstm = self.lstm_decoder(sequence_output, seq_lengths, hidden_lstm)
         
         # compute classification of answer span
         logits = self.fc_qa(sequence_output)
@@ -275,7 +283,7 @@ class RecurrentQAHead(nn.Module):
         if self.multitask and isinstance(self.n_aux_tasks, int):
 
             if self.adversarial:
-                # reverse gradients to learn qa-type / domain-invariant features
+                # reverse gradients to learn qa-type / domain-invariant features (i.e., semi-supervised domain-adaptation)
                 sequence_output = grad_reverse(sequence_output)
 
             # we only need hidden states of last time step (summary of the sequence) (i.e., seq[batch_size, -1, hidden_size])

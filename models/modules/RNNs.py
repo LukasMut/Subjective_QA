@@ -22,7 +22,7 @@ else:
     device = torch.device("cpu")
     print("GPU not available, CPU used")
 """
-class EncoderLSTM(nn.Module):
+class BiLSTM(nn.Module):
     
     def __init__(
                  self,
@@ -76,7 +76,7 @@ class EncoderLSTM(nn.Module):
         hidden = (nn.init.xavier_uniform_(hidden_state), nn.init.xavier_uniform_(cell_state))
         return hidden
     
-class EncoderGRU(nn.Module):
+class BiGRU(nn.Module):
     
     def __init__( 
                  self,
