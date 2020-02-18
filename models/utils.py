@@ -216,7 +216,8 @@ def train(
 
         model.train()
         
-        # if last training epoch
+        """
+        # if last training epoch, unfreeze BERT weights to fine-tune BERT weights for a single epoch
         if epoch == args['n_epochs'] - 1 and (args['dataset'] == 'SubjQA' or args['dataset'] == 'combined'):
             model = freeze_transformer_layers(model, unfreeze=True, l=l)
             print("------------------------------------------------------------------------------------------")
@@ -225,6 +226,7 @@ def train(
             print("---------------------- Entire model will be trained for single epoch ----------------------")
             print("-------------------------------------------------------------------------------------------")
             print()
+        """
 
         if isinstance(n_aux_tasks, int):
           batch_acc_sbj, batch_f1_sbj = 0, 0
