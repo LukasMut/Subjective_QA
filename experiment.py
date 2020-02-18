@@ -53,7 +53,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_epochs', type=int, default=5,
             help='Set number of epochs model should be fine-tuned for. If we fine-tune on SubjQA or combined, an additional epoch will be added.')
     parser.add_argument('--optim', type=str, default='Adam',
-            help='Define optimizer. Must be one of {AdamW, Adam, SGD, SGDCos}.')
+            help='Define optimizer. Must be one of {AdamW, Adam}.')
     parser.add_argument('--sd', type=str, default='saved_models',
             help='Set model save directory for QA model.')
     parser.add_argument('--not_finetuned', action='store_true',
@@ -498,7 +498,6 @@ if __name__ == '__main__':
         hypers = {
                   "lr_adam": 1e-3,
                   "lr_sgd": 1e-2,
-                  "lr_sgd_cos": 1e-1,
                   "warmup_steps": 50,
                   "max_grad_norm": 10,
                   "sort_batch": False, # TODO: figure out, whether we should sort batch for RNNs (not necessary for linear QA heads)
@@ -537,24 +536,14 @@ if __name__ == '__main__':
             )
             scheduler = None
         
-        elif (args.optim == 'SGD' or args.optim == 'SGDCos'):
+        elif args.optim == 'SGD':
             
             optimizer = SGD(
                             model.parameters(),
-                            lr=hypers['lr_sgd_cos'] if args.optim == 'SGDCos' else hypers['lr_sgd'], 
+                            lr=hypers['lr_sgd'], 
                             momentum=0.9,
             )
-            if args.optim == 'SGDCos':
-                
-                # TODO: figure out, whether cosine-annealing is useful for SGD with momentum when optimizing a BERT-QA model
-                # NOTE: Both T_0 and T_mult are picked according to the params in the orig. paper
-                scheduler = CosineAnnealingWarmRestarts(
-                                                        optimizer,
-                                                        T_0=10,
-                                                        T_mult=2,
-                )
-            elif args.optim == 'SGD':
-                scheduler = None
+            scheduler = None
         
         else:
             raise ValueError("Optimizer must be one of {AdamW, Adam, SGD, SGDCos}.")

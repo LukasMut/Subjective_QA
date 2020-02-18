@@ -41,3 +41,4 @@ data/SubjQA/trustyou/cached_train_bert-large-cased-whole-word-masking-finetuned-
 *.pyc
 *.png
 .ipynb_checkpoints/debugging-checkpoint.ipynb
+.ipynb_checkpoints/results_analysis-checkpoint.ipynb
