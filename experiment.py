@@ -535,16 +535,7 @@ if __name__ == '__main__':
                              amsgrad=True,
             )
             scheduler = None
-        """
-        elif args.optim == 'SGD':
-            
-            optimizer = SGD(
-                            model.parameters(),
-                            lr=hypers['lr_sgd'], 
-                            momentum=0.9,
-            )
-            scheduler = None
-        """
+        
         else:
             raise ValueError("Optimizer must be one of {AdamW, Adam}.")
                     
