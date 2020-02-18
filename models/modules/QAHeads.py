@@ -104,6 +104,7 @@ class LinearQAHead(nn.Module):
         end_logits = end_logits.squeeze(-1)
 
         outputs = (start_logits, end_logits,) + bert_outputs[2:]
+
         if (start_positions is not None) and (end_positions is not None):
             # If we are on multi-GPU, split add a dimension
             if len(start_positions.size()) > 1:
@@ -123,6 +124,9 @@ class LinearQAHead(nn.Module):
             outputs = (total_loss,) + outputs
             
         if self.multitask and isinstance(self.n_aux_tasks, int):
+            
+            # use contextual embedding of the special [CLS] token (corresponds to the semantic representation of an input sentence X)
+            sequence_output = sequence_output[:, 0, :] 
 
             if self.adversarial:
                 # reverse gradients to learn qa-type / domain-invariant features (i.e., semi-supervised domain-adaptation)
