@@ -180,7 +180,7 @@ class RecurrentQAHead(nn.Module):
         self.multitask = multitask
         self.n_aux_tasks = n_aux_tasks
         self.aux_dropout = aux_dropout
-        self.n_recurrent_layers = 1 # set number of recurrent layers to 1 or 2 (more are not necessary and computationally inefficient)
+        self.n_recurrent_layers = 2 # set number of recurrent layers to 1 or 2 (more are not necessary and computationally inefficient / costly)
         self.rnn_version = 'LSTM'
 
         self.rnn_encoder = BiLSTM(max_seq_length, n_layers=self.n_recurrent_layers) if self.rnn_version == 'LSTM' else BiGRU(max_seq_length, n_layers=self.n_recurrent_layers)

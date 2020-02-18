@@ -28,7 +28,7 @@ class BiLSTM(nn.Module):
                  self,
                  max_seq_length:int,
                  in_size:int=1024,
-                 n_layers:int=1,
+                 n_layers:int=2,
                  dropout:float=0.25,
                  bidir:bool=True,
     ):
@@ -82,7 +82,7 @@ class BiGRU(nn.Module):
                  self,
                  max_seq_length:int,
                  in_size:int=1024,
-                 n_layers:int=1,
+                 n_layers:int=2,
                  dropout:float=0.25,
                  bidir:bool=True,
     ):
