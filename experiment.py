@@ -535,7 +535,7 @@ if __name__ == '__main__':
                              amsgrad=True,
             )
             scheduler = None
-        
+        """
         elif args.optim == 'SGD':
             
             optimizer = SGD(
@@ -544,9 +544,9 @@ if __name__ == '__main__':
                             momentum=0.9,
             )
             scheduler = None
-        
+        """
         else:
-            raise ValueError("Optimizer must be one of {AdamW, Adam, SGD, SGDCos}.")
+            raise ValueError("Optimizer must be one of {AdamW, Adam}.")
                     
         batch_losses, train_losses, train_accs, train_f1s, val_losses, val_accs, val_f1s, model = train(
                                                                                                         model=model,
