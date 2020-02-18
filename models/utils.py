@@ -44,7 +44,13 @@ else:
     print("GPU not available, CPU used")
 """
 
-def soft_to_hard(probas:torch.Tensor): return torch.tensor(list(map(lambda p: 1 if p > 0.5 else 0, to_cpu(probas, detach=True))), dtype=torch.double)
+# NOTE: in case, we want to use a unidirectional LSTM (or GRU) instead of a BiLSTM
+# BERT feature representation sequences have to be reversed (special [CLS] token corresponds to semantic representation of sentence)
+def reverse_sequences(batch:torch.Tensor):
+    return torch.tensor(list(map(lambda feat_reps: feat_reps[::-1], batch)), dtype=torch.double).to(device)
+
+def soft_to_hard(probas:torch.Tensor):
+    return torch.tensor(list(map(lambda p: 1 if p > 0.5 else 0, to_cpu(probas, detach=True))), dtype=torch.double)
 
 def accuracy(probas:torch.Tensor, y_true:torch.Tensor, task:str):
     y_pred = soft_to_hard(probas) if task == 'binary' else torch.argmax(to_cpu(probas, to_numpy=False), dim=1) 
