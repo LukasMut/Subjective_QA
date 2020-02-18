@@ -159,7 +159,7 @@ def train(
           n_aux_tasks=None,
           qa_type_weights=None,
           domain_weights=None,
-          max_epochs:int=6,
+          max_epochs:int=5,
 ):
     n_iters = len(train_dl)
     n_examples = n_iters * batch_size
@@ -209,12 +209,14 @@ def train(
             assert isinstance(domain_weights, torch.Tensor), 'Tensor of class weights for different domains is not provided'
             domain_loss_func = nn.CrossEntropyLoss(weight=domain_weights.to(device))
             train_accs_domain, train_f1s_domain = [], []
-    
+
+    """
     if args['dataset'] == 'SubjQA' or args['dataset'] == 'combined':
       if args['freeze_bert']:
-        if args['n_epochs'] <= 3:
-          # add an additional epoch for fine-tuning (not only the heads but) the entire model (+ BERT encoder)
+        if args['n_epochs'] <= 5:
+          # add an additional epoch for fine-tuning (not only the task-specific layers but) the entire model (+ BERT encoder)
           args['n_epochs'] += (max_epochs - args['n_epochs'])
+    """
 
     for epoch in trange(args['n_epochs'],  desc="Epoch"):
 
@@ -387,7 +389,7 @@ def train(
             
             batch_loss.backward()
             
-            # clip gradients
+            # clip gradients if gradients are larger than specified norm
             torch.nn.utils.clip_grad_norm_(model.parameters(), args["max_grad_norm"])
 
             # update model parameters and take a step using the computed gradient
