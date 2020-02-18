@@ -52,7 +52,7 @@ if __name__ == '__main__':
             help='Define mini-batch size.')
     parser.add_argument('--n_epochs', type=int, default=5,
             help='Set number of epochs model should be fine-tuned for. If we fine-tune on SubjQA or combined, an additional epoch will be added.')
-    parser.add_argument('--optim', type=str, default='Adam',
+    parser.add_argument('--optim', type=str, default='AdamW',
             help='Define optimizer. Must be one of {AdamW, Adam}.')
     parser.add_argument('--sd', type=str, default='saved_models',
             help='Set model save directory for QA model.')
