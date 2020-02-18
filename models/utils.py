@@ -475,7 +475,7 @@ def train(
            print("------------------------------------")
            print()
 
-        train_losses.append(train_loss)
+        train_losses.append(tr_loss)
         train_accs.append(train_exact_match)
         train_f1s.append(train_f1)
        
