@@ -54,7 +54,7 @@ def soft_to_hard(probas:torch.Tensor):
 
 def accuracy(probas:torch.Tensor, y_true:torch.Tensor, task:str):
     y_pred = soft_to_hard(probas) if task == 'binary' else torch.argmax(to_cpu(probas, to_numpy=False), dim=1) 
-    y_true = type_as(y_pred)
+    y_true = y_true.type_as(y_pred)
     return (y_pred == to_cpu(y_true, to_numpy=False)).float().mean().item()
 
 def f1(probas:torch.Tensor, y_true:torch.Tensor, task:str, avg:str='macro'):
