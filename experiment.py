@@ -498,7 +498,7 @@ if __name__ == '__main__':
         hypers = {
                   "lr_adam": 1e-3,
                   "lr_sgd": 1e-2,
-                  "warmup_steps": 50,
+                  "warmup_steps": 100,
                   "max_grad_norm": 5,
                   "sort_batch": False, # TODO: figure out, whether we should sort batch for RNNs (not necessary for linear output layers)
         }
