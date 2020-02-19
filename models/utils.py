@@ -54,7 +54,7 @@ def soft_to_hard(probas:torch.Tensor):
 
 def accuracy(probas:torch.Tensor, y_true:torch.Tensor, task:str):
     y_pred = soft_to_hard(probas) if task == 'binary' else torch.argmax(to_cpu(probas, to_numpy=False), dim=1) 
-    return (y_pred == to_cpu(y_true, to_numpy=False)).float().mean().item()
+    return (y_pred == to_cpu(y_true, to_numpy=False)).double().mean().item()
 
 def f1(probas:torch.Tensor, y_true:torch.Tensor, task:str, avg:str='macro'):
     y_pred = soft_to_hard(probas) if task == 'binary' else torch.argmax(to_cpu(probas, detach=True, to_numpy=False), dim=1)
@@ -213,9 +213,9 @@ def train(
     """
     if args['dataset'] == 'SubjQA' or args['dataset'] == 'combined':
       if args['freeze_bert']:
-        if args['n_epochs'] <= 5:
+        if args['n_epochs'] <= max_epochs:
           # add an additional epoch for fine-tuning (not only the task-specific layers but) the entire model (+ BERT encoder)
-          args['n_epochs'] += (max_epochs - args['n_epochs'])
+          args['n_epochs'] += 1
     """
 
     for epoch in trange(args['n_epochs'],  desc="Epoch"):
@@ -270,9 +270,6 @@ def train(
                                                                                                                         b_a_sbj,
                                                                                                                         b_domains,
                 )
-            
-            if args['optim'] == 'SGD' and not isinstance(scheduler, type(None)):
-                scheduler.step(epoch + i / n_iters)
             
             # zero-out gradients
             optimizer.zero_grad()
