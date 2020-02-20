@@ -27,7 +27,7 @@ class BiLSTM(nn.Module):
     def __init__(
                  self,
                  max_seq_length:int,
-                 in_size:int=1024,
+                 in_size:int,
                  n_layers:int=2,
                  dropout:float=0.25,
                  bidir:bool=True,
@@ -81,7 +81,7 @@ class BiGRU(nn.Module):
     def __init__( 
                  self,
                  max_seq_length:int,
-                 in_size:int=1024,
+                 in_size:int,
                  n_layers:int=2,
                  dropout:float=0.25,
                  bidir:bool=True,

@@ -7,14 +7,14 @@ import re
 import torch 
 import transformers
 
+import matplotlib.pyplot as plt
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 
 from collections import Counter, defaultdict
 from torch.optim import Adam, SGD
-from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
-from transformers import BertTokenizer, BertModel, BertForQuestionAnswering
+from transformers import DistilBertTokenizer, DistilBertModel, DistilBertForQuestionAnswering
 from transformers import AdamW
 from transformers import get_cosine_with_hard_restarts_schedule_with_warmup, get_linear_schedule_with_warmup
 
@@ -36,8 +36,8 @@ if __name__ == '__main__':
             help='If train, then train model on train set(s); if test, then evaluate model on SubjQA test set.')
     parser.add_argument('--multitask', action='store_true',
             help='If provided, MTL instead of STL setting.')
-    parser.add_argument('--adversarial', action='store_true',
-            help='If provided, adversarial training instead of classic training. Only necessary, if MTL setting.')
+    parser.add_argument('--adversarial', type=str, default=None,
+            help='If provided, adversarial training instead of classic training. Only necessary, if MTL setting. Specify which adversarial version.')
     parser.add_argument('--n_aux_tasks', type=int, default=None,
             help='Define number of auxiliary tasks QA model should perform during training. Only necessary, if MTL setting.')
     parser.add_argument('--encoder', action='store_true',
@@ -102,13 +102,13 @@ if __name__ == '__main__':
     # TODO: figure out, whether we should use pretrained weights from 'bert-base-cased' or 'bert-base-uncased' model
     if args.bert_weights == 'cased':
         
-        bert_tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
-        pretrained_weights = 'bert-large-cased-whole-word-masking-finetuned-squad'
+        bert_tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-cased')
+        pretrained_weights = 'distilbert-base-cased-distilled-squad'
         
     elif args.bert_weights == 'uncased':
         
-        bert_tokenizer == BertTokenizer.from_pretrained('bert-base-uncased')
-        pretrained_weights = 'bert-large-uncased-whole-word-masking-finetuned-squad'
+        bert_tokenizer == DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
+        pretrained_weights = 'distilbert-base-uncased-distilled-squad'
         
     else:
         raise ValueError('Pretrained weights must be loaded from an uncased or cased BERT model.')
@@ -118,9 +118,13 @@ if __name__ == '__main__':
     highway = 'Highway' if args.highway_connection else ''
     decoder = 'BiLSTM' if args.decoder else ''
     train_method = 'multitask' + '_' + str(args.n_aux_tasks) if args.multitask else 'singletask'
-    adversarial = 'adversarial' if args.adversarial else 'classic'
-    
-    model_name = 'BERT' + '_' + args.bert_weights + '_' + encoding + '_' + highway + '_' + decoder + '_' + train_method + '_' + adversarial + '_' + dataset
+
+    if isinstance(args.adversarial, type(None)):
+        training = 'classic'
+    else:
+        training = args.adversarial
+
+    model_name = 'DistilBERT' + '_' + args.bert_weights + '_' + encoding + '_' + highway + '_' + decoder + '_' + train_method + '_' + training + '_' + dataset
     model_name = model_name.lower()
     
     if args.version == 'train':
@@ -223,7 +227,6 @@ if __name__ == '__main__':
                 q_type_weights = get_class_weights(
                                                    subjqa_classes=subjqa_q_types,
                                                    idx_to_class=idx_to_qa_types,
-                                                   squad_classes=squad_q_types,
                                                    binary=True,
                                                    qa_type='questions',
                 )
@@ -231,12 +234,12 @@ if __name__ == '__main__':
                 a_type_weights = get_class_weights(
                                                   subjqa_classes=subjqa_q_types,
                                                   idx_to_class=idx_to_qa_types,
-                                                  squad_classes=squad_q_types,
                                                   binary=True,
                                                   qa_type='answers',
                 )
 
-                qa_type_weights = torch.stack((a_type_weights, q_type_weights), dim=1)
+
+                qa_type_weights = torch.stack((a_type_weights, q_type_weights))
 
                 
         elif args.finetuning == 'SQuAD':
@@ -504,14 +507,14 @@ if __name__ == '__main__':
                 qa_type_weights = torch.stack((a_type_weights, q_type_weights), dim=1)
 
         # initialise QA model
-        model = BertForQA.from_pretrained(
+        model = DistilBertForQA.from_pretrained(
                                           pretrained_weights,
                                           max_seq_length = max_seq_length,
                                           encoder = True if encoding == 'recurrent' else False,
                                           highway_connection = args.highway_connection,
                                           decoder = args.decoder,
                                           multitask = args.multitask,
-                                          adversarial = args.adversarial,
+                                          adversarial = True if args.adversarial == 'GRL' else False,
                                           n_aux_tasks = args.n_aux_tasks,
                                           n_domain_labels = n_domain_labels,
         )
@@ -564,7 +567,7 @@ if __name__ == '__main__':
             raise ValueError("Optimizer must be one of {AdamW, Adam}.")
 
         train_results  = dict()
-        if isintance(args.n_aux_tasks, type(None)):           
+        if isinstance(args.n_aux_tasks, type(None)):           
             batch_losses, train_losses, train_accs_qa, train_f1s_qa, val_losses, val_accs, val_f1s, model = train(
                                                                                                             model=model,
                                                                                                             tokenizer=bert_tokenizer,
@@ -578,6 +581,7 @@ if __name__ == '__main__':
                                                                                                             early_stopping=True,
                                                                                                             qa_type_weights=qa_type_weights,
                                                                                                             domain_weights=domain_weights,
+                                                                                                            adversarial_simple=True if args.adversarial == 'simple' else False,
             )
 
 
@@ -595,6 +599,7 @@ if __name__ == '__main__':
                                                                                                                                                 early_stopping=True,
                                                                                                                                                 qa_type_weights=qa_type_weights,
                                                                                                                                                 domain_weights=domain_weights,
+                                                                                                                                                adversarial_simple=True if args.adversarial == 'simple' else False,
             )
 
             train_results['train_accs_sbj'] = train_accs_sbj
@@ -614,6 +619,7 @@ if __name__ == '__main__':
                                                                                                                                                                                     early_stopping=True,
                                                                                                                                                                                     qa_type_weights=qa_type_weights,
                                                                                                                                                                                     domain_weights=domain_weights,
+                                                                                                                                                                                    adversarial_simple=True if args.adversarial == 'simple' else False,
             )
 
             train_results['train_accs_sbj'] = train_accs_sbj
@@ -678,12 +684,12 @@ if __name__ == '__main__':
             
             if args.not_finetuned:
                 # test (simple) BERT-QA-model fine-tuned on SQuAD without (prior) task-specific fine-tuning on SubjQA
-                model = BertForQuestionAnswering.from_pretrained(pretrained_weights)
-                model_name = 'bert_pretrained_squad_no_fine_tuning'
+                model = DistilBertForQuestionAnswering.from_pretrained(pretrained_weights)
+                model_name = 'distilbert_pretrained_squad_no_fine_tuning'
                 # set model to device
                 model.to(device)
             else:
-                model = BertForQA.from_pretrained(
+                model = DistilBertForQA.from_pretrained(
                                                   pretrained_weights,
                                                   max_seq_length = max_seq_length,
                                                   encoder = True if encoding == 'recurrent' else False,

@@ -1,4 +1,4 @@
-__all__ = ['BertForQA']
+__all__ = ['DistilBertForQA']
 
 import numpy as np
 import torch.nn as nn
@@ -6,7 +6,7 @@ import torch.nn as nn
 import random
 import torch
 
-from transformers import BertModel, BertPreTrainedModel
+from transformers import DistilBertModel, DistilBertPreTrainedModel
 from models.modules.QAHeads import *
 
 # set random seeds to reproduce results
@@ -17,18 +17,7 @@ torch.manual_seed(42)
 # set device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-"""
-is_cuda = torch.cuda.is_available()
-
-if is_cuda:
-    device = torch.device("cuda")
-    print("GPU is available")
-else:
-    device = torch.device("cpu")
-    print("GPU not available, CPU used")
-"""
-
-class BertForQA(BertPreTrainedModel):
+class DistilBertForQA(DistilBertPreTrainedModel):
     
     def __init__(
                  self,
@@ -41,10 +30,9 @@ class BertForQA(BertPreTrainedModel):
                  adversarial:bool=False,
                  n_aux_tasks=None,
                  n_domain_labels=None,
-    ):
-        
-        super(BertForQA, self).__init__(config)
-        self.bert = BertModel(config)
+    ):        
+        super(DistilBertForQA, self).__init__(config)
+        self.distilbert = DistilBertModel(config)
         self.max_seq_length = max_seq_length
         self.encoder = encoder
         self.highway_connection = highway_connection
@@ -58,9 +46,10 @@ class BertForQA(BertPreTrainedModel):
         
         if self.encoder:
             self.qa_head = RecurrentQAHead(
-                                           max_seq_length=self.max_seq_length,
-                                           in_size=config.hidden_size,
+                                           in_size=config.dim,
                                            n_labels_qa=config.num_labels,
+                                           qa_dropout_p=config.qa_dropout,
+                                           max_seq_length=self.max_seq_length,
                                            highway_block=self.highway_connection,
                                            multitask=self.multitask,
                                            decoder=self.decoder,
@@ -70,15 +59,17 @@ class BertForQA(BertPreTrainedModel):
                                            )
         else:
             self.qa_head = LinearQAHead(
-                                        in_size=config.hidden_size,
+                                        in_size=config.dim,
                                         n_labels_qa=config.num_labels,
+                                        qa_dropout_p=config.qa_dropout,
                                         highway_block=self.highway_connection,
                                         multitask=self.multitask,
                                         n_aux_tasks=self.n_aux_tasks,
                                         n_domain_labels=self.n_domain_labels,
                                         adversarial=self.adversarial,
                                         )
-            
+        self.init_weights()
+
     def forward(
                 self,
                 input_ids:torch.Tensor,
@@ -92,19 +83,17 @@ class BertForQA(BertPreTrainedModel):
                 start_positions=None,
                 end_positions=None,
     ):
-        # TODO: figure out, why position IDs are necessary and how we can provide them
         # NOTE: token_type_ids == segment_ids
-        bert_outputs = self.bert(
-                            input_ids=input_ids,
-                            token_type_ids=token_type_ids,
-                            attention_mask=attention_masks,
-                            position_ids=position_ids,
-                            head_mask=head_mask
-      )
+        distilbert_output = self.distilbert(
+                                        input_ids=input_ids,
+                                        #token_type_ids=token_type_ids,
+                                        attention_mask=attention_masks,
+                                        head_mask=head_mask,
+                                        )
       
         if self.encoder:
             return self.qa_head(
-                                bert_outputs=bert_outputs,
+                                distilbert_output=distilbert_output,
                                 seq_lengths=input_lengths,
                                 task=task,
                                 start_positions=start_positions,
@@ -112,7 +101,7 @@ class BertForQA(BertPreTrainedModel):
             )
         else:
             return self.qa_head(
-                                bert_outputs=bert_outputs,
+                                distilbert_output=distilbert_output,
                                 task=task,
                                 start_positions=start_positions,
                                 end_positions=end_positions,

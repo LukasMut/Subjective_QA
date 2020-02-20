@@ -11,6 +11,8 @@ __all__ = [
            'test',
 ]
 
+import matplotlib as mpl
+import matplotlib.pyplot as plt
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
@@ -64,11 +66,11 @@ def f1(probas:torch.Tensor, y_true:torch.Tensor, task:str, avg:str='macro'):
 
 def freeze_transformer_layers(
                               model,
-                              model_name:str='bert',
-                              unfreeze:bool=False,
-                              l:int=12,
+                              model_name:str,
+                              unfreeze:bool,
+                              l:int=None,
 ):
-    model_names = ['roberta', 'bert',]
+    model_names = ['bert', 'distilbert']
     model_name = model_name.lower()
     if model_name not in model_names:
         raise ValueError('Incorrect model name provided. Model name must be one of {}'.format(model_names))
@@ -76,12 +78,14 @@ def freeze_transformer_layers(
     for n, p in model.named_parameters():
         if n.startswith(model_name):
             if unfreeze:
-                transformer_layer = model_name + '.encoder.layer.'
+                assert isinstance(l, int)
+                transformer_layer = model_name + '.transformer.layer.' if model_name == 'distilbert' else model_name + '.encoder.layer.' 
                 pooling_layer = model_name + '.pooler.'
                 if re.search(r'' + transformer_layer, n):
-                    if re.search(r'[0-9]{2}', n):
-                        layer_no = n[len(transformer_layer): len(transformer_layer) + 2]
-                        if int(layer_no) > l:
+                    n_digits = '1' if model_name == 'distilbert' else '2'
+                    if re.search(r'[0-9]{' + n_digits + '}', n):
+                        layer_no = n[len(transformer_layer): len(transformer_layer) + int(n_digits)]
+                        if int(layer_no) >= l:
                             p.requires_grad = True
                 elif re.search(r'' + pooling_layer, n):
                     p.requires_grad =True
@@ -172,11 +176,10 @@ def train(
     n_examples = n_steps * batch_size
     
     if args["freeze_bert"]:
-      L = 24 # total number of transformer layers in pre-trained BERT model (L = 24 for BERT large, L = 12 for BERT base)
-      k = 4 / 4 # for fine-tuning BERT attention, leave L * k transformer layers frozen
-      l = int(L * k) - 1 # after training the task-specific RNN and linear output layers, unfreeze the top L - l BERT transformer layers for a single epoch
+      L = 6 # total number of transformer layers in pre-trained BERT model (L = 24 for BERT large, L = 12 for BERT base, L = 6 for DistilBERT)
+      l = L - 1 #int(L * k) - 1  after training the task-specific RNN and linear output layers for one epoch, gradually unfreeze the top L - l BERT transformer layers
       model_name = 'bert'
-      model = freeze_transformer_layers(model, model_name=model_name)
+      model = freeze_transformer_layers(model, model_name=model_name, unfreeze=False)
       print("--------------------------------------------------")
       print("------ Pre-trained BERT weights are frozen -------")
       print("--------------------------------------------------")
@@ -201,7 +204,7 @@ def train(
 
     if isinstance(n_aux_tasks, int):
         
-        tasks.extend('Sbj_Class')
+        tasks.append('Sbj_Class')
         # loss func for auxiliary task to inform model about subjectivity (binary classification)
         assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
         print("Weights for subjective Anwers: {}".format(qa_type_weights[0]))
@@ -222,7 +225,7 @@ def train(
             assert isinstance(domain_weights, torch.Tensor), 'Tensor of class weights for different domains is not provided'
             domain_loss_func = nn.CrossEntropyLoss(weight=domain_weights.to(device))
             train_accs_domain, train_f1s_domain = [], []
-            tasks.extend('Domain_Class')
+            tasks.append('Domain_Class')
 
     # generate uniform random sample over all entries
     task_order = np.random.choice(tasks, size=n_steps, replace=True, p = [1/len(tasks) for _ in tasks])
@@ -235,14 +238,6 @@ def train(
     plt.show()
     plt.clf()
 
-    """
-    # NOTE: fine-tuning BERT only works with DistilBERT but not with BERT Large
-    if args['dataset'] == 'SubjQA' or args['dataset'] == 'combined':
-      if args['freeze_bert']:
-        if args['n_epochs'] <= max_epochs:
-          # add an additional epoch for fine-tuning (not only the task-specific layers but) the entire model (+ BERT encoder)
-          args['n_epochs'] += 1
-    """
 
     for epoch in trange(args['n_epochs'],  desc="Epoch"):
 
@@ -250,17 +245,16 @@ def train(
 
         model.train()
         
-        """
-        # if last training epoch, unfreeze BERT weights to fine-tune BERT weights for a single epoch
-        if epoch == args['n_epochs'] - 1 and (args['dataset'] == 'SubjQA' or args['dataset'] == 'combined'):
+        # gradually unfreeze layer by layer after the first epoch (no updating of BERT weights before task-specific layers haven't been trained)
+        if epoch > 0 and (args['dataset'] == 'SubjQA' or args['dataset'] == 'combined'):
             model = freeze_transformer_layers(model, unfreeze=True, l=l)
             print("------------------------------------------------------------------------------------------")
-            print("---------- Pre-trained BERT weights of top {} transformer layers are unfrozen -----------".format(L - (l + 1)))
+            print("---------- Pre-trained BERT weights of top {} transformer layers are unfrozen -----------".format(L - l ))
             print("------------------------------------------------------------------------------------------")
             print("---------------------- Entire model will be trained for single epoch ----------------------")
             print("-------------------------------------------------------------------------------------------")
             print()
-        """
+            l -= 1
 
         if isinstance(n_aux_tasks, int):
           batch_acc_sbj, batch_f1_sbj = 0, 0
@@ -302,6 +296,12 @@ def train(
             nb_tr_steps += 1
             
             current_task = tasks[i]
+
+            if isinstance(n_aux_tasks, int):
+              print('------------------------------------')
+              print('-------- Current task: {} --------'.format(current_task))
+              print('------------------------------------')
+              print()
 
             if current_task == 'QA':
 
@@ -358,7 +358,7 @@ def train(
 
             else:
 
-              if current_task == 'Sbj_Class.':
+              if current_task == 'Sbj_Class':
 
                 sbj_logits = model(
                                    input_ids=b_input_ids,
