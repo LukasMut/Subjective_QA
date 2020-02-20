@@ -217,11 +217,8 @@ if __name__ == '__main__':
                                                        idx_to_class=idx_to_domains,
                 ) 
                 
-                subjqa_q_types = [f.q_sbj for f in subjqa_features_train] 
-                squad_q_types = [f.q_sbj for f in squad_features_train] 
-                
+                subjqa_q_types = [f.q_sbj for f in subjqa_features_train]                 
                 subjqa_a_types = [f.a_sbj for f in subjqa_features_train]
-                squad_a_types = [f.a_sbj for f in squad_features_train]
                 
                 q_type_weights = get_class_weights(
                                                    subjqa_classes=subjqa_q_types,
@@ -469,8 +466,11 @@ if __name__ == '__main__':
                                     split='eval',
             )
             if args.multitask:
+                
                 assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
+                
                 if args.n_aux_tasks == 2:
+                    
                     squad_domains = [f.domain for f in squad_features_train]
                     subjqa_domains = [f.domain for f in subjqa_features_train]
                     domain_weights = get_class_weights(
