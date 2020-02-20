@@ -379,10 +379,10 @@ def train(
                 current_sbj_acc = 0
                 current_sbj_f1 = 0
 
-                for j in range(b_sbj.size(1)):
-                  
-                  current_sbj_acc += accuracy(probas=torch.sigmoid(sbj_logits[:, j].squeeze(1)), y_true=b_sbj[:, j].squeeze(1), task='binary')  
-                  current_sbj_f1 += f1(probas=torch.sigmoid(sbj_logits[:, j].squeeze(1)), y_true=b_sbj[:, j].squeeze(1), task='binary')
+                for k in range(b_sbj.size(1)):
+
+                  current_sbj_acc += accuracy(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')  
+                  current_sbj_f1 += f1(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')
 
                 batch_acc_sbj += (current_sbj_acc / b_sbj.size(1))
                 batch_f1_sbj += (current_sbj_f1 / b_sbj.size(1))
