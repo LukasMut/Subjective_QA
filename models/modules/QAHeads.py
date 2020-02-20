@@ -60,8 +60,9 @@ class LinearQAHead(nn.Module):
             self.dropout = nn.Dropout(p = self.aux_dropout)
             
             # fully-connected subjectivity output layers (must be present in every MTL setting)
-            self.fc_sbj_1 = nn.Linear(in_size, in_size // 2)
-            self.fc_sbj_2 = nn.Linear(in_size // 2, 1)
+            self.fc_sbj = nn.Linear(in_size, in_size // 2)
+            self.fc_sbj_a = nn.Linear(in_size // 2, 1) # fc subj. layer for answers
+            self.fc_sbj_q = nn.Linear(in_size // 2, 1) # fc subj. layer for questions
 
             if self.n_aux_tasks == 2:
                 assert isinstance(n_domain_labels, int), 'If model is to perform two auxiliary tasks, domain labels must be provided'
@@ -132,11 +133,15 @@ class LinearQAHead(nn.Module):
                 # reverse gradients to learn qa-type / domain-invariant features (i.e., semi-supervised domain-adaptation)
                 sequence_output = grad_reverse(sequence_output)
 
-            sbj_out = F.relu(self.dropout(self.fc_sbj_1(sequence_output)))
-            sbj_logits = self.fc_sbj_2(sbj_out)
-            
+            sbj_out = F.relu(self.dropout(self.fc_sbj(sequence_output)))
+            sbj_logits_a = self.fc_sbj_a(sbj_out)
+            sbj_logits_q = self.fc_sbj_q(sbj_out)
+
             # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
-            sbj_logits = sbj_logits.squeeze(-1)
+            sbj_logits_a = sbj_logits_a.squeeze(-1)
+            sbj_logits_q = sbj_logits_q.squeeze(-1)
+
+            sbj_logits = torch.stack((sbj_logits_a, sbj_logits_q), dim=1)
 
             if self.n_aux_tasks == 1:
                 return outputs, sbj_logits
@@ -206,8 +211,9 @@ class RecurrentQAHead(nn.Module):
             self.dropout = nn.Dropout(p = self.aux_dropout)
             
             # fully-connected subjectivity output layers (must be present in every MTL setting)
-            self.fc_sbj_1 = nn.Linear(in_size, in_size // 2)
-            self.fc_sbj_2 = nn.Linear(in_size // 2, 1)
+            self.fc_sbj = nn.Linear(in_size, in_size // 2)
+            self.fc_sbj_a = nn.Linear(in_size // 2, 1) # fc subj. layer for answers
+            self.fc_sbj_q = nn.Linear(in_size // 2, 1) # fc subj. layer for questions
 
             if self.n_aux_tasks == 2:
                 assert isinstance(n_domain_labels, int), 'If model is to perform two auxiliary tasks, domain labels must be provided'
@@ -290,11 +296,15 @@ class RecurrentQAHead(nn.Module):
                 sequence_output = grad_reverse(sequence_output)
 
             # we only need hidden states of last time step (summary of the sequence) (i.e., seq[batch_size, -1, hidden_size])
-            sbj_out = F.relu(self.dropout(self.fc_sbj_1(sequence_output[:, -1, :])))
-            sbj_logits = self.fc_sbj_2(sbj_out)
-            
+            sbj_out = F.relu(self.dropout(self.fc_sbj(sequence_output[:, -1, :])))
+            sbj_logits_a = self.fc_sbj_a(sbj_out)
+            sbj_logits_q = self.fc_sbj_q(sbj_out)
+
             # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
-            sbj_logits = sbj_logits.squeeze(-1)
+            sbj_logits_a = sbj_logits_a.squeeze(-1)
+            sbj_logits_q = sbj_logits_q.squeeze(-1)
+
+            sbj_logits = torch.stack((sbj_logits_a, sbj_logits_q), dim=1)
 
             if self.n_aux_tasks == 1:
                 return outputs, sbj_logits #, hidden_rnn
@@ -314,7 +324,7 @@ class RecurrentQAHead(nn.Module):
                 domain_logits = domain_logits.squeeze(-1)
 
                 ds_out = F.relu(self.dropout(self.fc_ds_1(sequence_output[:, -1, :])))
-                ds_logits = self.fc_ds_2(domain_out)
+                ds_logits = self.fc_ds_2(ds_out)
                 ds_logits = domain_logits.squeeze(-1)
 
                 return outputs, sbj_logits, domain_logits, ds_logits #, hidden_rnn

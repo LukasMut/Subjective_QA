@@ -742,8 +742,12 @@ def create_tensor_dataset(
         all_input_lengths = torch.tensor([f.input_length for f in features], dtype=torch.long)
         all_cls_index = torch.tensor([f.cls_index for f in features], dtype=torch.long)
         all_p_mask = torch.tensor([f.p_mask for f in features], dtype=torch.float)
+        
         all_q_sbj = torch.tensor([f.q_sbj for f in features], dtype=torch.long)
         all_a_sbj = torch.tensor([f.a_sbj for f in features], dtype=torch.long)
+
+        all_sbj = torch.stack((all_a_sbj, all_q_sbj), dim=1)
+
         all_domains = torch.tensor([f.domain for f in features], dtype=torch.long)
         all_datasets = torch.tensor([f.dataset for f in features], dtype=torch.long)
         all_example_index = torch.arange(all_input_ids.size(0), dtype=torch.long)
@@ -770,8 +774,7 @@ def create_tensor_dataset(
                                     all_end_positions,
                                     all_cls_index,
                                     all_p_mask,
-                                    all_q_sbj,
-                                    all_a_sbj,
+                                    all_sbj,
                                     all_domains,
                                     all_datasets,
             )
@@ -784,6 +787,7 @@ def get_class_weights(
                       idx_to_class:dict,
                       squad_classes=None,
                       binary:bool=False,
+                      qa_type:str='questions',
 
 ):
     n_total_subjqa = len(subjqa_classes)
@@ -805,7 +809,7 @@ def get_class_weights(
     if binary:
         # for binary cross-entropy we just need to compute weight for positive class
         class_weight = class_distrib['obj'] / class_distrib['sbj']
-        print("Subjective questions will be weighted {} higher than objective questions".format(class_weight))
+        print("Subjective {} will be weighted {} higher than objective {}".format(qa_type, class_weight, qa_type))
         print()
         return torch.tensor(class_weight, dtype=torch.float)
     else:

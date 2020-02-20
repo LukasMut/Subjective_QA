@@ -217,16 +217,30 @@ if __name__ == '__main__':
                                                        idx_to_class=idx_to_domains,
                 ) 
                 
-                if qa_type == 'question':
-                    subjqa_qa_types = [f.q_sbj for f in subjqa_features_train] 
-                elif qa_type == 'answer':
-                    subjqa_qa_types = [f.a_sbj for f in subjqa_features_train]
+                subjqa_q_types = [f.q_sbj for f in subjqa_features_train] 
+                squad_q_types = [f.q_sbj for f in squad_features_train] 
                 
-                qa_type_weights = get_class_weights(
-                                                    subjqa_classes=subjqa_qa_types,
-                                                    idx_to_class=idx_to_qa_types,
-                                                    binary=True,
-                ) 
+                subjqa_a_types = [f.a_sbj for f in subjqa_features_train]
+                squad_a_types = [f.a_sbj for f in squad_features_train]
+                
+                q_type_weights = get_class_weights(
+                                                   subjqa_classes=subjqa_q_types,
+                                                   idx_to_class=idx_to_qa_types,
+                                                   squad_classes=squad_q_types,
+                                                   binary=True,
+                                                   qa_type='questions',
+                )
+
+                a_type_weights = get_class_weights(
+                                                  subjqa_classes=subjqa_q_types,
+                                                  idx_to_class=idx_to_qa_types,
+                                                  squad_classes=squad_q_types,
+                                                  binary=True,
+                                                  qa_type='answers',
+                )
+
+                qa_type_weights = torch.stack((a_type_weights, q_type_weights), dim=1)
+
                 
         elif args.finetuning == 'SQuAD':
             
@@ -465,20 +479,30 @@ if __name__ == '__main__':
                                                        squad_classes=squad_domains,
                 ) 
                 
-                if qa_type == 'question':
-                    subjqa_qa_types = [f.q_sbj for f in subjqa_features_train] 
-                    squad_qa_types = [f.q_sbj for f in squad_features_train] 
-                elif qa_type == 'answer':
-                    subjqa_qa_types = [f.a_sbj for f in subjqa_features_train]
-                    squad_qa_types = [f.a_sbj for f in squad_features_train]
+                subjqa_q_types = [f.q_sbj for f in subjqa_features_train] 
+                squad_q_types = [f.q_sbj for f in squad_features_train] 
                 
-                qa_type_weights = get_class_weights(
-                                                    subjqa_classes=subjqa_qa_types,
-                                                    idx_to_class=idx_to_qa_types,
-                                                    squad_classes=squad_qa_types,
-                                                    binary=True,
-                )   
-        
+                subjqa_a_types = [f.a_sbj for f in subjqa_features_train]
+                squad_a_types = [f.a_sbj for f in squad_features_train]
+                
+                q_type_weights = get_class_weights(
+                                                   subjqa_classes=subjqa_q_types,
+                                                   idx_to_class=idx_to_qa_types,
+                                                   squad_classes=squad_q_types,
+                                                   binary=True,
+                                                   qa_type='questions',
+                )
+
+                a_type_weights = get_class_weights(
+                                                  subjqa_classes=subjqa_q_types,
+                                                  idx_to_class=idx_to_qa_types,
+                                                  squad_classes=squad_q_types,
+                                                  binary=True,
+                                                  qa_type='answers',
+                )
+
+                qa_type_weights = torch.stack((a_type_weights, q_type_weights), dim=1)
+
         # initialise QA model
         model = BertForQA.from_pretrained(
                                           pretrained_weights,

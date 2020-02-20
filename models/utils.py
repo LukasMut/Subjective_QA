@@ -12,10 +12,10 @@ __all__ = [
 ]
 
 import numpy as np
-import random
 import torch.nn as nn
 import torch.nn.functional as F
 
+import random
 import torch
 import transformers
 
@@ -30,6 +30,7 @@ from eval_squad import compute_exact, compute_f1
 np.random.seed(42)
 random.seed(42)
 torch.manual_seed(42)
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -97,15 +98,18 @@ def sort_batch(
                input_lengths:torch.Tensor,
                start_pos:torch.Tensor,
                end_pos:torch.Tensor,
-               q_sbj:torch.Tensor,
-               a_sbj:torch.Tensor,
-               domains:torch.Tensor,
+               qa_sbj=None,
+               domains=None,
                PAD_token:int=0,
+               train:bool=True,
 ):
     indices, input_ids = zip(*sorted(enumerate(to_cpu(input_ids)), key=lambda seq: len(seq[1][seq[1] != PAD_token]), reverse=True))
     indices = np.array(indices) if isinstance(indices, list) else np.array(list(indices))
     input_ids = torch.tensor(np.array(list(input_ids)), dtype=torch.long).to(device)
-    return input_ids, attn_masks[indices], token_type_ids[indices], input_lengths[indices], start_pos[indices], end_pos[indices], q_sbj[indices], a_sbj[indices], domains[indices]
+    if train:
+      return input_ids, attn_masks[indices], token_type_ids[indices], input_lengths[indices], start_pos[indices], end_pos[indices], qa_sbj[indices], domains[indices]
+    else:
+      return input_ids, attn_masks[indices], token_type_ids[indices], input_lengths[indices], start_pos[indices], end_pos[indices]
 
 def get_answers(
                 tokenizer,
@@ -161,6 +165,7 @@ def train(
           qa_type_weights=None,
           domain_weights=None,
           max_epochs:int=5,
+          adversarial_simple:bool=False,
 ):
     n_iters = len(train_dl)
     n_examples = n_iters * batch_size
@@ -190,12 +195,12 @@ def train(
     
     # define loss function (Cross-Entropy is numerically more stable than LogSoftmax plus Negative-Log-Likelihood)
     qa_loss_func = nn.CrossEntropyLoss()
-    
+
     if isinstance(n_aux_tasks, int):
         
+        tasks = ['QA', 'Sbj Class.']
         # loss func for auxiliary task to inform model about subjectivity (binary classification)
         assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
-        #assert len(qa_type_weights) == 1, 'For binary cross-entropy loss, we must provide a single weight for positive examples'
         print("Weights for subjective QAs: {}".format(qa_type_weights))
         print()
         
@@ -210,7 +215,18 @@ def train(
             assert isinstance(domain_weights, torch.Tensor), 'Tensor of class weights for different domains is not provided'
             domain_loss_func = nn.CrossEntropyLoss(weight=domain_weights.to(device))
             train_accs_domain, train_f1s_domain = [], []
+            tasks.extend('Domain Class.')
 
+        # generate uniform random sample over all entries
+        task_order = np.random.choice(tasks, size=n_iters, replace=True, p = [1/len(tasks) for _ in tasks])
+        task_distrib = Counter(task_order)
+        plt.bar(tasks, [task_distrib[task] for task in tasks], alpha=0.5, edgecolor='black')
+        plt.xticks(range(len(tasks)), labels=tasks)
+        plt.xlabel('Tasks', fontsize=12)
+        plt.ylabel('Frequency per epoch', fontsize=12)
+        plt.title('Task distribution in MTL setting')
+        plt.show()
+        plt.clf()
     """
     if args['dataset'] == 'SubjQA' or args['dataset'] == 'combined':
       if args['freeze_bert']:
@@ -256,35 +272,46 @@ def train(
             batch = tuple(t.to(device) for t in batch)
 
             # unpack inputs from dataloader            
-            b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_cls_indexes, _, b_q_sbj, b_a_sbj, b_domains, _ = batch
+            b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_cls_indexes, _, b_sbj, b_domains, _ = batch
             
             if args["sort_batch"]:
                 # sort sequences in batch in decreasing order w.r.t. to (original) sequence length
-                b_input_ids, b_attn_masks, b_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_q_sbj, b_a_sbj, b_domains = sort_batch(
+                b_input_ids, b_attn_masks, b_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_sbj, b_domains = sort_batch(
                                                                                                                         b_input_ids,
                                                                                                                         b_attn_masks,
                                                                                                                         b_token_type_ids,
                                                                                                                         b_input_lengths,
                                                                                                                         b_start_pos,
                                                                                                                         b_end_pos,
-                                                                                                                        b_q_sbj,
-                                                                                                                        b_a_sbj,
+                                                                                                                        b_sbj,
                                                                                                                         b_domains,
                 )
             
-            # zero-out gradients
             optimizer.zero_grad()
             
             if isinstance(n_aux_tasks, type(None)):
-                # compute start and end logits respectively
                 start_logits, end_logits = model(
                                                  input_ids=b_input_ids,
                                                  attention_masks=b_attn_masks,
                                                  token_type_ids=b_token_type_ids,
                                                  input_lengths=b_input_lengths,
+                                                 task='QA'
                 )
                 
             elif isinstance(n_aux_tasks, int):
+
+                current_task = tasks[i]
+
+                if current_task = 'QA':
+
+                  start_logits, end_logits = model(
+                                 input_ids=b_input_ids,
+                                 attention_masks=b_attn_masks,
+                                 token_type_ids=b_token_type_ids,
+                                 input_lengths=b_input_lengths,
+                                 task=current_task,
+                                 )
+
                 if n_aux_tasks == 1:
                     ans_logits, sbj_logits = model(
                                                    input_ids=b_input_ids,
@@ -294,15 +321,13 @@ def train(
                 )
                     start_logits, end_logits = ans_logits
                     
-                    # compute auxiliary loss (subjectivity loss)
-                    if args['qa_type'] == 'question':
-                        b_q_sbj = b_q_sbj.type_as(sbj_logits)
-                        sbj_loss = sbj_loss_func(sbj_logits, b_q_sbj)
-                        
-                    elif args['qa_type'] == 'answer':
-                        b_a_sbj = b_a_sbj.type_as(sbj_logits)
-                        sbj_loss = sbj_loss_func(sbj_logits, b_a_sbj)
-                    
+                    b_sbj = b_sbj.type_as(sbj_logits)
+
+                    if adversarial_simple:
+                      sbj_loss -= sbj_loss_func(sbj_logits, b_sbj)
+                    else:
+                      sbj_loss += sbj_loss_func(sbj_logits, b_sbj)
+
                 elif n_aux_tasks == 2:
                     ans_logits, sbj_logits, domain_logits = model(
                                                                   input_ids=b_input_ids,
@@ -312,32 +337,20 @@ def train(
                 )
                     start_logits, end_logits = ans_logits
                     
-                    # compute auxiliary losses
-                    if args['qa_type'] == 'question':
-                        b_q_sbj = b_q_sbj.type_as(sbj_logits)
-                        sbj_loss = sbj_loss_func(sbj_logits, b_q_sbj)
-                        
-                    elif args['qa_type'] == 'answer':
-                        b_a_sbj = b_a_sbj.type_as(sbj_logits)
-                        sbj_loss = sbj_loss_func(sbj_logits, b_a_sbj)
+                    b_sbj = b_sbj.type_as(sbj_logits)
+
+                    if adversarial_simple:
+                      sbj_loss -= sbj_loss_func(sbj_logits, b_sbj)
+                    else:
+                      sbj_loss += sbj_loss_func(sbj_logits, b_sbj)
                     
-                    domain_loss = domain_loss_func(domain_logits, b_domains)
-                
-                """
-                elif n_aux_tasks == 3:
-                    ans_logits, sbj_logits, domain_logits, ds_logits = model(
-                                                                             input_ids=b_input_ids,
-                                                                             attention_masks=b_attn_masks,
-                                                                             token_type_ids=b_token_type_ids,
-                                                                             input_lengths=b_input_lengths,
-                )
-                    start_logits, end_logits = ans_logits                    
-                """
+                    domain_loss += domain_loss_func(domain_logits, b_domains)
             
             # start and end loss must be computed separately
             start_loss = qa_loss_func(start_logits, b_start_pos)
             end_loss = qa_loss_func(end_logits, b_end_pos)
             qa_loss = (start_loss + end_loss) / 2
+
             
             # accumulate all losses
             if isinstance(n_aux_tasks, type(None)):
@@ -519,17 +532,36 @@ def train(
                                                                                                             b_input_lengths,
                                                                                                             b_start_pos,
                                                                                                             b_end_pos,
+                                                                                                            train=False,
                 )
             
             with torch.no_grad():
+
+              if isinstance(n_aux_tasks, type(None)):
+                ans_logits_val = model(
+                                       input_ids=b_input_ids,
+                                       attention_masks=b_attn_masks,
+                                       token_type_ids=b_token_type_ids,
+                                       input_lengths=b_input_lengths,
+                                       )
                 
-                # compute start and end logits respectively
-                start_logits_val, end_logits_val = model(
-                                                         input_ids=b_input_ids,
-                                                         attention_masks=b_attn_masks,
-                                                         token_type_ids=b_token_type_ids,
-                                                         input_lengths=b_input_lengths,
+              elif n_aux_tasks == 1:
+                ans_logits_val, _ = model(
+                                            input_ids=b_input_ids,
+                                            attention_masks=b_attn_masks,
+                                            token_type_ids=b_token_type_ids,
+                                            input_lengths=b_input_lengths,
+              )
+              
+              elif n_aux_tasks == 2:
+                ans_logits_val, _, _ = model(
+                                            input_ids=b_input_ids,
+                                            attention_masks=b_attn_masks,
+                                            token_type_ids=b_token_type_ids,
+                                            input_lengths=b_input_lengths,
                 )
+
+                start_logits_val, end_logits_val = ans_logits_val
 
                 start_true_val = to_cpu(b_start_pos)
                 end_true_val = to_cpu(b_end_pos)
