@@ -425,7 +425,7 @@ def train(
 
             tr_loss += batch_loss.item()
 
-            # we only want to store QA loss
+            # we just want to store QA losses
             if current_task == 'QA':
               batch_losses.append(batch_loss.item())
 
