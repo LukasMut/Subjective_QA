@@ -666,7 +666,6 @@ def test(
                 start_logits_test, end_logits_test = model(
                                                            input_ids=b_input_ids,
                                                            attention_mask=b_attn_masks,
-                                                           token_type_ids=b_token_type_ids,
                 )
 
             else:  
