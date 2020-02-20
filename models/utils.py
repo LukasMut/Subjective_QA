@@ -317,11 +317,6 @@ def train(
               end_loss = qa_loss_func(end_logits, b_end_pos)
               batch_loss += (start_loss + end_loss) / 2
 
-              print("------------------------------------")
-              print("----- Current {} loss: {} -----".format(current_task, round(batch_loss.item(), 3)))
-              print("------------------------------------")
-              print()
-
               start_log_probas = to_cpu(F.log_softmax(start_logits, dim=1), detach=False, to_numpy=False)
               end_log_probas = to_cpu(F.log_softmax(end_logits, dim=1), detach=False, to_numpy=False)
             
@@ -350,7 +345,6 @@ def train(
               current_batch_acc = 100 * (correct_answers / nb_tr_examples_qa)
               current_batch_f1 = 100 * (batch_f1 / nb_tr_examples_qa)
               
-            
               print("--------------------------------------------")
               print("----- Current batch {} exact-match: {} % -----".format(current_task, round(current_batch_acc, 3)))
               print("----- Current batch {} F1: {} % -----".format(current_task, round(current_batch_f1, 3)))
@@ -421,9 +415,15 @@ def train(
               print("----- Current batch {} F1: {} % -----".format(current_task, round(current_batch_f1_aux, 3)))
               print("--------------------------------------------")
               print()
-            
+
+            print("------------------------------------")
+            print("----- Current {} loss: {} -----".format(current_task, round(batch_loss.item(), 3)))
+            print("------------------------------------")
+            print()
+
             tr_loss += batch_loss.item()
-            batch_losses.append(batch_loss.item())
+            if current_task == 'QA':
+              batch_losses.append(batch_loss.item())
             batch_loss.backward()
             
             # clip gradients if gradients become larger than specified norm
