@@ -216,6 +216,7 @@ def train(
         # TODO: figure out, whether we need pos_weights for adversarial setting
         # loss func for auxiliary task to inform model about subjectivity (binary classification)
         
+        # NOTE: pos_weight does not work really well
         #sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
         sbj_loss_func = nn.BCEWithLogitsLoss()
         train_accs_sbj, train_f1s_sbj = [], []
@@ -642,7 +643,7 @@ def test(
         batch = tuple(t.to(device) for t in batch)
 
         # unpack inputs from dataloader            
-        b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_cls_indexes, _, _, _, _, _ = batch
+        b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_cls_indexes, _, _, _, _ = batch
         
         # if current batch_size is smaller than specified batch_size, skip batch
         if b_input_ids.size(0) != batch_size:
