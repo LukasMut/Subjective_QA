@@ -178,7 +178,7 @@ def train(
     
     if args["freeze_bert"]:
       L = 6 # total number of transformer layers in pre-trained BERT model (L = 24 for BERT large, L = 12 for BERT base, L = 6 for DistilBERT)
-      l = L - 1 #int(L * k) - 1  after training the task-specific RNN and linear output layers for one epoch, gradually unfreeze the top L - l BERT transformer layers
+      l = L - 1 # after training the task-specific (RNN and) linear output layers for one epoch, gradually unfreeze the top L - l BERT transformer layers
       model_name = args['pretrained_model']
       model = freeze_transformer_layers(model, model_name=model_name, unfreeze=False)
       print("--------------------------------------------------")
@@ -281,7 +281,7 @@ def train(
             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_cls_indexes, _, b_sbj, b_domains, _ = batch
             
             if args["sort_batch"]:
-                # sort sequences in batch in decreasing order w.r.t. to (original) sequence length
+                # sort sequences in batch in decreasing order w.r.t. to (original) sequence length (without [PAD] tokens)
                 b_input_ids, b_attn_masks, b_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_sbj, b_domains = sort_batch(
                                                                                                                         b_input_ids,
                                                                                                                         b_attn_masks,
@@ -351,12 +351,13 @@ def train(
               # keep track of train examples used for QA
               nb_tr_examples_qa = Counter(task_order[:i+1])[current_task] * batch_size
 
-              current_batch_f1 = 100 * (batch_f1 / nb_tr_examples_qa)
               current_batch_acc = 100 * (correct_answers / nb_tr_examples_qa)
+              current_batch_f1 = 100 * (batch_f1 / nb_tr_examples_qa)
+              
             
               print("--------------------------------------------")
-              print("----- Current batch exact-match: {} % -----".format(round(current_batch_acc, 3)))
-              print("----- Current batch F1: {} % -----".format(round(current_batch_f1, 3)))
+              print("----- Current batch {} exact-match: {} % -----".format(current_task, round(current_batch_acc, 3)))
+              print("----- Current batch {} F1: {} % -----".format(current_task, round(current_batch_f1, 3)))
               print("--------------------------------------------")
               print()
 
@@ -382,13 +383,13 @@ def train(
                 for i in range(b_sbj.size(1)):
                   
                   batch_acc_sbj += accuracy(probas=torch.sigmoid(sbj_logits[:, i]), y_true=b_sbj[:, i], task='binary')  
-                  batch_f1_sbj += f1(probas=torch.sigmoid(sbj_logits[:, i]), y_true=b_a_sbj[:, i], task='binary')
+                  batch_f1_sbj += f1(probas=torch.sigmoid(sbj_logits[:, i]), y_true=b_sbj[:, i], task='binary')
 
                 batch_acc_sbj /= b_sbj.size(1)
                 batch_f1_sbj /= b_sbj.size(1)
 
-                batch_acc = batch_acc_sbj
-                batch_f1 = batch_f1_sbj
+                batch_acc_aux = batch_acc_sbj
+                batch_f1_aux = batch_f1_sbj
 
               elif current_task == 'Domain_Class':
 
@@ -400,23 +401,25 @@ def train(
                                       task=current_task,
                   )
 
-                      
-                batch_loss += domain_loss_func(domain_logits, b_domains)
+                if adversarial_simple:
+                  batch_loss -= domain_loss_func(domain_logits, b_domains)
+                else:
+                  batch_loss += domain_loss_func(domain_logits, b_domains)
 
                 batch_acc_domain += accuracy(probas=F.log_softmax(domain_logits, dim=1), y_true=b_domains, task='multi-way')  
                 batch_f1_domain += f1(probas=F.log_softmax(domain_logits, dim=1), y_true=b_domains, task='multi-way')
 
-                batch_acc = batch_acc_domain
-                batch_f1 = batch_f1_domain
+                batch_acc_aux = batch_acc_domain
+                batch_f1_aux = batch_f1_domain
               
               # keep track of steps taken per task
               nb_tr_steps_aux = Counter(task_order[:i+1])[current_task]
-              current_batch_acc = 100 * (batch_acc / nb_tr_steps_aux)
-              current_batch_f1 = 100 * (batch_f1 / nb_tr_steps_aux)
+              current_batch_acc_aux = 100 * (batch_acc_aux / nb_tr_steps_aux)
+              current_batch_f1_aux = 100 * (batch_f1_aux / nb_tr_steps_aux)
 
               print("--------------------------------------------")
-              print("----- Current batch {} acc: {} % -----".format(current_task, round(current_batch_acc, 3)))
-              print("----- Current batch {} F1: {} % -----".format(current_task, round(current_batch_f1, 3)))
+              print("----- Current batch {} acc: {} % -----".format(current_task, round(current_batch_acc_aux, 3)))
+              print("----- Current batch {} F1: {} % -----".format(current_task, round(current_batch_f1_aux, 3)))
               print("--------------------------------------------")
               print()
             
