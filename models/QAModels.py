@@ -84,6 +84,7 @@ class BertForQA(BertPreTrainedModel):
                 input_ids:torch.Tensor,
                 attention_masks:torch.Tensor,
                 token_type_ids:torch.Tensor,
+                task:str,
                 position_ids=None,
                 head_mask=None,
                 inputs_embeds=None,
@@ -105,12 +106,14 @@ class BertForQA(BertPreTrainedModel):
             return self.qa_head(
                                 bert_outputs=bert_outputs,
                                 seq_lengths=input_lengths,
+                                task=task,
                                 start_positions=start_positions,
                                 end_positions=end_positions,
             )
         else:
             return self.qa_head(
                                 bert_outputs=bert_outputs,
+                                task=task,
                                 start_positions=start_positions,
                                 end_positions=end_positions,
             )

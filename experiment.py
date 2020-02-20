@@ -562,37 +562,77 @@ if __name__ == '__main__':
         
         else:
             raise ValueError("Optimizer must be one of {AdamW, Adam}.")
-                    
-        batch_losses, train_losses, train_accs, train_f1s, val_losses, val_accs, val_f1s, model = train(
-                                                                                                        model=model,
-                                                                                                        tokenizer=bert_tokenizer,
-                                                                                                        train_dl=train_dl,
-                                                                                                        val_dl=val_dl,
-                                                                                                        batch_size=batch_size,
-                                                                                                        n_aux_tasks=args.n_aux_tasks,
-                                                                                                        args=hypers,
-                                                                                                        optimizer=optimizer,
-                                                                                                        scheduler=scheduler,
-                                                                                                        early_stopping=True,
-                                                                                                        qa_type_weights=qa_type_weights,
-                                                                                                        domain_weights=domain_weights,
-        )
-        
+
         train_results  = dict()
+        if isintance(args.n_aux_tasks, type(None)):           
+            batch_losses, train_losses, train_accs_qa, train_f1s_qa, val_losses, val_accs, val_f1s, model = train(
+                                                                                                            model=model,
+                                                                                                            tokenizer=bert_tokenizer,
+                                                                                                            train_dl=train_dl,
+                                                                                                            val_dl=val_dl,
+                                                                                                            batch_size=batch_size,
+                                                                                                            n_aux_tasks=args.n_aux_tasks,
+                                                                                                            args=hypers,
+                                                                                                            optimizer=optimizer,
+                                                                                                            scheduler=scheduler,
+                                                                                                            early_stopping=True,
+                                                                                                            qa_type_weights=qa_type_weights,
+                                                                                                            domain_weights=domain_weights,
+            )
+
+
+        elif args.n_aux_tasks == 1:           
+            batch_losses, train_losses, train_accs_qa, train_f1s_qa, train_accs_sbj, train_f1s_sbj, val_losses, val_accs, val_f1s, model = train(
+                                                                                                                                                model=model,
+                                                                                                                                                tokenizer=bert_tokenizer,
+                                                                                                                                                train_dl=train_dl,
+                                                                                                                                                val_dl=val_dl,
+                                                                                                                                                batch_size=batch_size,
+                                                                                                                                                n_aux_tasks=args.n_aux_tasks,
+                                                                                                                                                args=hypers,
+                                                                                                                                                optimizer=optimizer,
+                                                                                                                                                scheduler=scheduler,
+                                                                                                                                                early_stopping=True,
+                                                                                                                                                qa_type_weights=qa_type_weights,
+                                                                                                                                                domain_weights=domain_weights,
+            )
+
+            train_results['train_accs_sbj'] = train_accs_sbj
+            train_results['train_f1s_sbj'] = train_f1s_sbj
+        
+        elif args.n_aux_tasks == 2:           
+            batch_losses, train_losses, train_accs_qa, train_f1s_qa, train_accs_sbj, train_f1s_sbj, train_accs_domain, train_f1s_domain, val_losses, val_accs, val_f1s, model = train(
+                                                                                                                                                                                    model=model,
+                                                                                                                                                                                    tokenizer=bert_tokenizer,
+                                                                                                                                                                                    train_dl=train_dl,
+                                                                                                                                                                                    val_dl=val_dl,
+                                                                                                                                                                                    batch_size=batch_size,
+                                                                                                                                                                                    n_aux_tasks=args.n_aux_tasks,
+                                                                                                                                                                                    args=hypers,
+                                                                                                                                                                                    optimizer=optimizer,
+                                                                                                                                                                                    scheduler=scheduler,
+                                                                                                                                                                                    early_stopping=True,
+                                                                                                                                                                                    qa_type_weights=qa_type_weights,
+                                                                                                                                                                                    domain_weights=domain_weights,
+            )
+
+            train_results['train_accs_sbj'] = train_accs_sbj
+            train_results['train_f1s_sbj'] = train_f1s_sbj
+            train_results['train_accs_domain'] = train_accs_domain
+            train_results['train_f1s_domain'] = train_f1s_domain        
+            
         train_results['batch_losses'] = batch_losses
         train_results['train_losses'] = train_losses
-        train_results['train_accs'] = train_accs
-        train_results['train_f1s'] = train_f1s
+        train_results['train_accs_qa'] = train_accs_qa
+        train_results['train_f1s_qa'] = train_f1s_qa
         train_results['val_losses'] = val_losses
         train_results['val_accs'] = val_accs
         train_results['val_f1s'] = val_f1s
-            
+
         with open('./results_train/' + model_name + '.json', 'w') as json_file:
             json.dump(train_results, json_file)
         
-        # TODO: implement model unfreezing (necessary for fine-tuning on SubjQA - freeze for ~ 2 epochs, unfreeze, train as long as for other setting)
-        
-    # we always test on SubjQA
+    # we always test on SubjQA (TODO: evaluate model on both entire test data set and individual review domains)
     elif args.version == 'test':
         
             subjqa_data_test_df, hidden_domain_idx_test = get_data(

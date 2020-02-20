@@ -89,43 +89,47 @@ class LinearQAHead(nn.Module):
                     
     def forward(
                 self,
-                bert_outputs:torch.Tensor, 
+                bert_outputs:torch.Tensor,
+                task:str, 
                 start_positions=None,
                 end_positions=None,
     ):
-        
         sequence_output = bert_outputs[0]
         
         if hasattr(self, 'highway'):
             sequence_output = self.highway(sequence_output) # pass BERT representations through highway-connection (for better information flow)
-        
-        logits = self.fc_qa(sequence_output)
-        start_logits, end_logits = logits.split(1, dim=-1)
-        start_logits = start_logits.squeeze(-1)
-        end_logits = end_logits.squeeze(-1)
+       
+        if task == 'QA':
 
-        outputs = (start_logits, end_logits,) + bert_outputs[2:]
+            logits = self.fc_qa(sequence_output)
+            start_logits, end_logits = logits.split(1, dim=-1)
+            start_logits = start_logits.squeeze(-1)
+            end_logits = end_logits.squeeze(-1)
 
-        if (start_positions is not None) and (end_positions is not None):
-            # If we are on multi-GPU, split add a dimension
-            if len(start_positions.size()) > 1:
-                start_positions = start_positions.squeeze(-1)
-            if len(end_positions.size()) > 1:
-                end_positions = end_positions.squeeze(-1)
-            
-            # sometimes the start/end positions are outside our model inputs, we ignore these terms
-            ignored_index = start_logits.size(1)
-            start_positions.clamp_(0, ignored_index)
-            end_positions.clamp_(0, ignored_index)
+            outputs = (start_logits, end_logits,) + bert_outputs[2:]
 
-            loss_fct = CrossEntropyLoss(ignore_index=ignored_index)
-            start_loss = loss_fct(start_logits, start_positions)
-            end_loss = loss_fct(end_logits, end_positions)
-            total_loss = (start_loss + end_loss) / 2
-            outputs = (total_loss,) + outputs
-            
-        if self.multitask and isinstance(self.n_aux_tasks, int):
-            
+            if (start_positions is not None) and (end_positions is not None):
+                # If we are on multi-GPU, split add a dimension
+                if len(start_positions.size()) > 1:
+                    start_positions = start_positions.squeeze(-1)
+                if len(end_positions.size()) > 1:
+                    end_positions = end_positions.squeeze(-1)
+                
+                # sometimes the start/end positions are outside our model inputs, we ignore these terms
+                ignored_index = start_logits.size(1)
+                start_positions.clamp_(0, ignored_index)
+                end_positions.clamp_(0, ignored_index)
+
+                loss_fct = CrossEntropyLoss(ignore_index=ignored_index)
+                start_loss = loss_fct(start_logits, start_positions)
+                end_loss = loss_fct(end_logits, end_positions)
+                total_loss = (start_loss + end_loss) / 2
+                outputs = (total_loss,) + outputs
+
+            return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)
+
+        else:
+
             # use contextual embedding of the special [CLS] token (corresponds to the semantic representation of an input sentence X)
             sequence_output = sequence_output[:, 0, :] 
 
@@ -133,40 +137,27 @@ class LinearQAHead(nn.Module):
                 # reverse gradients to learn qa-type / domain-invariant features (i.e., semi-supervised domain-adaptation)
                 sequence_output = grad_reverse(sequence_output)
 
-            sbj_out = F.relu(self.dropout(self.fc_sbj(sequence_output)))
-            sbj_logits_a = self.fc_sbj_a(sbj_out)
-            sbj_logits_q = self.fc_sbj_q(sbj_out)
+            if task == 'Sbj_Class':
 
-            # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
-            sbj_logits_a = sbj_logits_a.squeeze(-1)
-            sbj_logits_q = sbj_logits_q.squeeze(-1)
+                sbj_out = F.relu(self.dropout(self.fc_sbj(sequence_output)))
+                sbj_logits_a = self.fc_sbj_a(sbj_out)
+                sbj_logits_q = self.fc_sbj_q(sbj_out)
 
-            sbj_logits = torch.stack((sbj_logits_a, sbj_logits_q), dim=1)
+                # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
+                sbj_logits_a = sbj_logits_a.squeeze(-1)
+                sbj_logits_q = sbj_logits_q.squeeze(-1)
 
-            if self.n_aux_tasks == 1:
-                return outputs, sbj_logits
+                sbj_logits = torch.stack((sbj_logits_a, sbj_logits_q), dim=1)
 
-            elif self.n_aux_tasks == 2:
+                return sbj_logits
 
-                domain_out = F.relu(self.dropout(self.fc_domain_1(sequence_output)))
-                domain_logits = self.fc_domain_2(domain_out)
-                domain_logits = domain_logits.squeeze(-1)
-
-                return outputs, sbj_logits, domain_logits
-
-            elif self.n_aux_tasks == 3:
+            elif task == 'Domain_Class':
 
                 domain_out = F.relu(self.dropout(self.fc_domain_1(sequence_output)))
                 domain_logits = self.fc_domain_2(domain_out)
                 domain_logits = domain_logits.squeeze(-1)
 
-                ds_out = F.relu(self.dropout(self.fc_ds_1(sequence_output)))
-                ds_logits = self.fc_ds_2(domain_out)
-                ds_logits = domain_logits.squeeze(-1)
-
-                return outputs, sbj_logits, domain_logits, ds_logits
-        else:
-            return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)
+                return domain_logits
         
         
 class RecurrentQAHead(nn.Module):
@@ -242,6 +233,7 @@ class RecurrentQAHead(nn.Module):
                 self,
                 bert_outputs:torch.Tensor,
                 seq_lengths:torch.Tensor,
+                task:str,
                 start_positions=None,
                 end_positions=None,
     ):
@@ -261,72 +253,62 @@ class RecurrentQAHead(nn.Module):
         if hasattr(self, 'rnn_decoder'):
             sequence_output, hidden_rnn = self.rnn_decoder(sequence_output, seq_lengths, hidden_rnn)
         
-        # compute classification of answer span
-        logits = self.fc_qa(sequence_output)
-        
-        # split logits into chunks for start and end of answer span respectively
-        start_logits, end_logits = logits.split(1, dim=-1)
-        start_logits = start_logits.squeeze(-1)
-        end_logits = end_logits.squeeze(-1)
 
-        outputs = (start_logits, end_logits,) + bert_outputs[2:]
-        
-        if (start_positions is not None) and (end_positions is not None):
-            # If we are on multi-GPU, split add a dimension
-            if len(start_positions.size()) > 1:
-                start_positions = start_positions.squeeze(-1)
-            if len(end_positions.size()) > 1:
-                end_positions = end_positions.squeeze(-1)
+        if task == 'QA':
+
+            logits = self.fc_qa(sequence_output)
             
-            # sometimes the start/end positions are outside our model inputs, we ignore these terms
-            ignored_index = start_logits.size(1)
-            start_positions.clamp_(0, ignored_index)
-            end_positions.clamp_(0, ignored_index)
+            # split logits into chunks for start and end of answer span respectively
+            start_logits, end_logits = logits.split(1, dim=-1)
+            start_logits = start_logits.squeeze(-1)
+            end_logits = end_logits.squeeze(-1)
 
-            loss_fct = CrossEntropyLoss(ignore_index=ignored_index)
-            start_loss = loss_fct(start_logits, start_positions)
-            end_loss = loss_fct(end_logits, end_positions)
-            total_loss = (start_loss + end_loss) / 2
-            outputs = (total_loss,) + outputs
-        
-        if self.multitask and isinstance(self.n_aux_tasks, int):
+            outputs = (start_logits, end_logits,) + bert_outputs[2:]
 
+            if (start_positions is not None) and (end_positions is not None):
+                # If we are on multi-GPU, split add a dimension
+                if len(start_positions.size()) > 1:
+                    start_positions = start_positions.squeeze(-1)
+                if len(end_positions.size()) > 1:
+                    end_positions = end_positions.squeeze(-1)
+                
+                # sometimes the start/end positions are outside our model inputs, we ignore these terms
+                ignored_index = start_logits.size(1)
+                start_positions.clamp_(0, ignored_index)
+                end_positions.clamp_(0, ignored_index)
+
+                loss_fct = CrossEntropyLoss(ignore_index=ignored_index)
+                start_loss = loss_fct(start_logits, start_positions)
+                end_loss = loss_fct(end_logits, end_positions)
+                total_loss = (start_loss + end_loss) / 2
+                outputs = (total_loss,) + outputs
+
+            return outputs #, hidden_rnn  # (loss), start_logits, end_logits, (hidden_states), (attentions)
+
+        else:
             if self.adversarial:
                 # reverse gradients to learn qa-type / domain-invariant features (i.e., semi-supervised domain-adaptation)
                 sequence_output = grad_reverse(sequence_output)
 
-            # we only need hidden states of last time step (summary of the sequence) (i.e., seq[batch_size, -1, hidden_size])
-            sbj_out = F.relu(self.dropout(self.fc_sbj(sequence_output[:, -1, :])))
-            sbj_logits_a = self.fc_sbj_a(sbj_out)
-            sbj_logits_q = self.fc_sbj_q(sbj_out)
+            if task == 'Sbj_Class':
 
-            # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
-            sbj_logits_a = sbj_logits_a.squeeze(-1)
-            sbj_logits_q = sbj_logits_q.squeeze(-1)
+                # we only need hidden states of last time step (summary of the sequence) (i.e., seq[batch_size, -1, hidden_size])
+                sbj_out = F.relu(self.dropout(self.fc_sbj(sequence_output[:, -1, :])))
+                sbj_logits_a = self.fc_sbj_a(sbj_out)
+                sbj_logits_q = self.fc_sbj_q(sbj_out)
 
-            sbj_logits = torch.stack((sbj_logits_a, sbj_logits_q), dim=1)
+                # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
+                sbj_logits_a = sbj_logits_a.squeeze(-1)
+                sbj_logits_q = sbj_logits_q.squeeze(-1)
 
-            if self.n_aux_tasks == 1:
-                return outputs, sbj_logits #, hidden_rnn
+                sbj_logits = torch.stack((sbj_logits_a, sbj_logits_q), dim=1)
 
-            elif self.n_aux_tasks == 2:
+                return sbj_logits #, hidden_rnn
 
-                domain_out = F.relu(self.dropout(self.fc_domain_1(sequence_output[:, -1, :])))
-                domain_logits = self.fc_domain_2(domain_out)
-                domain_logits = domain_logits.squeeze(-1)
-
-                return outputs, sbj_logits, domain_logits #, hidden_rnn
-
-            elif self.n_aux_tasks == 3:
+            elif task == 'Domain_Class':
 
                 domain_out = F.relu(self.dropout(self.fc_domain_1(sequence_output[:, -1, :])))
                 domain_logits = self.fc_domain_2(domain_out)
                 domain_logits = domain_logits.squeeze(-1)
 
-                ds_out = F.relu(self.dropout(self.fc_ds_1(sequence_output[:, -1, :])))
-                ds_logits = self.fc_ds_2(ds_out)
-                ds_logits = domain_logits.squeeze(-1)
-
-                return outputs, sbj_logits, domain_logits, ds_logits #, hidden_rnn
-        else:
-            return outputs #, hidden_rnn  # (loss), start_logits, end_logits, (hidden_states), (attentions)
+                return domain_logits #, hidden_rnn

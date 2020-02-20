@@ -167,8 +167,9 @@ def train(
           max_epochs:int=5,
           adversarial_simple:bool=False,
 ):
-    n_iters = len(train_dl)
-    n_examples = n_iters * batch_size
+    n_steps = len(train_dl)
+    n_iters = n_steps * args['n_epochs']
+    n_examples = n_steps * batch_size
     
     if args["freeze_bert"]:
       L = 24 # total number of transformer layers in pre-trained BERT model (L = 24 for BERT large, L = 12 for BERT base)
@@ -184,8 +185,8 @@ def train(
     # store loss and accuracy for plotting
     batch_losses = []
     train_losses = []
-    train_accs = []
-    train_f1s = []
+    train_accs_qa = []
+    train_f1s_qa = []
     val_losses = []
     val_accs = []
     val_f1s = []
@@ -193,15 +194,19 @@ def train(
     # path to save models
     model_path = args['model_dir'] 
     
-    # define loss function (Cross-Entropy is numerically more stable than LogSoftmax plus Negative-Log-Likelihood)
+    # define loss function (Cross-Entropy is numerically more stable than LogSoftmax plus Negative-Log-Likelihood Loss)
     qa_loss_func = nn.CrossEntropyLoss()
+
+    tasks = ['QA']
 
     if isinstance(n_aux_tasks, int):
         
-        tasks = ['QA', 'Sbj Class.']
+        tasks.extend('Sbj_Class')
         # loss func for auxiliary task to inform model about subjectivity (binary classification)
         assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
-        print("Weights for subjective QAs: {}".format(qa_type_weights))
+        print("Weights for subjective Anwers: {}".format(qa_type_weights[0]))
+        print()
+        print("Weights for subjective Questions: {}".format(qa_type_weights[1]))
         print()
         
         if n_aux_tasks == 1:
@@ -211,23 +216,27 @@ def train(
         
         # loss func for auxiliary task to inform model about different review / context domains (multi-way classification)
         elif n_aux_tasks == 2:
+            
             sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
+            
             assert isinstance(domain_weights, torch.Tensor), 'Tensor of class weights for different domains is not provided'
             domain_loss_func = nn.CrossEntropyLoss(weight=domain_weights.to(device))
             train_accs_domain, train_f1s_domain = [], []
-            tasks.extend('Domain Class.')
+            tasks.extend('Domain_Class')
 
-        # generate uniform random sample over all entries
-        task_order = np.random.choice(tasks, size=n_iters, replace=True, p = [1/len(tasks) for _ in tasks])
-        task_distrib = Counter(task_order)
-        plt.bar(tasks, [task_distrib[task] for task in tasks], alpha=0.5, edgecolor='black')
-        plt.xticks(range(len(tasks)), labels=tasks)
-        plt.xlabel('Tasks', fontsize=12)
-        plt.ylabel('Frequency per epoch', fontsize=12)
-        plt.title('Task distribution in MTL setting')
-        plt.show()
-        plt.clf()
+    # generate uniform random sample over all entries
+    task_order = np.random.choice(tasks, size=n_steps, replace=True, p = [1/len(tasks) for _ in tasks])
+    task_distrib = Counter(task_order)
+    plt.bar(tasks, [task_distrib[task] for task in tasks], alpha=0.5, edgecolor='black')
+    plt.xticks(range(len(tasks)), labels=tasks)
+    plt.xlabel('Tasks', fontsize=12)
+    plt.ylabel('Frequency per epoch', fontsize=12)
+    plt.title('Task distribution in MTL setting')
+    plt.show()
+    plt.clf()
+
     """
+    # NOTE: fine-tuning BERT only works with DistilBERT but not with BERT Large
     if args['dataset'] == 'SubjQA' or args['dataset'] == 'combined':
       if args['freeze_bert']:
         if args['n_epochs'] <= max_epochs:
@@ -263,10 +272,10 @@ def train(
         tr_loss = 0
         nb_tr_examples, nb_tr_steps = 0, 0
         
-        # number of steps == number of updates per epoch
+        # n_steps == n_updates per epoch (n_iters = n_epochs * n_steps per epoch)
         for i, batch in enumerate(tqdm(train_dl, desc="Step")):
             
-            batch_loss, qa_loss, sbj_loss, domain_loss = 0, 0, 0, 0 
+            batch_loss = 0 
 
             # add batch to GPU
             batch = tuple(t.to(device) for t in batch)
@@ -288,177 +297,140 @@ def train(
                 )
             
             optimizer.zero_grad()
+
+            nb_tr_examples += b_input_ids.size(0)
+            nb_tr_steps += 1
             
-            if isinstance(n_aux_tasks, type(None)):
-                start_logits, end_logits = model(
-                                                 input_ids=b_input_ids,
-                                                 attention_masks=b_attn_masks,
-                                                 token_type_ids=b_token_type_ids,
-                                                 input_lengths=b_input_lengths,
-                                                 task='QA'
-                )
-                
-            elif isinstance(n_aux_tasks, int):
+            current_task = tasks[i]
 
-                current_task = tasks[i]
+            if current_task == 'QA':
 
-                if current_task = 'QA':
+              start_logits, end_logits = model(
+                             input_ids=b_input_ids,
+                             attention_masks=b_attn_masks,
+                             token_type_ids=b_token_type_ids,
+                             input_lengths=b_input_lengths,
+                             task=current_task,
+                             )
 
-                  start_logits, end_logits = model(
-                                 input_ids=b_input_ids,
-                                 attention_masks=b_attn_masks,
-                                 token_type_ids=b_token_type_ids,
-                                 input_lengths=b_input_lengths,
-                                 task=current_task,
-                                 )
+              # start and end loss must be computed separately
+              start_loss = qa_loss_func(start_logits, b_start_pos)
+              end_loss = qa_loss_func(end_logits, b_end_pos)
+              batch_loss += (start_loss + end_loss) / 2
 
-                if n_aux_tasks == 1:
-                    ans_logits, sbj_logits = model(
-                                                   input_ids=b_input_ids,
-                                                   attention_masks=b_attn_masks,
-                                                   token_type_ids=b_token_type_ids,
-                                                   input_lengths=b_input_lengths,
-                )
-                    start_logits, end_logits = ans_logits
-                    
-                    b_sbj = b_sbj.type_as(sbj_logits)
+              print("------------------------------------")
+              print("----- Current {} loss: {} -----".format(current_task, round(batch_loss.item(), 3)))
+              print("------------------------------------")
+              print()
 
-                    if adversarial_simple:
-                      sbj_loss -= sbj_loss_func(sbj_logits, b_sbj)
-                    else:
-                      sbj_loss += sbj_loss_func(sbj_logits, b_sbj)
-
-                elif n_aux_tasks == 2:
-                    ans_logits, sbj_logits, domain_logits = model(
-                                                                  input_ids=b_input_ids,
-                                                                  attention_masks=b_attn_masks,
-                                                                  token_type_ids=b_token_type_ids,
-                                                                  input_lengths=b_input_lengths,
-                )
-                    start_logits, end_logits = ans_logits
-                    
-                    b_sbj = b_sbj.type_as(sbj_logits)
-
-                    if adversarial_simple:
-                      sbj_loss -= sbj_loss_func(sbj_logits, b_sbj)
-                    else:
-                      sbj_loss += sbj_loss_func(sbj_logits, b_sbj)
-                    
-                    domain_loss += domain_loss_func(domain_logits, b_domains)
+              start_log_probas = to_cpu(F.log_softmax(start_logits, dim=1), detach=False, to_numpy=False)
+              end_log_probas = to_cpu(F.log_softmax(end_logits, dim=1), detach=False, to_numpy=False)
             
-            # start and end loss must be computed separately
-            start_loss = qa_loss_func(start_logits, b_start_pos)
-            end_loss = qa_loss_func(end_logits, b_end_pos)
-            qa_loss = (start_loss + end_loss) / 2
-
+              pred_answers = get_answers(
+                                         tokenizer=tokenizer,
+                                         b_input_ids=b_input_ids,
+                                         start_logs=start_log_probas,
+                                         end_logs=end_log_probas,
+                                         predictions=True,
+              )
             
-            # accumulate all losses
-            if isinstance(n_aux_tasks, type(None)):
-                batch_loss += qa_loss
-                
-            elif n_aux_tasks == 1:
-                batch_loss += (qa_loss + sbj_loss) / 2
-                
-            elif n_aux_tasks == 2:
-                batch_loss += (qa_loss + sbj_loss + domain_loss) / 3
+              true_answers = get_answers(
+                                         tokenizer=tokenizer,
+                                         b_input_ids=b_input_ids,
+                                         start_logs=b_start_pos,
+                                         end_logs=b_end_pos,
+                                         predictions=False,
+              )
             
-            print("------------------------------------")
-            print("----- Current batch loss: {} -----".format(round(batch_loss.item(), 3)))
-            print("------------------------------------")
-            print()
+              correct_answers += compute_exact_batch(true_answers, pred_answers)
+              batch_f1 += compute_f1_batch(true_answers, pred_answers)
 
+              nb_tr_examples_qa = Counter(task_order[:i])[current_task] * batch_size
+
+              current_batch_f1 = 100 * (batch_f1 / nb_tr_examples_qa)
+              current_batch_acc = 100 * (correct_answers / nb_tr_examples_qa)
+            
+              print("--------------------------------------------")
+              print("----- Current batch exact-match: {} % -----".format(round(current_batch_acc, 3)))
+              print("----- Current batch F1: {} % -----".format(round(current_batch_f1, 3)))
+              print("--------------------------------------------")
+              print()
+
+            else:
+
+              if current_task == 'Sbj_Class.':
+
+                sbj_logits = model(
+                                   input_ids=b_input_ids,
+                                   attention_masks=b_attn_masks,
+                                   token_type_ids=b_token_type_ids,
+                                   input_lengths=b_input_lengths,
+                                   task=current_task,
+                  )
+                      
+                b_sbj = b_sbj.type_as(sbj_logits)
+
+                if adversarial_simple:
+                  batch_loss -= sbj_loss_func(sbj_logits, b_sbj)
+                else:
+                  batch_loss += sbj_loss_func(sbj_logits, b_sbj)
+
+                for i in range(b_sbj.size(1)):
+                  
+                  batch_acc_sbj += accuracy(probas=torch.sigmoid(sbj_logits[:, i]), y_true=b_sbj[:, i], task='binary')  
+                  batch_f1_sbj += f1(probas=torch.sigmoid(sbj_logits[:, i]), y_true=b_a_sbj[:, i], task='binary')
+
+                batch_acc_sbj /= b_sbj.size(1)
+                batch_f1_sbj /= b_sbj.size(1)
+
+                batch_acc = batch_acc_sbj
+                batch_f1 = batch_f1_sbj
+
+              elif current_task == 'Domain_Class':
+
+                domain_logits = model(
+                                      input_ids=b_input_ids,
+                                      attention_masks=b_attn_masks,
+                                      token_type_ids=b_token_type_ids,
+                                      input_lengths=b_input_lengths,
+                                      task=current_task,
+                  )
+
+                      
+                batch_loss += domain_loss_func(domain_logits, b_domains)
+
+                batch_acc_domain += accuracy(probas=F.log_softmax(domain_logits, dim=1), y_true=b_domains, task='multi-way')  
+                batch_f1_domain += f1(probas=F.log_softmax(domain_logits, dim=1), y_true=b_domains, task='multi-way')
+
+                batch_acc = batch_acc_domain
+                batch_f1 = batch_f1_domain
+              
+              current_batch_acc = 100 * (batch_acc / nb_tr_steps)
+              current_batch_f1 = 100 * (batch_f1 / nb_tr_steps)
+
+              print("--------------------------------------------")
+              print("----- Current batch {} acc: {} % -----".format(current_task, round(current_batch_acc, 3)))
+              print("----- Current batch {} F1: {} % -----".format(current_task, round(current_batch_f1, 3)))
+              print("--------------------------------------------")
+              print()
+            
+            tr_loss += batch_loss.item()
             batch_losses.append(batch_loss.item())
-            
-            start_log_probas = to_cpu(F.log_softmax(start_logits, dim=1), detach=False, to_numpy=False)
-            end_log_probas = to_cpu(F.log_softmax(end_logits, dim=1), detach=False, to_numpy=False)
-            
-            pred_answers = get_answers(
-                                       tokenizer=tokenizer,
-                                       b_input_ids=b_input_ids,
-                                       start_logs=start_log_probas,
-                                       end_logs=end_log_probas,
-                                       predictions=True,
-            )
-            
-            true_answers = get_answers(
-                                       tokenizer=tokenizer,
-                                       b_input_ids=b_input_ids,
-                                       start_logs=b_start_pos,
-                                       end_logs=b_end_pos,
-                                       predictions=False,
-            )
-            
-            correct_answers += compute_exact_batch(true_answers, pred_answers)
-            batch_f1 += compute_f1_batch(true_answers, pred_answers)
-                        
-            # backpropagate error
-            
-            #TODO: figure out how to backpropagte errors for MTL
-            #qa_loss.backward()
-            #sbj_loss.backward()
-            #domain_loss.backward()
-            
             batch_loss.backward()
             
             # clip gradients if gradients are larger than specified norm
             torch.nn.utils.clip_grad_norm_(model.parameters(), args["max_grad_norm"])
 
-            # update model parameters and take a step using the computed gradient
+            # take step down the valley
             optimizer.step()
             
-            # scheduler is only necessary, if we optimize through AdamW (BERT specific version of Adam)
+            # scheduler is only necessary, if we optimize with AdamW (BERT specific version of Adam)
             if args['optim'] == 'AdamW' and not isinstance(scheduler, type(None)):
                 scheduler.step()
 
-            tr_loss += batch_loss.item()
-            nb_tr_examples += b_input_ids.size(0)
-            nb_tr_steps += 1
-            
-            current_batch_f1 = 100 * (batch_f1 / nb_tr_examples)
-            current_batch_acc = 100 * (correct_answers / nb_tr_examples)
-            
-            print("--------------------------------------------")
-            print("----- Current batch exact-match: {} % -----".format(round(current_batch_acc, 3)))
-            print("----- Current batch F1: {} % -----".format(round(current_batch_f1, 3)))
-            print("--------------------------------------------")
-            print()
-
-
-            if isinstance(n_aux_tasks, int):
-
-              if args['qa_type'] == 'question':
-                batch_acc_sbj += accuracy(probas=torch.sigmoid(sbj_logits), y_true=b_q_sbj, task='binary')
-                batch_f1_sbj += f1(probas=torch.sigmoid(sbj_logits), y_true=b_q_sbj, task='binary')
-                
-              elif args['qa_type'] == 'answer':
-                batch_acc_sbj += accuracy(probas=torch.sigmoid(sbj_logits), y_true=b_a_sbj, task='binary')  
-                batch_f1_sbj += f1(probas=torch.sigmoid(sbj_logits), y_true=b_a_sbj, task='binary')
-
-              if n_aux_tasks == 2:
-                batch_acc_domain += accuracy(probas=F.log_softmax(domain_logits, dim=1), y_true=b_domains, task='multi-way')  
-                batch_f1_domain += f1(probas=F.log_softmax(domain_logits, dim=1), y_true=b_domains, task='multi-way')
-
-                current_batch_acc_domain = 100 * (batch_acc_domain / nb_tr_steps)
-                current_batch_f1_domain = 100 * (batch_f1_domain / nb_tr_steps)
-
-                print("--------------------------------------------")
-                print("----- Current batch domain acc: {} % -----".format(round(current_batch_acc_domain, 3)))
-                print("----- Current batch domain F1: {} % -----".format(round(current_batch_f1_domain, 3)))
-                print("--------------------------------------------")
-                print()
-
-              current_batch_acc_sbj = 100 * (batch_acc_sbj / nb_tr_steps)
-              current_batch_f1_sbj = 100 * (batch_f1_sbj / nb_tr_steps)
-
-              print("--------------------------------------------")
-              print("----- Current batch sbj acc: {} % -----".format(round(current_batch_acc_sbj, 3)))
-              print("----- Current batch sbj F1: {} % -----".format(round(current_batch_f1_sbj, 3)))
-              print("--------------------------------------------")
-              print()
-                    
         tr_loss /= nb_tr_steps
-        train_exact_match = 100 * (correct_answers / nb_tr_examples)
-        train_f1 = 100 * (batch_f1 / nb_tr_examples)
+        train_exact_match = 100 * (correct_answers / (task_distrib['QA'] * batch_size))
+        train_f1 = 100 * (batch_f1 / (task_distrib['QA'] * batch_size))
 
         print("------------------------------------")
         print("---------- EPOCH {} ----------".format(epoch + 1))
@@ -470,16 +442,16 @@ def train(
 
         if isinstance(n_aux_tasks, int):
            
-           train_acc_sbj = 100 * (batch_acc_sbj / nb_tr_steps)
-           train_f1_sbj = 100 * (batch_f1_sbj / nb_tr_steps)
+           train_acc_sbj = 100 * (batch_acc_sbj / task_distrib['Sbj_Class'])
+           train_f1_sbj = 100 * (batch_f1_sbj / task_distrib['Sbj_Class'])
 
            train_accs_sbj.append(train_acc_sbj)
            train_f1s_sbj.append(train_f1_sbj)
 
            if n_aux_tasks == 2:
 
-              train_acc_domain = 100 * (batch_acc_domain / nb_tr_steps)
-              train_f1_domain = 100 * (batch_f1_domain / nb_tr_steps)
+              train_acc_domain = 100 * (batch_acc_domain / task_distrib['Domain_Class'])
+              train_f1_domain = 100 * (batch_f1_domain / task_distrib['Domain_Class'])
 
               train_accs_domain.append(train_acc_domain)
               train_f1s_domain.append(train_f1_domain)
@@ -497,8 +469,8 @@ def train(
            print()
 
         train_losses.append(tr_loss)
-        train_accs.append(train_exact_match)
-        train_f1s.append(train_f1)
+        train_accs_qa.append(train_exact_match)
+        train_f1s_qa.append(train_f1)
        
         ### Validation ###
 
@@ -537,29 +509,13 @@ def train(
             
             with torch.no_grad():
 
-              if isinstance(n_aux_tasks, type(None)):
                 ans_logits_val = model(
                                        input_ids=b_input_ids,
                                        attention_masks=b_attn_masks,
                                        token_type_ids=b_token_type_ids,
                                        input_lengths=b_input_lengths,
+                                       task='QA'
                                        )
-                
-              elif n_aux_tasks == 1:
-                ans_logits_val, _ = model(
-                                            input_ids=b_input_ids,
-                                            attention_masks=b_attn_masks,
-                                            token_type_ids=b_token_type_ids,
-                                            input_lengths=b_input_lengths,
-              )
-              
-              elif n_aux_tasks == 2:
-                ans_logits_val, _, _ = model(
-                                            input_ids=b_input_ids,
-                                            attention_masks=b_attn_masks,
-                                            token_type_ids=b_token_type_ids,
-                                            input_lengths=b_input_lengths,
-                )
 
                 start_logits_val, end_logits_val = ans_logits_val
 
@@ -631,8 +587,13 @@ def train(
                   print("----- Early stopping after {} epochs -----".format(epoch + 1))
                   print("------------------------------------------")
                   break
-       
-    return batch_losses, train_losses, train_accs, train_f1s, val_losses, val_accs, val_f1s, model
+    
+    if isinstance(n_aux_tasks, type(None)):
+      return batch_losses, train_losses, train_accs_qa, train_f1s_qa, val_losses, val_accs, val_f1s, model
+    elif n_aux_tasks == 1:
+      return batch_losses, train_losses, train_accs_qa, train_f1s_qa, train_accs_sbj, train_f1s_sbj, val_losses, val_accs, val_f1s, model
+    elif n_aux_tasks == 2:
+      return batch_losses, train_losses, train_accs_qa, train_f1s_qa, train_accs_sbj, train_f1s_sbj, train_accs_domain, train_f1s_domain, val_losses, val_accs, val_f1s, model
 
 def test(
           model,
@@ -642,8 +603,8 @@ def test(
           sort_batch:bool=False,
           not_finetuned:bool=False,
 ):
-    n_iters = len(test_dl)
-    n_examples = n_iters * batch_size
+    n_steps = len(test_dl)
+    n_examples = n_steps * batch_size
        
     ### Inference ###
 
