@@ -298,7 +298,7 @@ def train(
             nb_tr_examples += b_input_ids.size(0)
             nb_tr_steps += 1
             
-            current_task = tasks[i]
+            current_task = task_order[i]
 
             if isinstance(n_aux_tasks, int):
               print('------------------------------------')
@@ -410,9 +410,9 @@ def train(
                 batch_f1 = batch_f1_domain
               
               # keep track of steps taken per task
-              nb_tr_steps = Counter(task_order[:i+1])[current_task]
-              current_batch_acc = 100 * (batch_acc / nb_tr_steps)
-              current_batch_f1 = 100 * (batch_f1 / nb_tr_steps)
+              nb_tr_steps_aux = Counter(task_order[:i+1])[current_task]
+              current_batch_acc = 100 * (batch_acc / nb_tr_steps_aux)
+              current_batch_f1 = 100 * (batch_f1 / nb_tr_steps_aux)
 
               print("--------------------------------------------")
               print("----- Current batch {} acc: {} % -----".format(current_task, round(current_batch_acc, 3)))
