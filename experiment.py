@@ -232,7 +232,7 @@ if __name__ == '__main__':
                 )
 
                 a_type_weights = get_class_weights(
-                                                  subjqa_classes=subjqa_q_types,
+                                                  subjqa_classes=subjqa_a_types,
                                                   idx_to_class=idx_to_qa_types,
                                                   binary=True,
                                                   qa_type='answers',
@@ -497,9 +497,9 @@ if __name__ == '__main__':
                 )
 
                 a_type_weights = get_class_weights(
-                                                  subjqa_classes=subjqa_q_types,
+                                                  subjqa_classes=subjqa_a_types,
                                                   idx_to_class=idx_to_qa_types,
-                                                  squad_classes=squad_q_types,
+                                                  squad_classes=squad_a_types,
                                                   binary=True,
                                                   qa_type='answers',
                 )

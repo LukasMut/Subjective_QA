@@ -58,11 +58,11 @@ class BiLSTM(nn.Module):
     ):
         # TODO: figure out, whether rnn.pack_padded_sequence is useful for QA (most likely, since each batch contains padded)
         out, hidden = self.lstm(bert_outputs, hidden)
-        
+
         #seq_lengths = to_cpu(seq_lengths, detach=True)        
         #packed = nn.utils.rnn.pack_padded_sequence(bert_outputs, seq_lengths, batch_first=True)
-        #out, hidden = self.lstm(packed, hidden)
-        #out, _ = nn.utils.rnn.pad_packed_sequence(out, batch_first=True, total_length=self.max_seq_length)
+        #packed_out, hidden = self.lstm(packed, hidden)
+        #out, _ = nn.utils.rnn.pad_packed_sequence(packed_out, batch_first=True, total_length=self.max_seq_length)
         return out, hidden
     
     def init_hidden(
@@ -117,8 +117,8 @@ class BiGRU(nn.Module):
         
         #seq_lengths = to_cpu(seq_lengths, detach=True)        
         #packed = nn.utils.rnn.pack_padded_sequence(bert_outputs, seq_lengths, batch_first=True)
-        #out, hidden = self.gru(packed, hidden)
-        #out, _ = nn.utils.rnn.pad_packed_sequence(out, batch_first=True, total_length=self.max_seq_length)
+        #packed_out, hidden = self.gru(packed, hidden)
+        #out, _ = nn.utils.rnn.pad_packed_sequence(packed_out, batch_first=True, total_length=self.max_seq_length)
         return out, hidden
     
     def init_hidden(

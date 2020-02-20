@@ -206,7 +206,6 @@ def train(
     if isinstance(n_aux_tasks, int):
         
         tasks.append('Sbj_Class')
-        # loss func for auxiliary task to inform model about subjectivity (binary classification)
         assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
         print("Weights for subjective Anwers: {}".format(qa_type_weights[0]))
         print()
@@ -214,10 +213,11 @@ def train(
         print()
 
         # TODO: figure out, whether we need pos_weights for adversarial setting
+        # loss func for auxiliary task to inform model about subjectivity (binary classification)
         sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
         train_accs_sbj, train_f1s_sbj = [], []
       
-        elif n_aux_tasks == 2:
+        if n_aux_tasks == 2:
             assert isinstance(domain_weights, torch.Tensor), 'Tensor of class weights for different domains is not provided'
             # loss func for auxiliary task to inform model about different review / context domains (multi-way classification)
             domain_loss_func = nn.CrossEntropyLoss(weight=domain_weights.to(device))
@@ -379,11 +379,10 @@ def train(
                 current_sbj_acc = 0
                 current_sbj_f1 = 0
 
-                for i in range(b_sbj.size(1)):
-                  print(b_sbj.size(1))
+                for j in range(b_sbj.size(1)):
                   
-                  current_sbj_acc += accuracy(probas=torch.sigmoid(sbj_logits[:, i]), y_true=b_sbj[:, i], task='binary')  
-                  current_sbj_f1 += f1(probas=torch.sigmoid(sbj_logits[:, i]), y_true=b_sbj[:, i], task='binary')
+                  current_sbj_acc += accuracy(probas=torch.sigmoid(sbj_logits[:, j].squeeze(1)), y_true=b_sbj[:, j].squeeze(1), task='binary')  
+                  current_sbj_f1 += f1(probas=torch.sigmoid(sbj_logits[:, j].squeeze(1)), y_true=b_sbj[:, j].squeeze(1), task='binary')
 
                 batch_acc_sbj += (current_sbj_acc / b_sbj.size(1))
                 batch_f1_sbj += (current_sbj_f1 / b_sbj.size(1))
