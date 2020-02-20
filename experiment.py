@@ -37,7 +37,7 @@ if __name__ == '__main__':
     parser.add_argument('--multitask', action='store_true',
             help='If provided, MTL instead of STL setting.')
     parser.add_argument('--adversarial', type=str, default=None,
-            help='If provided, adversarial training instead of classic training. Only necessary, if MTL setting. Specify which adversarial version.')
+            help='If provided, adversarial instead of classic training. Only necessary, if MTL setting. Specify which adversarial version.')
     parser.add_argument('--n_aux_tasks', type=int, default=None,
             help='Define number of auxiliary tasks QA model should perform during training. Only necessary, if MTL setting.')
     parser.add_argument('--encoder', action='store_true',
@@ -57,10 +57,10 @@ if __name__ == '__main__':
     parser.add_argument('--sd', type=str, default='saved_models',
             help='Set model save directory for QA model.')
     parser.add_argument('--not_finetuned', action='store_true',
-            help='If provided, test pre-trained BERT large model on SubjQA (no prior task-specific fine-tuning); only possible in test version.')
+            help='If provided, test pre-trained DistilBERT model on SubjQA (no prior task-specific fine-tuning); only possible in test version.')
     args = parser.parse_args()
     
-    # see whether arg.parser works correctly
+    # check whether arg.parser works correctly
     print(args)
     print()
     

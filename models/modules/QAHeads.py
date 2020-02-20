@@ -153,9 +153,7 @@ class LinearQAHead(nn.Module):
                 sbj_logits_a = sbj_logits_a.squeeze(-1)
                 sbj_logits_q = sbj_logits_q.squeeze(-1)
 
-                sbj_logits = torch.stack((sbj_logits_a, sbj_logits_q), dim=1)
-
-                return sbj_logits
+                return sbj_logits_a, sbj_logits_q
 
             elif task == 'Domain_Class':
 
@@ -312,9 +310,7 @@ class RecurrentQAHead(nn.Module):
                 sbj_logits_a = sbj_logits_a.squeeze(-1)
                 sbj_logits_q = sbj_logits_q.squeeze(-1)
 
-                sbj_logits = torch.stack((sbj_logits_a, sbj_logits_q), dim=1)
-
-                return sbj_logits #, hidden_rnn
+                return sbj_logits_a, sbj_logits_q #, hidden_rnn
 
             elif task == 'Domain_Class':
 

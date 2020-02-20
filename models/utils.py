@@ -355,13 +355,15 @@ def train(
 
               if current_task == 'Sbj_Class':
 
-                sbj_logits = model(
-                                   input_ids=b_input_ids,
-                                   attention_masks=b_attn_masks,
-                                   token_type_ids=b_token_type_ids,
-                                   input_lengths=b_input_lengths,
-                                   task=current_task,
-                  )
+                sbj_logits_a, sbj_logits_q = model(
+                                                   input_ids=b_input_ids,
+                                                   attention_masks=b_attn_masks,
+                                                   token_type_ids=b_token_type_ids,
+                                                   input_lengths=b_input_lengths,
+                                                   task=current_task,
+                                                   )
+
+                sbj_logits = torch.stack((sbj_logits_a, sbj_logits_q), dim=1)
                       
                 b_sbj = b_sbj.type_as(sbj_logits)
 
@@ -426,7 +428,7 @@ def train(
             # we only want to store QA loss
             if current_task == 'QA':
               batch_losses.append(batch_loss.item())
-              
+
             batch_loss.backward()
             
             # clip gradients if gradients become larger than specified norm
@@ -500,7 +502,7 @@ def train(
             batch = tuple(t.to(device) for t in batch)
 
             # unpack inputs from dataloader            
-            b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_cls_indexes, _, _, _, _, _ = batch
+            b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_cls_indexes, _, _, _, _ = batch
 
              # if current batch_size is smaller than specified batch_size, skip batch
             if b_input_ids.size(0) != batch_size:
