@@ -43,3 +43,4 @@ data/SubjQA/trustyou/cached_train_bert-large-cased-whole-word-masking-finetuned-
 .ipynb_checkpoints/debugging-checkpoint.ipynb
 .ipynb_checkpoints/results_analysis-checkpoint.ipynb
 saved_models/distilbert_cased_linear___multitask_2_classic_subjqa
+saved_models/distilbert_cased_linear___multitask_2_simple_subjqa
