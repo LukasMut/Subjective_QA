@@ -411,7 +411,7 @@ def train(
                 batch_acc_aux = batch_acc_domain
                 batch_f1_aux = batch_f1_domain
               
-              # keep track of steps taken per task
+              # keep track of steps taken per task (don't use overall steps)
               nb_tr_steps_aux = Counter(task_order[:i+1])[current_task]
               current_batch_acc_aux = 100 * (batch_acc_aux / nb_tr_steps_aux)
               current_batch_f1_aux = 100 * (batch_f1_aux / nb_tr_steps_aux)
@@ -426,7 +426,7 @@ def train(
             batch_losses.append(batch_loss.item())
             batch_loss.backward()
             
-            # clip gradients if gradients are larger than specified norm
+            # clip gradients if gradients become larger than specified norm
             torch.nn.utils.clip_grad_norm_(model.parameters(), args["max_grad_norm"])
 
             # take step down the valley
