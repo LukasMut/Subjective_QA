@@ -212,18 +212,14 @@ def train(
         print()
         print("Weights for subjective Questions: {}".format(qa_type_weights[1]))
         print()
-        
-        if n_aux_tasks == 1:
-          # TODO: figure out, whether we need pos_weights for adversarial setting
-          sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
-          train_accs_sbj, train_f1s_sbj = [], []
-        
-        # loss func for auxiliary task to inform model about different review / context domains (multi-way classification)
+
+        # TODO: figure out, whether we need pos_weights for adversarial setting
+        sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
+        train_accs_sbj, train_f1s_sbj = [], []
+      
         elif n_aux_tasks == 2:
-            
-            sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
-            
             assert isinstance(domain_weights, torch.Tensor), 'Tensor of class weights for different domains is not provided'
+            # loss func for auxiliary task to inform model about different review / context domains (multi-way classification)
             domain_loss_func = nn.CrossEntropyLoss(weight=domain_weights.to(device))
             train_accs_domain, train_f1s_domain = [], []
             tasks.append('Domain_Class')
@@ -380,13 +376,17 @@ def train(
                 else:
                   batch_loss += sbj_loss_func(sbj_logits, b_sbj)
 
-                for i in range(b_sbj.size(1)):
-                  
-                  batch_acc_sbj += accuracy(probas=torch.sigmoid(sbj_logits[:, i]), y_true=b_sbj[:, i], task='binary')  
-                  batch_f1_sbj += f1(probas=torch.sigmoid(sbj_logits[:, i]), y_true=b_sbj[:, i], task='binary')
+                current_sbj_acc = 0
+                current_sbj_f1 = 0
 
-                batch_acc_sbj /= b_sbj.size(1)
-                batch_f1_sbj /= b_sbj.size(1)
+                for i in range(b_sbj.size(1)):
+                  print(b_sbj.size(1))
+                  
+                  current_sbj_acc += accuracy(probas=torch.sigmoid(sbj_logits[:, i]), y_true=b_sbj[:, i], task='binary')  
+                  current_sbj_f1 += f1(probas=torch.sigmoid(sbj_logits[:, i]), y_true=b_sbj[:, i], task='binary')
+
+                batch_acc_sbj += (current_sbj_acc / b_sbj.size(1))
+                batch_f1_sbj += (current_sbj_f1 / b_sbj.size(1))
 
                 batch_acc_aux = batch_acc_sbj
                 batch_f1_aux = batch_f1_sbj
