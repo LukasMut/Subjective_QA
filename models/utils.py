@@ -421,14 +421,13 @@ def train(
               print()
 
             print("------------------------------------")
-            print("----- Current {} loss: {} -----".format(current_task, round(batch_loss.item(), 3)))
+            print("----- Current {} loss: {} -----".format(current_task, abs(round(batch_loss.item(), 3))))
             print("------------------------------------")
             print()
 
-            tr_loss += batch_loss.item()
-
             # we just want to store QA losses
             if current_task == 'QA':
+              tr_loss += batch_loss.item()
               batch_losses.append(batch_loss.item())
 
             batch_loss.backward()
@@ -443,7 +442,7 @@ def train(
             if args['optim'] == 'AdamW' and not isinstance(scheduler, type(None)):
                 scheduler.step()
 
-        tr_loss /= nb_tr_steps
+        tr_loss /= task_distrib['QA'] # number of times QA task was performed during an epoch
         train_exact_match = 100 * (correct_answers / (task_distrib['QA'] * batch_size))
         train_f1 = 100 * (batch_f1 / (task_distrib['QA'] * batch_size))
 
