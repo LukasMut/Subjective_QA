@@ -658,6 +658,7 @@ def test(
                                                                                                         b_input_lengths,
                                                                                                         b_start_pos,
                                                                                                         b_end_pos,
+                                                                                                        train=False,
             )
 
         with torch.no_grad():
