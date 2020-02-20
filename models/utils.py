@@ -422,8 +422,11 @@ def train(
             print()
 
             tr_loss += batch_loss.item()
+
+            # we only want to store QA loss
             if current_task == 'QA':
               batch_losses.append(batch_loss.item())
+              
             batch_loss.backward()
             
             # clip gradients if gradients become larger than specified norm
