@@ -53,7 +53,7 @@ def reverse_sequences(batch:torch.Tensor):
     return torch.tensor(list(map(lambda feat_reps: feat_reps[::-1], batch)), dtype=torch.double).to(device)
 
 def soft_to_hard(probas:torch.Tensor):
-    return torch.tensor(list(map(lambda p: 1 if p > 0.5 else 0, to_cpu(probas, detach=True))), dtype=torch.double)
+    return torch.tensor(list(map(lambda p: 1 if p >= 0.5 else 0, to_cpu(probas, detach=True))), dtype=torch.double)
 
 def accuracy(probas:torch.Tensor, y_true:torch.Tensor, task:str):
     y_pred = soft_to_hard(probas) if task == 'binary' else torch.argmax(to_cpu(probas, to_numpy=False), dim=1) 
@@ -214,7 +214,9 @@ def train(
 
         # TODO: figure out, whether we need pos_weights for adversarial setting
         # loss func for auxiliary task to inform model about subjectivity (binary classification)
-        sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
+        
+        #sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
+        sbj_loss_func = nn.BCEWithLogitsLoss()
         train_accs_sbj, train_f1s_sbj = [], []
       
         if n_aux_tasks == 2:
@@ -246,7 +248,7 @@ def train(
         
         # gradually unfreeze layer by layer after the first epoch (no updating of BERT weights before task-specific layers haven't been trained)
         if epoch > 0 and (args['dataset'] == 'SubjQA' or args['dataset'] == 'combined'):
-            model = freeze_transformer_layers(model, unfreeze=True, l=l)
+            model = freeze_transformer_layers(model, model_name=model_name, unfreeze=True, l=l)
             print("------------------------------------------------------------------------------------------")
             print("---------- Pre-trained BERT weights of top {} transformer layers are unfrozen -----------".format(L - l ))
             print("------------------------------------------------------------------------------------------")
