@@ -170,6 +170,7 @@ def train(
           domain_weights=None,
           max_epochs:int=5,
           adversarial_simple:bool=False,
+          plot_task_distrib:bool=False,
 ):
     n_steps = len(train_dl)
     n_iters = n_steps * args['n_epochs']
@@ -178,14 +179,14 @@ def train(
     if args["freeze_bert"]:
       L = 6 # total number of transformer layers in pre-trained BERT model (L = 24 for BERT large, L = 12 for BERT base, L = 6 for DistilBERT)
       l = L - 1 #int(L * k) - 1  after training the task-specific RNN and linear output layers for one epoch, gradually unfreeze the top L - l BERT transformer layers
-      model_name = 'bert'
+      model_name = args['pretrained_model']
       model = freeze_transformer_layers(model, model_name=model_name, unfreeze=False)
       print("--------------------------------------------------")
       print("------ Pre-trained BERT weights are frozen -------")
       print("--------------------------------------------------")
       print()
         
-    # store loss and accuracy for plotting
+    # keep track of losses, accuracies and F1s for plotting
     batch_losses = []
     train_losses = []
     train_accs_qa = []
@@ -227,16 +228,18 @@ def train(
             train_accs_domain, train_f1s_domain = [], []
             tasks.append('Domain_Class')
 
-    # generate uniform random sample over all entries
+    # generate uniform random sample over all entries (for MTL setting with 2 auxiliary tasks, we might want to sample QA task with a higher probability)
     task_order = np.random.choice(tasks, size=n_steps, replace=True, p = [1/len(tasks) for _ in tasks])
     task_distrib = Counter(task_order)
-    plt.bar(tasks, [task_distrib[task] for task in tasks], alpha=0.5, edgecolor='black')
-    plt.xticks(range(len(tasks)), labels=tasks)
-    plt.xlabel('Tasks', fontsize=12)
-    plt.ylabel('Frequency per epoch', fontsize=12)
-    plt.title('Task distribution in MTL setting')
-    plt.show()
-    plt.clf()
+
+    if plot_task_distrib:
+      plt.bar(tasks, [task_distrib[task] for task in tasks], alpha=0.5, edgecolor='black')
+      plt.xticks(range(len(tasks)), labels=tasks)
+      plt.xlabel('Tasks', fontsize=12)
+      plt.ylabel('Frequency per epoch', fontsize=12)
+      plt.title('Task distribution in MTL setting')
+      plt.show()
+      plt.clf()
 
 
     for epoch in trange(args['n_epochs'],  desc="Epoch"):
@@ -345,7 +348,8 @@ def train(
               correct_answers += compute_exact_batch(true_answers, pred_answers)
               batch_f1 += compute_f1_batch(true_answers, pred_answers)
 
-              nb_tr_examples_qa = Counter(task_order[:i])[current_task] * batch_size
+              # keep track of train examples used for QA
+              nb_tr_examples_qa = Counter(task_order[:i+1])[current_task] * batch_size
 
               current_batch_f1 = 100 * (batch_f1 / nb_tr_examples_qa)
               current_batch_acc = 100 * (correct_answers / nb_tr_examples_qa)
@@ -405,6 +409,8 @@ def train(
                 batch_acc = batch_acc_domain
                 batch_f1 = batch_f1_domain
               
+              # keep track of steps taken per task
+              nb_tr_steps = Counter(task_order[:i+1])[current_task]
               current_batch_acc = 100 * (batch_acc / nb_tr_steps)
               current_batch_f1 = 100 * (batch_f1 / nb_tr_steps)
 
@@ -507,6 +513,7 @@ def train(
                                                                                                             train=False,
                 )
             
+            # we evaluate the model on the main task only (i.e., QA)
             with torch.no_grad():
 
                 ans_logits_val = model(

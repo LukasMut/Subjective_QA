@@ -55,9 +55,10 @@ class LinearQAHead(nn.Module):
 
         # fully-connected QA output layer with dropout
         self.fc_qa = nn.Linear(self.in_size, self.n_labels)
-        self.qa_dropout = nn.Dropout(self.qa_dropout_p)
+        self.qa_dropout = nn.Dropout(p = self.qa_dropout_p)
         
         if self.multitask:
+
             # define, whether we want to perform adversarial training with a GRL between feature extractor and classifiers
             self.adversarial = adversarial
 

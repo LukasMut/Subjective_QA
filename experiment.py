@@ -532,6 +532,7 @@ if __name__ == '__main__':
 
         hypers["n_epochs"] = args.n_epochs
         hypers["freeze_bert"] = True
+        hypers["pretrained_model"] = 'distilbert' #OR 'bert'
         hypers["optim"] = args.optim
         hypers["model_dir"] = args.sd
         hypers["model_name"] = model_name
