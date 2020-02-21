@@ -13,7 +13,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from collections import Counter, defaultdict
-from torch.optim import Adam, SGD
 from transformers import DistilBertTokenizer, DistilBertModel, DistilBertForQuestionAnswering
 from transformers import AdamW
 from transformers import get_cosine_with_hard_restarts_schedule_with_warmup, get_linear_schedule_with_warmup
@@ -523,9 +522,8 @@ if __name__ == '__main__':
         model.to(device)
 
         hypers = {
-                  "lr_adam": 1e-3,
-                  "lr_sgd": 1e-2,
-                  "warmup_steps": 100,
+                  "lr_adam": 5e-5,
+                  "warmup_steps": 0,
                   "max_grad_norm": 5,
                   "sort_batch": False, # TODO: figure out, whether we should sort batch for RNNs (not necessary for linear output layers)
         }
@@ -544,7 +542,7 @@ if __name__ == '__main__':
             optimizer = AdamW(
                               model.parameters(), 
                               lr=hypers['lr_adam'], 
-                              correct_bias=False,
+                              correct_bias=True,
             )
             
             t_total = len(train_dl) * hypers['n_epochs'] # total number of training steps (i.e., step = iteration)

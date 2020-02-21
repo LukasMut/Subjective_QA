@@ -179,7 +179,8 @@ def train(
     
     if args["freeze_bert"]:
       L = 6 # total number of transformer layers in pre-trained BERT model (L = 24 for BERT large, L = 12 for BERT base, L = 6 for DistilBERT)
-      l = int(L / 2) # after training the task-specific (RNN and) linear output layers for one epoch, gradually unfreeze the top L - l BERT transformer layers
+      k = int(L / (args['n_epochs'] - 1))
+      l = L - k # after training the task-specific (RNN and) linear output layers for one epoch, gradually unfreeze the top L - l BERT transformer layers
       model_name = args['pretrained_model']
       model = freeze_transformer_layers(model, model_name=model_name, unfreeze=False)
       print("--------------------------------------------------")
@@ -255,7 +256,7 @@ def train(
             print("---------- Pre-trained BERT weights of top {} transformer layers are unfrozen -----------".format(L - l ))
             print("-------------------------------------------------------------------------------------------")
             print()
-            l -= l
+            l -= k
 
         if isinstance(n_aux_tasks, int):
           batch_acc_sbj, batch_f1_sbj = 0, 0
