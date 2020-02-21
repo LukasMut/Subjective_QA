@@ -587,10 +587,11 @@ def train(
         print("----- Val F1: {} % -----".format(round(val_f1, 3)))
         print("----------------------------------")
         print()
-        
-        if epoch == 0 or val_exact_match > val_accs[-1]:
+
+
+        if epoch == 0 or (val_exact_match > val_accs[-1] and val_f1 > val_f1s[-1]):
             torch.save(model.state_dict(), model_path + '/%s' % (args['model_name']))
-        
+                
         val_losses.append(val_loss)
         val_accs.append(val_exact_match)
         val_f1s.append(val_f1)
@@ -601,6 +602,7 @@ def train(
                 print("----- Early stopping after {} epochs -----".format(epoch + 1))
                 print("------------------------------------------")
                 break
+
     
     if isinstance(n_aux_tasks, type(None)):
       return batch_losses, train_losses, train_accs_qa, train_f1s_qa, val_losses, val_accs, val_f1s, model
