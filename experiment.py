@@ -100,13 +100,7 @@ if __name__ == '__main__':
     
     # NOTE: we use pretrained weights from a cased model since both BERT and DistilBERT cased models perform significantly better on SQuAD than uncased versions        
     bert_tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-cased')
-    pretrained_weights = 'distilbert-base-cased-distilled-squad'
-        
-    #elif args.bert_weights == 'uncased':   
-    #    bert_tokenizer == DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
-    #    pretrained_weights = 'distilbert-base-uncased-distilled-squad'
-    #else:
-    #    raise ValueError('Pretrained weights must be loaded from an uncased or cased BERT model.')
+    pretrained_weights = 'distilbert-base-cased-distilled-squad' # 'distilbert-base-cased' #
 
     dataset = args.finetuning
     encoding = 'recurrent' if args.encoder else 'linear'
@@ -119,7 +113,7 @@ if __name__ == '__main__':
     else:
         training = args.adversarial if args.adversarial == 'GRL' else 'adv' + args.adversarial
 
-    model_name = 'DistilBERT' + '_' + args.bert_weights + '_' + encoding + '_' + highway + '_' + decoder + '_' + train_method + '_' + training + '_' + dataset
+    model_name = 'DistilBERT' + '_' + encoding + '_' + highway + '_' + decoder + '_' + train_method + '_' + training + '_' + dataset
     model_name = model_name.lower()
     
     if args.version == 'train':

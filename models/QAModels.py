@@ -41,6 +41,8 @@ class DistilBertForQA(DistilBertPreTrainedModel):
         self.adversarial = adversarial
         self.n_aux_tasks = n_aux_tasks
         self.n_domain_labels = n_domain_labels
+
+        print(config.qa_dropout)
         
         if self.multitask: assert isinstance(self.n_aux_tasks, int), "If MTL setting, number of auxiliary tasks must be defined"
         
