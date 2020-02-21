@@ -169,7 +169,7 @@ def train(
           n_aux_tasks=None,
           qa_type_weights=None,
           domain_weights=None,
-          max_epochs:int=4,
+          max_epochs:int=3,
           adversarial_simple:bool=False,
           plot_task_distrib:bool=False,
 ):
@@ -179,7 +179,7 @@ def train(
     
     if args["freeze_bert"]:
       L = 6 # total number of transformer layers in pre-trained BERT model (L = 24 for BERT large, L = 12 for BERT base, L = 6 for DistilBERT)
-      l = L - 3 # after training the task-specific (RNN and) linear output layers for one epoch, gradually unfreeze the top L - l BERT transformer layers
+      l = int(L / 2) # after training the task-specific (RNN and) linear output layers for one epoch, gradually unfreeze the top L - l BERT transformer layers
       model_name = args['pretrained_model']
       model = freeze_transformer_layers(model, model_name=model_name, unfreeze=False)
       print("--------------------------------------------------")
