@@ -178,7 +178,7 @@ def train(
     n_examples = n_steps * batch_size
     
     if args["freeze_bert"]:
-      L = 6 # total number of transformer layers in pre-trained BERT model (L = 24 for BERT large, L = 12 for BERT base, L = 6 for DistilBERT)
+      L = 6 # total number of transformer layers in pre-trained BERT model (L = 12 for BERT base, L = 6 for DistilBERT)
       k = int(L / (args['n_epochs'] - 1))
       l = L - k # after training the task-specific (RNN and) linear output layers for one epoch, gradually unfreeze the top L - l BERT transformer layers
       model_name = args['pretrained_model']

@@ -45,8 +45,8 @@ if __name__ == '__main__':
             help='If provided, put Highway connection in between BERT OR BiLSTM encoder and fc linear output head.')
     parser.add_argument('--decoder', action='store_true',
             help='If provided, put BiLSTM or BiGRU in between Highway bridge and fc linear output layers; requires BiLSTM-Encoder and Highway bridge.')
-    parser.add_argument('--bert_weights', type=str, default='cased',
-            help='If cased, load pre-trained weights from BERT cased model; if uncased, load pre-trained weights from BERT uncased model.')
+    #parser.add_argument('--bert_weights', type=str, default='cased',
+    #        help='If cased, load pre-trained weights from DistilBERT cased model; if uncased, load pre-trained weights from DistilBERT uncased model.')
     parser.add_argument('--batch_size', type=int, default=32,
             help='Define mini-batch size.')
     parser.add_argument('--n_epochs', type=int, default=3,
@@ -98,19 +98,15 @@ if __name__ == '__main__':
 
     n_domain_labels = None if args.finetuning == 'SQuAD' else len(domains)
     
-    # TODO: figure out, whether we should use pretrained weights from 'bert-base-cased' or 'bert-base-uncased' model
-    if args.bert_weights == 'cased':
+    # NOTE: we use pretrained weights from a cased model since both BERT and DistilBERT cased models perform significantly better on SQuAD than uncased versions        
+    bert_tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-cased')
+    pretrained_weights = 'distilbert-base-cased-distilled-squad'
         
-        bert_tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-cased')
-        pretrained_weights = 'distilbert-base-cased-distilled-squad'
-        
-    elif args.bert_weights == 'uncased':
-        
-        bert_tokenizer == DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
-        pretrained_weights = 'distilbert-base-uncased-distilled-squad'
-        
-    else:
-        raise ValueError('Pretrained weights must be loaded from an uncased or cased BERT model.')
+    #elif args.bert_weights == 'uncased':   
+    #    bert_tokenizer == DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
+    #    pretrained_weights = 'distilbert-base-uncased-distilled-squad'
+    #else:
+    #    raise ValueError('Pretrained weights must be loaded from an uncased or cased BERT model.')
 
     dataset = args.finetuning
     encoding = 'recurrent' if args.encoder else 'linear'
