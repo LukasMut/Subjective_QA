@@ -180,13 +180,14 @@ def train(
     
     if args["freeze_bert"]:
       k = int(L / (args['n_epochs'] - 1))
-      l = L - k # after training the task-specific (RNN and) linear output layers for one epoch, gradually unfreeze the top L - l BERT transformer layers
+      l = L - k
       model_name = args['pretrained_model']
       model = freeze_transformer_layers(model, model_name=model_name, unfreeze=False)
       print("--------------------------------------------------")
       print("------ Pre-trained BERT weights are frozen -------")
       print("--------------------------------------------------")
       print()
+
     else:
       model = freeze_transformer_layers(model, model_name=model_name, unfreeze=False)
       model =  freeze_transformer_layers(model, model_name=model_name, unfreeze=True, l= L/2)
@@ -258,7 +259,7 @@ def train(
         model.train()
         
         """
-        # NOTE: for now, don't use this step
+        ## NOTE: for now, we don't use this step ##
         if args["freeze_bert"]:
           # gradually unfreeze layer by layer after the first epoch (no updating of BERT weights before task-specific layers haven't been trained)
           if epoch > 0 and (args['dataset'] == 'SubjQA' or args['dataset'] == 'combined'):
