@@ -253,8 +253,6 @@ def train(
             model = freeze_transformer_layers(model, model_name=model_name, unfreeze=True, l=l)
             print("------------------------------------------------------------------------------------------")
             print("---------- Pre-trained BERT weights of top {} transformer layers are unfrozen -----------".format(L - l ))
-            print("------------------------------------------------------------------------------------------")
-            print("---------------------- Entire model will be trained for single epoch ----------------------")
             print("-------------------------------------------------------------------------------------------")
             print()
             l -= 1
@@ -597,13 +595,12 @@ def train(
         val_accs.append(val_exact_match)
         val_f1s.append(val_f1)
         
-        if args['dataset'] == 'SQuAD':
-          if epoch > 0 and early_stopping:
-              if (val_f1s[-2] > val_f1s[-1]) and (val_accs[-2] > val_accs[-1]):
-                  print("------------------------------------------")
-                  print("----- Early stopping after {} epochs -----".format(epoch + 1))
-                  print("------------------------------------------")
-                  break
+        if epoch > 0 and early_stopping:
+            if (val_f1s[-2] > val_f1s[-1]) and (val_accs[-2] > val_accs[-1]):
+                print("------------------------------------------")
+                print("----- Early stopping after {} epochs -----".format(epoch + 1))
+                print("------------------------------------------")
+                break
     
     if isinstance(n_aux_tasks, type(None)):
       return batch_losses, train_losses, train_accs_qa, train_f1s_qa, val_losses, val_accs, val_f1s, model

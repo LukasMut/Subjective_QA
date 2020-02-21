@@ -122,7 +122,7 @@ if __name__ == '__main__':
     if isinstance(args.adversarial, type(None)):
         training = 'classic'
     else:
-        training = args.adversarial
+        training = args.adversarial if args.adversarial == 'GRL' else 'adv' + args.adversarial
 
     model_name = 'DistilBERT' + '_' + args.bert_weights + '_' + encoding + '_' + highway + '_' + decoder + '_' + train_method + '_' + training + '_' + dataset
     model_name = model_name.lower()
