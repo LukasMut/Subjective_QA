@@ -71,6 +71,7 @@ if __name__ == '__main__':
     doc_stride = 200
     max_query_length = 100
     batch_size = args.batch_size
+    freeze_bert = False
     
     # create list of all review / paragraph domains in dataset(s)
     domains = ['books', 'tripadvisor', 'grocery', 'electronics', 'movies', 'restaurants', 'wikipedia']
@@ -100,7 +101,7 @@ if __name__ == '__main__':
     
     # NOTE: we use pretrained weights from a cased model since both BERT and DistilBERT cased models perform significantly better on SQuAD than uncased versions        
     bert_tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-cased')
-    pretrained_weights = 'distilbert-base-cased-distilled-squad' # 'distilbert-base-cased' #
+    pretrained_weights = 'distilbert-base-cased' #'distilbert-base-cased-distilled-squad'
 
     dataset = args.finetuning
     encoding = 'recurrent' if args.encoder else 'linear'
@@ -519,7 +520,7 @@ if __name__ == '__main__':
         }
 
         hypers["n_epochs"] = args.n_epochs
-        hypers["freeze_bert"] = True
+        hypers["freeze_bert"] = freeze_bert
         hypers["pretrained_model"] = 'distilbert' #OR 'bert'
         hypers["optim"] = args.optim
         hypers["model_dir"] = args.sd

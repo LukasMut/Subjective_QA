@@ -249,14 +249,15 @@ def train(
 
         model.train()
         
-        # gradually unfreeze layer by layer after the first epoch (no updating of BERT weights before task-specific layers haven't been trained)
-        if epoch > 0 and (args['dataset'] == 'SubjQA' or args['dataset'] == 'combined'):
-            model = freeze_transformer_layers(model, model_name=model_name, unfreeze=True, l=l)
-            print("------------------------------------------------------------------------------------------")
-            print("---------- Pre-trained BERT weights of top {} transformer layers are unfrozen -----------".format(L - l ))
-            print("-------------------------------------------------------------------------------------------")
-            print()
-            l -= k
+        if args["freeze_bert"]:
+          # gradually unfreeze layer by layer after the first epoch (no updating of BERT weights before task-specific layers haven't been trained)
+          if epoch > 0 and (args['dataset'] == 'SubjQA' or args['dataset'] == 'combined'):
+              model = freeze_transformer_layers(model, model_name=model_name, unfreeze=True, l=l)
+              print("------------------------------------------------------------------------------------------")
+              print("---------- Pre-trained BERT weights of top {} transformer layers are unfrozen -----------".format(L - l ))
+              print("-------------------------------------------------------------------------------------------")
+              print()
+              l -= k
 
         if isinstance(n_aux_tasks, int):
           batch_acc_sbj, batch_f1_sbj = 0, 0

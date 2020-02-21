@@ -42,15 +42,13 @@ class DistilBertForQA(DistilBertPreTrainedModel):
         self.n_aux_tasks = n_aux_tasks
         self.n_domain_labels = n_domain_labels
 
-        print(config.qa_dropout)
-        
         if self.multitask: assert isinstance(self.n_aux_tasks, int), "If MTL setting, number of auxiliary tasks must be defined"
         
         if self.encoder:
             self.qa_head = RecurrentQAHead(
                                            in_size=config.dim,
-                                           n_labels_qa=config.num_labels,
-                                           qa_dropout_p=config.qa_dropout,
+                                           n_labels_qa=2, #config.num_labels,
+                                           qa_dropout_p=0.1, #config.qa_dropout,
                                            max_seq_length=self.max_seq_length,
                                            highway_block=self.highway_connection,
                                            multitask=self.multitask,
@@ -62,8 +60,8 @@ class DistilBertForQA(DistilBertPreTrainedModel):
         else:
             self.qa_head = LinearQAHead(
                                         in_size=config.dim,
-                                        n_labels_qa=config.num_labels,
-                                        qa_dropout_p=config.qa_dropout,
+                                        n_labels_qa=2, #config.num_labels,
+                                        qa_dropout_p=0.1, #config.qa_dropout,
                                         highway_block=self.highway_connection,
                                         multitask=self.multitask,
                                         n_aux_tasks=self.n_aux_tasks,
