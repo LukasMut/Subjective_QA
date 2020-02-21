@@ -176,9 +176,9 @@ def train(
     n_steps = len(train_dl)
     n_iters = n_steps * args['n_epochs']
     n_examples = n_steps * batch_size
+    L = 6 # total number of transformer layers in pre-trained BERT model (L = 12 for BERT base, L = 6 for DistilBERT)
     
     if args["freeze_bert"]:
-      L = 6 # total number of transformer layers in pre-trained BERT model (L = 12 for BERT base, L = 6 for DistilBERT)
       k = int(L / (args['n_epochs'] - 1))
       l = L - k # after training the task-specific (RNN and) linear output layers for one epoch, gradually unfreeze the top L - l BERT transformer layers
       model_name = args['pretrained_model']
@@ -187,6 +187,14 @@ def train(
       print("------ Pre-trained BERT weights are frozen -------")
       print("--------------------------------------------------")
       print()
+    else:
+      model = freeze_transformer_layers(model, model_name=model_name, unfreeze=False)
+      model =  freeze_transformer_layers(model, model_name=model_name, unfreeze=True, l= L/2)
+      print("------------------------------------------------------------------------------------------")
+      print("---------- Pre-trained BERT weights of bottom {} transformer layers are frozen -----------".format(L/2))
+      print("-------------------------------------------------------------------------------------------")
+      print()
+
         
     # keep track of losses, accuracies and F1s for plotting
     batch_losses = []
