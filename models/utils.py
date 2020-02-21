@@ -675,6 +675,7 @@ def test(
                                                          attention_masks=b_attn_masks,
                                                          token_type_ids=b_token_type_ids,
                                                          input_lengths=b_input_lengths,
+                                                         task='QA',
                 )
 
             start_true_test = to_cpu(b_start_pos)
