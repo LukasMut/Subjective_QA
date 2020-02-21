@@ -50,7 +50,7 @@ if __name__ == '__main__':
             help='If cased, load pre-trained weights from BERT cased model; if uncased, load pre-trained weights from BERT uncased model.')
     parser.add_argument('--batch_size', type=int, default=32,
             help='Define mini-batch size.')
-    parser.add_argument('--n_epochs', type=int, default=5,
+    parser.add_argument('--n_epochs', type=int, default=3,
             help='Set number of epochs model should be fine-tuned for. If we fine-tune on SubjQA or combined, an additional epoch will be added.')
     parser.add_argument('--optim', type=str, default='AdamW',
             help='Define optimizer. Must be one of {AdamW, Adam}.')
@@ -691,11 +691,15 @@ if __name__ == '__main__':
                 model.to(device)
             else:
                 model = DistilBertForQA.from_pretrained(
-                                                  pretrained_weights,
-                                                  max_seq_length = max_seq_length,
-                                                  encoder = True if encoding == 'recurrent' else False,
-                                                  highway_connection = args.highway_connection,
-                                                  decoder = args.decoder,
+                                                        pretrained_weights,
+                                                        max_seq_length = max_seq_length,
+                                                        encoder = True if encoding == 'recurrent' else False,
+                                                        highway_connection = args.highway_connection,
+                                                        decoder = args.decoder,
+                                                        multitask = args.multitask,
+                                                        adversarial = True if args.adversarial == 'GRL' else False,
+                                                        n_aux_tasks = args.n_aux_tasks,
+                                                        n_domain_labels = n_domain_labels,
                 )
                 # load fine-tuned model
                 model.load_state_dict(torch.load(args.sd + '/%s' % (model_name)))

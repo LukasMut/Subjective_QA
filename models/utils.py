@@ -169,7 +169,7 @@ def train(
           n_aux_tasks=None,
           qa_type_weights=None,
           domain_weights=None,
-          max_epochs:int=5,
+          max_epochs:int=4,
           adversarial_simple:bool=False,
           plot_task_distrib:bool=False,
 ):
