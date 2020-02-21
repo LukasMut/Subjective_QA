@@ -45,8 +45,8 @@ if __name__ == '__main__':
             help='If provided, put Highway connection in between BERT OR BiLSTM encoder and fc linear output head.')
     parser.add_argument('--decoder', action='store_true',
             help='If provided, put BiLSTM or BiGRU in between Highway bridge and fc linear output layers; requires BiLSTM-Encoder and Highway bridge.')
-    #parser.add_argument('--bert_weights', type=str, default='cased',
-    #        help='If cased, load pre-trained weights from DistilBERT cased model; if uncased, load pre-trained weights from DistilBERT uncased model.')
+    parser.add_argument('--bert_weights', type=str, default='not_finetuned',
+            help='If finetuned, load pre-trained weights from DistilBERT model fine-tuned on SQuAD; else, load pre-trained weights from DistilBERT base model.')
     parser.add_argument('--batch_size', type=int, default=32,
             help='Define mini-batch size.')
     parser.add_argument('--n_epochs', type=int, default=3,
@@ -71,7 +71,7 @@ if __name__ == '__main__':
     doc_stride = 200
     max_query_length = 100
     batch_size = args.batch_size
-    freeze_bert = False
+    
     
     # create list of all review / paragraph domains in dataset(s)
     domains = ['books', 'tripadvisor', 'grocery', 'electronics', 'movies', 'restaurants', 'wikipedia']
@@ -99,9 +99,16 @@ if __name__ == '__main__':
 
     n_domain_labels = None if args.finetuning == 'SQuAD' else len(domains)
     
-    # NOTE: we use pretrained weights from a cased model since both BERT and DistilBERT cased models perform significantly better on SQuAD than uncased versions        
+    # NOTE: we use cased model since both BERT and DistilBERT cased models perform significantly better on SQuAD than uncased versions     
     bert_tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-cased')
-    pretrained_weights = 'distilbert-base-cased' #'distilbert-base-cased-distilled-squad'
+    
+    if args.bert_weights == 'not_finetuned':
+        pretrained_weights = 'distilbert-base-cased'
+        freeze_bert = False
+
+    elif args.bert_weights == 'finetuned':
+        pretrained_weights = 'distilbert-base-cased-distilled-squad'
+        freeze_bert = True
 
     dataset = args.finetuning
     encoding = 'recurrent' if args.encoder else 'linear'

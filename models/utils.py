@@ -249,6 +249,8 @@ def train(
 
         model.train()
         
+        """
+        # NOTE: for now, don't use this step
         if args["freeze_bert"]:
           # gradually unfreeze layer by layer after the first epoch (no updating of BERT weights before task-specific layers haven't been trained)
           if epoch > 0 and (args['dataset'] == 'SubjQA' or args['dataset'] == 'combined'):
@@ -258,6 +260,7 @@ def train(
               print("-------------------------------------------------------------------------------------------")
               print()
               l -= k
+        """
 
         if isinstance(n_aux_tasks, int):
           batch_acc_sbj, batch_f1_sbj = 0, 0
