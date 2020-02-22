@@ -188,6 +188,7 @@ def train(
       print("--------------------------------------------------")
       print()
 
+    """
     else:
       model = freeze_transformer_layers(model, model_name=model_name, unfreeze=False)
       model =  freeze_transformer_layers(model, model_name=model_name, unfreeze=True, l= L/2)
@@ -195,7 +196,7 @@ def train(
       print("---------- Pre-trained BERT weights of bottom {} transformer layers are frozen -----------".format(L/2))
       print("-------------------------------------------------------------------------------------------")
       print()
-
+    """
         
     # keep track of losses, accuracies and F1s for plotting
     batch_losses = []

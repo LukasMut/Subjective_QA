@@ -47,7 +47,7 @@ if __name__ == '__main__':
             help='If provided, put BiLSTM or BiGRU in between Highway bridge and fc linear output layers; requires BiLSTM-Encoder and Highway bridge.')
     parser.add_argument('--bert_weights', type=str, default='not_finetuned',
             help='If finetuned, load pre-trained weights from DistilBERT model fine-tuned on SQuAD; else, load pre-trained weights from DistilBERT base model.')
-    parser.add_argument('--batch_size', type=int, default=32,
+    parser.add_argument('--batch_size', type=int, default=16,
             help='Define mini-batch size.')
     parser.add_argument('--n_epochs', type=int, default=3,
             help='Set number of epochs model should be fine-tuned for. If we fine-tune on SubjQA or combined, an additional epoch will be added.')
