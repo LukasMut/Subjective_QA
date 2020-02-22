@@ -106,7 +106,7 @@ if __name__ == '__main__':
         pretrained_weights = 'distilbert-base-cased'
         freeze_bert = False
 
-    elif args.bert_weights == 'finetuned':
+    else:
         pretrained_weights = 'distilbert-base-cased-distilled-squad'
         freeze_bert = True
 
