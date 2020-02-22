@@ -11,7 +11,6 @@ __all__ = [
            'idx_to_class',
            'class_to_idx',
            'BatchGenerator',
-           'create_batches',
            'split_into_train_and_dev',
            'sort_dict', 
            'compute_doc_lengths', 
@@ -740,44 +739,33 @@ def create_tensor_dataset(
         all_segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
         all_input_lengths = torch.tensor([f.input_length for f in features], dtype=torch.long)
         all_cls_index = torch.tensor([f.cls_index for f in features], dtype=torch.long)
-        all_p_mask = torch.tensor([f.p_mask for f in features], dtype=torch.float)
+        all_p_mask = torch.tensor([f.p_mask for f in features], dtype=torch.float)        
         
+        # QA labels
+        all_start_positions = torch.tensor([f.start_position for f in features], dtype=torch.long)
+        all_end_positions = torch.tensor([f.end_position for f in features], dtype=torch.long)
+
+        # auxiliary task labels
         all_q_sbj = torch.tensor([f.q_sbj for f in features], dtype=torch.long)
         all_a_sbj = torch.tensor([f.a_sbj for f in features], dtype=torch.long)
-
         all_sbj = torch.stack((all_a_sbj, all_q_sbj), dim=1)
-
         all_domains = torch.tensor([f.domain for f in features], dtype=torch.long)
         all_datasets = torch.tensor([f.dataset for f in features], dtype=torch.long)
-        all_example_index = torch.arange(all_input_ids.size(0), dtype=torch.long)
-        
-        if evaluate:
-            dataset = TensorDataset(
-                                    all_input_ids, 
-                                    all_input_mask, 
-                                    all_segment_ids, 
-                                    all_example_index, 
-                                    all_cls_index, 
-                                    all_p_mask,
-            )
-        else:
-            all_start_positions = torch.tensor([f.start_position for f in features], dtype=torch.long)
-            all_end_positions = torch.tensor([f.end_position for f in features], dtype=torch.long)
-            
-            dataset = TensorDataset(
-                                    all_input_ids,
-                                    all_input_mask,
-                                    all_segment_ids,
-                                    all_input_lengths,
-                                    all_start_positions,
-                                    all_end_positions,
-                                    all_cls_index,
-                                    all_p_mask,
-                                    all_sbj,
-                                    all_domains,
-                                    all_datasets,
-            )
 
+          
+        dataset = TensorDataset(
+                                all_input_ids,
+                                all_input_mask,
+                                all_segment_ids,
+                                all_input_lengths,
+                                all_start_positions,
+                                all_end_positions,
+                                all_cls_index,
+                                all_p_mask,
+                                all_sbj,
+                                all_domains,
+                                all_datasets,
+            )
         return dataset
 
     
@@ -825,78 +813,45 @@ def get_class_weights(
 def idx_to_class(classes:list): return dict(enumerate(classes))
 def class_to_idx(classes:list): return {c: i for i, c in enumerate(classes)}
 
-## Generator of batches from SQuAD AND SubjQA (each batch consists of n = batch_size examples from SQuAD XOR SubjQA) ##
 
 class BatchGenerator(object):
     
     def __init__(
                  self,
-                 ds:torch.Tensor,
+                 dataset:torch.Tensor,
                  batch_size:int,
                  sort_batch:bool=False,
-                 split:str='train',
     ):
-        self.ds = ds
+        self.dataset = dataset
         self.batch_size = batch_size
-        self.n_batches = len(ds) // batch_size
+        self.n_batches = len(dataset) // batch_size
         self.sort_batch = sort_batch
-        self.split = split
     
     def __len__(self):
         return self.n_batches
     
     def __iter__(self):
-        return create_batches_custom(self.ds, self.batch_size, self.n_batches, self.sort_batch, self.split)
+        return create_batches(self.dataset, self.batch_size, self.n_batches, self.sort_batch)
 
-def create_batches_custom(
-                   ds:torch.Tensor,
+def create_batches(
+                   dataset:torch.Tensor,
                    batch_size:int,
                    n_batches:int,
                    sort_batch:bool=False,
-                   split:str='train',
 ):
-    n_examples = len(ds)
-    
-    print(ds[:10])
-    if split == 'train':
-        ds = ds[torch.randperm(ds.size()[0])]
-        # ds = np.random.shuffle(ds)
-        print(ds[:10])
-        raise Exception
-    
+    n_examples = len(dataset)
     idx = 0
     for _ in range(n_examples // batch_size):
-        batch = ds[idx: idx + batch_size]
+        batch = dataset[idx: idx + batch_size]
+        idx += batch_size
         
         if sort_batch:
-            sorted_idx, _ = zip(*sorted(enumerate(ds[0]), key=lambda seq: len(seq[1][seq[1] != 0]), reverse=True))
-            batch = batch[sorted_idx]
+            seq_length_pos = 3
+            sorted_indices, _ = zip(*sorted(enumerate(batch[seq_length_pos]), key=lambda seq_lengths: seq_lengths[1], reverse=True))
+            sorted_indices = np.array(sorted_indices)
+            batch = tuple(el[sorted_indices] for el in batch)
         
-        idx += batch_size
         yield batch
-
-# create batches for SQuAD OR SubjQA separately
-def create_batches(
-                   dataset:torch.Tensor, 
-                   batch_size:int,
-                   split:str='train', 
-):
-    if split == 'train':
-       # during training randomly sample examples
-        sampler = RandomSampler(
-                                dataset,
-                                replacement=False,
-        )
-    elif split == 'eval':
-        # during testing sequentially sample examples from the test set (alwas present in the same order)
-        sampler = SequentialSampler(dataset)
-    dl = DataLoader(
-                    dataset,
-                    sampler=sampler,
-                    batch_size=batch_size,
-    )
-    return dl
-
 
 ## Helper functions to compute descriptive statistics ##
 

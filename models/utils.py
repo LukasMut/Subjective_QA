@@ -2,12 +2,12 @@ __all__ = [
            'accuracy',
            'f1',
            'freeze_transformer_layers',
-           'sort_batch',
            'get_answers',
            'compute_exact_batch',
            'compute_f1_batch',
            'to_cpu',
            'train',
+           'val',
            'test',
 ]
 
@@ -34,19 +34,7 @@ np.random.seed(42)
 random.seed(42)
 torch.manual_seed(42)
 
-
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-"""
-is_cuda = torch.cuda.is_available()
-
-if is_cuda:
-    device = torch.device("cuda")
-    print("GPU is available")
-else:
-    device = torch.device("cpu")
-    print("GPU not available, CPU used")
-"""
 
 # NOTE: in case, we want to use a unidirectional LSTM (or GRU) instead of a BiLSTM
 # BERT feature representation sequences have to be reversed (special [CLS] token corresponds to semantic representation of sentence)
@@ -94,27 +82,6 @@ def freeze_transformer_layers(
                 p.requires_grad = False
                 
     return model
-
-# sort sequences in decreasing order w.r.t. to orig. sequence length
-def sort_batch(
-               input_ids:torch.Tensor,
-               attn_masks:torch.Tensor,
-               token_type_ids:torch.Tensor,
-               input_lengths:torch.Tensor,
-               start_pos:torch.Tensor,
-               end_pos:torch.Tensor,
-               qa_sbj=None,
-               domains=None,
-               PAD_token:int=0,
-               train:bool=True,
-):
-    indices, input_ids = zip(*sorted(enumerate(to_cpu(input_ids)), key=lambda seq: len(seq[1][seq[1] != PAD_token]), reverse=True))
-    indices = np.array(indices) if isinstance(indices, list) else np.array(list(indices))
-    input_ids = torch.tensor(np.array(list(input_ids)), dtype=torch.long).to(device)
-    if train:
-      return input_ids, attn_masks[indices], token_type_ids[indices], input_lengths[indices], start_pos[indices], end_pos[indices], qa_sbj[indices], domains[indices]
-    else:
-      return input_ids, attn_masks[indices], token_type_ids[indices], input_lengths[indices], start_pos[indices], end_pos[indices]
 
 def get_answers(
                 tokenizer,
@@ -176,7 +143,8 @@ def train(
     n_steps = len(train_dl)
     n_iters = n_steps * args['n_epochs']
     n_examples = n_steps * batch_size
-    L = 6 # total number of transformer layers in pre-trained BERT model (L = 12 for BERT base, L = 6 for DistilBERT)
+    steps_until_eval = n_steps // args['n_evals_per_epoch'] # number of steps between validations
+    L = 6 # total number of transformer layers in pre-trained DistilBERT model (L = 12 for BERT base, L = 6 for DistilBERT base)
     
     if args["freeze_bert"]:
       k = int(L / (args['n_epochs'] - 1))
@@ -187,22 +155,11 @@ def train(
       print("------ Pre-trained BERT weights are frozen -------")
       print("--------------------------------------------------")
       print()
-
-    """
-    else:
-      model = freeze_transformer_layers(model, model_name=model_name, unfreeze=False)
-      model =  freeze_transformer_layers(model, model_name=model_name, unfreeze=True, l= L/2)
-      print("------------------------------------------------------------------------------------------")
-      print("---------- Pre-trained BERT weights of bottom {} transformer layers are frozen -----------".format(L/2))
-      print("-------------------------------------------------------------------------------------------")
-      print()
-    """
         
-    # keep track of losses, accuracies and F1s for plotting
+    # keep track of batch losses, accuracies and F1s for plotting
     batch_losses = []
-    train_losses = []
-    train_accs_qa = []
-    train_f1s_qa = []
+    batch_accs_qa = []
+    batch_f1s_qa = []
     val_losses = []
     val_accs = []
     val_f1s = []
@@ -228,15 +185,15 @@ def train(
         # loss func for auxiliary task to inform model about subjectivity (binary classification)
         
         # NOTE: pos_weight does not work really well
-        #sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
-        sbj_loss_func = nn.BCEWithLogitsLoss()
-        train_accs_sbj, train_f1s_sbj = [], []
+        sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
+        #sbj_loss_func = nn.BCEWithLogitsLoss()
+        batch_accs_sbj, batch_f1s_sbj = [], []
       
         if n_aux_tasks == 2:
             assert isinstance(domain_weights, torch.Tensor), 'Tensor of class weights for different domains is not provided'
             # loss func for auxiliary task to inform model about different review / context domains (multi-way classification)
             domain_loss_func = nn.CrossEntropyLoss(weight=domain_weights.to(device))
-            train_accs_domain, train_f1s_domain = [], []
+            batch_accs_domain, batch_f1s_domain = [], []
             tasks.append('Domain_Class')
 
     # generate uniform random sample over all entries (for MTL setting with 2 auxiliary tasks, we might want to sample QA task with a higher probability)
@@ -260,7 +217,7 @@ def train(
         model.train()
         
         """
-        ## NOTE: for now, we don't use this step ##
+        ## NOTE: for now, we don't use this training regime ##
         if args["freeze_bert"]:
           # gradually unfreeze layer by layer after the first epoch (no updating of BERT weights before task-specific layers haven't been trained)
           if epoch > 0 and (args['dataset'] == 'SubjQA' or args['dataset'] == 'combined'):
@@ -292,19 +249,6 @@ def train(
 
             # unpack inputs from dataloader            
             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_cls_indexes, _, b_sbj, b_domains, _ = batch
-            
-            if args["sort_batch"]:
-                # sort sequences in batch in decreasing order w.r.t. to (original) sequence length (without [PAD] tokens)
-                b_input_ids, b_attn_masks, b_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_sbj, b_domains = sort_batch(
-                                                                                                                        b_input_ids,
-                                                                                                                        b_attn_masks,
-                                                                                                                        b_token_type_ids,
-                                                                                                                        b_input_lengths,
-                                                                                                                        b_start_pos,
-                                                                                                                        b_end_pos,
-                                                                                                                        b_sbj,
-                                                                                                                        b_domains,
-                )
             
             optimizer.zero_grad()
 
@@ -359,14 +303,17 @@ def train(
               # keep track of train examples used for QA
               nb_tr_examples_qa = Counter(task_order[:i+1])[current_task] * batch_size
 
-              current_batch_acc = 100 * (correct_answers / nb_tr_examples_qa)
-              current_batch_f1 = 100 * (batch_f1 / nb_tr_examples_qa)
+              current_batch_acc = round(100 * (correct_answers / nb_tr_examples_qa), 3)
+              current_batch_f1 = round(100 * (batch_f1 / nb_tr_examples_qa), 3)
               
               print("--------------------------------------------")
-              print("----- Current batch {} exact-match: {} % -----".format(current_task, round(current_batch_acc, 3)))
-              print("----- Current batch {} F1: {} % -----".format(current_task, round(current_batch_f1, 3)))
+              print("----- Current batch {} exact-match: {} % -----".format(current_task, current_batch_acc))
+              print("----- Current batch {} F1: {} % -----".format(current_task, current_batch_f1))
               print("--------------------------------------------")
               print()
+
+              batch_accs_qa.append(current_batch_acc)
+              batch_f1s_qa.append(current_batch_f1)
 
             else:
 
@@ -426,12 +373,20 @@ def train(
               
               # keep track of steps taken per task (don't use overall steps)
               nb_tr_steps_aux = Counter(task_order[:i+1])[current_task]
-              current_batch_acc_aux = 100 * (batch_acc_aux / nb_tr_steps_aux)
-              current_batch_f1_aux = 100 * (batch_f1_aux / nb_tr_steps_aux)
+              current_batch_acc_aux = round(100 * (batch_acc_aux / nb_tr_steps_aux), 3)
+              current_batch_f1_aux = round(100 * (batch_f1_aux / nb_tr_steps_aux), 3)
+              
+              if current_task == 'Sbj_Class':
+                batch_accs_sbj.append(current_batch_acc_aux)
+                batch_f1s_sbj.append(current_batch_f1_aux)
+              
+              elif current_task == 'Domain_Class':
+                batch_accs_domain.append(current_batch_acc_aux)
+                batch_f1s_domain.append(current_batch_f1_aux)
 
               print("--------------------------------------------")
-              print("----- Current batch {} acc: {} % -----".format(current_task, round(current_batch_acc_aux, 3)))
-              print("----- Current batch {} F1: {} % -----".format(current_task, round(current_batch_f1_aux, 3)))
+              print("----- Current batch {} acc: {} % -----".format(current_task, current_batch_acc_aux))
+              print("----- Current batch {} F1: {} % -----".format(current_task, current_batch_f1_aux))
               print("--------------------------------------------")
               print()
 
@@ -457,181 +412,176 @@ def train(
             if args['optim'] == 'AdamW' and not isinstance(scheduler, type(None)):
                 scheduler.step()
 
-        tr_loss /= task_distrib['QA'] # number of times QA task was performed during an epoch
-        train_exact_match = 100 * (correct_answers / (task_distrib['QA'] * batch_size))
-        train_f1 = 100 * (batch_f1 / (task_distrib['QA'] * batch_size))
+            if (i > 0 and i % steps_until_eval == 0):
+              val_losses, val_accs, val_f1s = val(
+                                                  model=model,
+                                                  tokenizer=tokenizer,
+                                                  val_dl=val_dl,
+                                                  current_step=i,
+                                                  epoch=epoch,
+                                                  batch_size=batch_size,
+                                                  val_losses=val_losses,
+                                                  val_accs=val_accs,
+                                                  val_f1s=val_f1s,
+                                                  )
+
+        tr_loss /= task_distrib['QA']
+        train_exact_match = round(100 * (correct_answers / (task_distrib['QA'] * batch_size)), 3)
+        train_f1 = round(100 * (batch_f1 / (task_distrib['QA'] * batch_size)), 3)
 
         print("------------------------------------")
         print("---------- EPOCH {} ----------".format(epoch + 1))
         print("----- Train loss: {} -----".format(round(tr_loss, 3)))
-        print("----- Train exact-match: {} % -----".format(round(train_exact_match, 3)))
-        print("----- Train F1: {} % -----".format(round(train_f1, 3)))
+        print("----- Train exact-match: {} % -----".format(train_exact_match))
+        print("----- Train F1: {} % -----".format(train_f1))
         print("------------------------------------")
         print()
 
         if isinstance(n_aux_tasks, int):
-           
-           train_acc_sbj = 100 * (batch_acc_sbj / task_distrib['Sbj_Class'])
-           train_f1_sbj = 100 * (batch_f1_sbj / task_distrib['Sbj_Class'])
-
-           train_accs_sbj.append(train_acc_sbj)
-           train_f1s_sbj.append(train_f1_sbj)
-
-           if n_aux_tasks == 2:
-
-              train_acc_domain = 100 * (batch_acc_domain / task_distrib['Domain_Class'])
-              train_f1_domain = 100 * (batch_f1_domain / task_distrib['Domain_Class'])
-
-              train_accs_domain.append(train_acc_domain)
-              train_f1s_domain.append(train_f1_domain)
-
-              print("------------------------------------")
-              print("----- Train domain acc: {} % -----".format(round(train_acc_domain, 3)))
-              print("----- Train domain F1: {} % -----".format(round(train_f1_domain, 3)))
-              print("------------------------------------")
-              print()
 
            print("------------------------------------")
-           print("----- Train sbj acc: {} % -----".format(round(train_acc_sbj, 3)))
-           print("----- Train sbj F1: {} % -----".format(round(train_f1_sbj, 3)))
+           print("----- Train sbj acc: {} % -----".format(batch_accs_sbj[-1]))
+           print("----- Train sbj F1: {} % -----".format(batch_f1s_sbj[-1]))
            print("------------------------------------")
            print()
 
-        train_losses.append(tr_loss)
-        train_accs_qa.append(train_exact_match)
-        train_f1s_qa.append(train_f1)
-       
-        ### Validation ###
+           if n_aux_tasks == 2:
 
-        # set model to eval mode
-        model.eval()
-        
-        correct_answers_val, batch_f1_val = 0, 0
-        val_loss = 0
-        nb_val_steps, nb_val_examples = 0, 0
-
-        for batch in val_dl:
-            
-            batch_loss_val = 0
-            
-            # add batch to current device
-            batch = tuple(t.to(device) for t in batch)
-
-            # unpack inputs from dataloader            
-            b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_cls_indexes, _, _, _, _ = batch
-
-             # if current batch_size is smaller than specified batch_size, skip batch
-            if b_input_ids.size(0) != batch_size:
-                continue
-            
-            if args["sort_batch"]:
-                # sort sequences in batch in decreasing order w.r.t. to (original) sequence length
-                b_input_ids, b_attn_masks, b_type_ids, b_input_lengths, b_start_pos, b_end_pos = sort_batch(
-                                                                                                            b_input_ids,
-                                                                                                            b_attn_masks,
-                                                                                                            b_token_type_ids,
-                                                                                                            b_input_lengths,
-                                                                                                            b_start_pos,
-                                                                                                            b_end_pos,
-                                                                                                            train=False,
-                )
-            
-            # we evaluate the model on the main task only (i.e., QA)
-            with torch.no_grad():
-
-                ans_logits_val = model(
-                                       input_ids=b_input_ids,
-                                       attention_masks=b_attn_masks,
-                                       token_type_ids=b_token_type_ids,
-                                       input_lengths=b_input_lengths,
-                                       task='QA'
-                                       )
-
-                start_logits_val, end_logits_val = ans_logits_val
-
-                start_true_val = to_cpu(b_start_pos)
-                end_true_val = to_cpu(b_end_pos)
+              print("------------------------------------")
+              print("----- Train domain acc: {} % -----".format(batch_accs_domain[-1]))
+              print("----- Train domain F1: {} % -----".format(batch_f1s_domain[-1]))
+              print("------------------------------------")
+              print()
                 
-                # start and end loss must be computed separately
-                start_loss = qa_loss_func(start_logits_val, b_start_pos)
-                end_loss = qa_loss_func(end_logits_val, b_end_pos)
-                batch_loss_val = (start_loss + end_loss) / 2
-                
-                print("----------------------------------------")
-                print("----- Current val batch loss: {} -----".format(round(batch_loss_val.item(), 3)))
-                print("----------------------------------------")
-                print()
-                
-                start_log_probs_val = to_cpu(F.log_softmax(start_logits_val, dim=1), detach=True, to_numpy=False)
-                end_log_probs_val = to_cpu(F.log_softmax(end_logits_val, dim=1), detach=True, to_numpy=False)
-            
-                pred_answers = get_answers(
-                                           tokenizer=tokenizer,
-                                           b_input_ids=b_input_ids,
-                                           start_logs=start_log_probs_val,
-                                           end_logs=end_log_probs_val,
-                                           predictions=True,
-                )
-
-                true_answers = get_answers(
-                                           tokenizer=tokenizer,
-                                           b_input_ids=b_input_ids,
-                                           start_logs=b_start_pos,
-                                           end_logs=b_end_pos,
-                                           predictions=False,
-                )
-                
-                correct_answers_val += compute_exact_batch(true_answers, pred_answers)
-                batch_f1_val += compute_f1_batch(true_answers, pred_answers)
-                
-                val_loss += batch_loss_val.item()
-                nb_val_examples += b_input_ids.size(0)
-                nb_val_steps += 1
-                
-                current_batch_f1 = 100 * (batch_f1_val / nb_val_examples)
-                current_batch_acc = 100 * (correct_answers_val / nb_val_examples)
-
-        val_loss /= nb_val_steps
-        val_exact_match = 100 * (correct_answers_val / nb_val_examples)
-        val_f1 = 100 * (batch_f1_val / nb_val_examples)
-        
-        print("----------------------------------")
-        print("---------- EPOCH {} ----------".format(epoch + 1))
-        print("----- Val loss: {} -----".format(round(val_loss, 3)))
-        print("----- Val exact-match: {} % -----".format(round(val_exact_match, 3)))
-        print("----- Val F1: {} % -----".format(round(val_f1, 3)))
-        print("----------------------------------")
-        print()
-
-
-        if epoch == 0 or (val_exact_match > val_accs[-1] and val_f1 > val_f1s[-1]):
-            torch.save(model.state_dict(), model_path + '/%s' % (args['model_name']))
-                
-        val_losses.append(val_loss)
-        val_accs.append(val_exact_match)
-        val_f1s.append(val_f1)
-        
         if epoch > 0 and early_stopping:
-            if (val_f1s[-2] > val_f1s[-1]) and (val_accs[-2] > val_accs[-1]):
+            if not (val_f1s[-1] >= val_f1s[-2] or val_f1s[-1] >= val_f1s[-3]) and not (val_accs[-1] >= val_accs[-2] or val_accs[-1] >= val_accs[-3]):
                 print("------------------------------------------")
-                print("----- Early stopping after {} epochs -----".format(epoch + 1))
+                print("----- Early stopping after {} steps -----".format(nb_tr_steps * (epoch + 1)))
                 print("------------------------------------------")
                 break
 
-    
     if isinstance(n_aux_tasks, type(None)):
-      return batch_losses, train_losses, train_accs_qa, train_f1s_qa, val_losses, val_accs, val_f1s, model
+      return batch_losses, batch_accs_qa, batch_f1s_qa, val_losses, val_accs, val_f1s, model
     elif n_aux_tasks == 1:
-      return batch_losses, train_losses, train_accs_qa, train_f1s_qa, train_accs_sbj, train_f1s_sbj, val_losses, val_accs, val_f1s, model
+      return batch_losses, batch_accs_qa, batch_f1s_qa, batch_accs_sbj, batch_f1s_sbj, val_losses, val_accs, val_f1s, model
     elif n_aux_tasks == 2:
-      return batch_losses, train_losses, train_accs_qa, train_f1s_qa, train_accs_sbj, train_f1s_sbj, train_accs_domain, train_f1s_domain, val_losses, val_accs, val_f1s, model
+      return batch_losses, batch_accs_qa, batch_f1s_qa, batch_accs_sbj, batch_f1s_sbj, batch_accs_domain, batch_f1s_domain, val_losses, val_accs, val_f1s, model
+
+def val(
+        model,
+        tokenizer,
+        val_dl,
+        current_step:int,
+        epoch:int,
+        batch_size:int,
+        val_losses:list,
+        val_accs:list,
+        val_f1s:list,
+):
+    ### Validation ###
+
+    # set model to eval mode
+    model.eval()
+    
+    correct_answers_val, batch_f1_val = 0, 0
+    val_loss = 0
+    nb_val_steps, nb_val_examples = 0, 0
+
+    for batch in val_dl:
+        
+        batch_loss_val = 0
+        
+        # add batch to current device
+        batch = tuple(t.to(device) for t in batch)
+
+        # unpack inputs from dataloader            
+        b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_cls_indexes, _, _, _, _ = batch
+
+         # if current batch_size is smaller than specified batch_size, skip batch
+        if b_input_ids.size(0) != batch_size:
+            continue
+        
+        # we evaluate the model on the main task only (i.e., QA)
+        with torch.no_grad():
+
+            ans_logits_val = model(
+                                   input_ids=b_input_ids,
+                                   attention_masks=b_attn_masks,
+                                   token_type_ids=b_token_type_ids,
+                                   input_lengths=b_input_lengths,
+                                   task='QA'
+                                   )
+
+            start_logits_val, end_logits_val = ans_logits_val
+
+            start_true_val = to_cpu(b_start_pos)
+            end_true_val = to_cpu(b_end_pos)
+            
+            # start and end loss must be computed separately
+            start_loss = qa_loss_func(start_logits_val, b_start_pos)
+            end_loss = qa_loss_func(end_logits_val, b_end_pos)
+            batch_loss_val = (start_loss + end_loss) / 2
+            
+            print("----------------------------------------")
+            print("----- Current val batch loss: {} -----".format(round(batch_loss_val.item(), 3)))
+            print("----------------------------------------")
+            print()
+            
+            start_log_probs_val = to_cpu(F.log_softmax(start_logits_val, dim=1), detach=True, to_numpy=False)
+            end_log_probs_val = to_cpu(F.log_softmax(end_logits_val, dim=1), detach=True, to_numpy=False)
+        
+            pred_answers = get_answers(
+                                       tokenizer=tokenizer,
+                                       b_input_ids=b_input_ids,
+                                       start_logs=start_log_probs_val,
+                                       end_logs=end_log_probs_val,
+                                       predictions=True,
+            )
+
+            true_answers = get_answers(
+                                       tokenizer=tokenizer,
+                                       b_input_ids=b_input_ids,
+                                       start_logs=b_start_pos,
+                                       end_logs=b_end_pos,
+                                       predictions=False,
+            )
+            
+            correct_answers_val += compute_exact_batch(true_answers, pred_answers)
+            batch_f1_val += compute_f1_batch(true_answers, pred_answers)
+            
+            val_loss += batch_loss_val.item()
+            nb_val_examples += b_input_ids.size(0)
+            nb_val_steps += 1
+            
+            current_batch_f1 = 100 * (batch_f1_val / nb_val_examples)
+            current_batch_acc = 100 * (correct_answers_val / nb_val_examples)
+
+    val_loss /= nb_val_steps
+    val_exact_match = 100 * (correct_answers_val / nb_val_examples)
+    val_f1 = 100 * (batch_f1_val / nb_val_examples)
+    
+    print("----------------------------------")
+    print("-------- Train step {} --------".format(current_step + 1))
+    print("----- Val loss: {} -----".format(round(val_loss, 3)))
+    print("----- Val exact-match: {} % -----".format(round(val_exact_match, 3)))
+    print("----- Val F1: {} % -----".format(round(val_f1, 3)))
+    print("----------------------------------")
+    print()
+
+    if epoch == 0 or (val_exact_match > val_accs[-1] and val_f1 > val_f1s[-1]):
+        torch.save(model.state_dict(), model_path + '/%s' % (args['model_name']))
+
+    val_losses.append(val_loss)
+    val_accs.append(val_exact_match)
+    val_f1s.append(val_f1)
+
+    return val_losses, val_accs, val_f1s
 
 def test(
           model,
           tokenizer,
           test_dl,
           batch_size:int,
-          sort_batch:bool=False,
           not_finetuned:bool=False,
 ):
     n_steps = len(test_dl)
@@ -662,18 +612,6 @@ def test(
         # if current batch_size is smaller than specified batch_size, skip batch
         if b_input_ids.size(0) != batch_size:
             continue
-
-        if sort_batch:
-            # sort sequences in batch in decreasing order w.r.t. to (original) sequence length
-            b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos = sort_batch(
-                                                                                                        b_input_ids,
-                                                                                                        b_attn_masks,
-                                                                                                        b_token_type_ids,
-                                                                                                        b_input_lengths,
-                                                                                                        b_start_pos,
-                                                                                                        b_end_pos,
-                                                                                                        train=False,
-            )
 
         with torch.no_grad():
             

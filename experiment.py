@@ -40,7 +40,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_aux_tasks', type=int, default=None,
             help='Define number of auxiliary tasks QA model should perform during training. Only necessary, if MTL setting.')
     parser.add_argument('--encoder', action='store_true',
-            help='If provided, use BiLSTM encoder to compute global interactions before passing feature representations to fc output layers.')
+            help='If provided, use BiLSTM encoder to compute temporal dependencies before passing feature representations to linear output layers.')
     parser.add_argument('--highway_connection', action='store_true',
             help='If provided, put Highway connection in between BERT OR BiLSTM encoder and fc linear output head.')
     parser.add_argument('--decoder', action='store_true',
@@ -71,7 +71,7 @@ if __name__ == '__main__':
     doc_stride = 200
     max_query_length = 100
     batch_size = args.batch_size
-    
+    sort_batch = True if args.encoder else False
     
     # create list of all review / paragraph domains in dataset(s)
     domains = ['books', 'tripadvisor', 'grocery', 'electronics', 'movies', 'restaurants', 'wikipedia']
@@ -99,7 +99,7 @@ if __name__ == '__main__':
 
     n_domain_labels = None if args.finetuning == 'SQuAD' else len(domains)
     
-    # NOTE: we use cased model since both BERT and DistilBERT cased models perform significantly better on SQuAD than uncased versions     
+    # NOTE: we use pre-trained cased model since both BERT and DistilBERT cased models perform significantly better on SQuAD than uncased versions     
     bert_tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-cased')
     
     if args.bert_weights == 'not_finetuned':
@@ -186,29 +186,25 @@ if __name__ == '__main__':
                                                                domain_to_idx=domain_to_idx,
                                                                dataset_to_idx=dataset_to_idx,
             )
-            
-            subjqa_tensor_dataset_train = create_tensor_dataset(
-                                                                subjqa_features_train,
-                                                                evaluate=False,
-            )
 
-            subjqa_tensor_dataset_dev = create_tensor_dataset(
-                                                              subjqa_features_dev,
-                                                              evaluate=False,
-            )
+            np.random.shuffle(subjqa_features_train)
             
-            train_dl = create_batches(
+            subjqa_tensor_dataset_train = create_tensor_dataset(subjqa_features_train)
+
+            subjqa_tensor_dataset_dev = create_tensor_dataset(subjqa_features_dev)
+
+            train_dl = BatchGenerator(
                                       dataset=subjqa_tensor_dataset_train,
                                       batch_size=batch_size,
-                                      split='train',
+                                      sort_batch=sort_batch,
             )
 
-            val_dl = create_batches(
+            val_dl = BatchGenerator(
                                     dataset=subjqa_tensor_dataset_dev,
                                     batch_size=batch_size,
-                                    split='eval',
+                                    sort_batch=sort_batch,
             )
-            
+
             if args.multitask:
                 assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
                 if args.n_aux_tasks == 2:
@@ -277,27 +273,23 @@ if __name__ == '__main__':
                                                              domain_to_idx=domain_to_idx,
                                                              dataset_to_idx=dataset_to_idx,
             )
-            
-            squad_tensor_dataset_train = create_tensor_dataset(
-                                                   squad_features_train,
-                                                   evaluate=False,
-            )
 
-            squad_tensor_dataset_dev = create_tensor_dataset(
-                                                 squad_features_dev,
-                                                 evaluate=False,
-            )
+            np.random.shuffle(squad_features_train)
             
-            train_dl = create_batches(
+            squad_tensor_dataset_train = create_tensor_dataset(squad_features_train)
+
+            squad_tensor_dataset_dev = create_tensor_dataset(squad_features_dev)
+
+            train_dl = BatchGenerator(
                                       dataset=squad_tensor_dataset_train,
                                       batch_size=batch_size,
-                                      split='train',
+                                      sort_batch=sort_batch,
             )
 
-            val_dl = create_batches(
+            val_dl = BatchGenerator(
                                     dataset=squad_tensor_dataset_dev,
                                     batch_size=batch_size,
-                                    split='eval',
+                                    sort_batch=sort_batch,
             )
             
         elif args.finetuning == 'combined':
@@ -363,18 +355,6 @@ if __name__ == '__main__':
             )
             np.random.shuffle(subjqa_features_train)
             
-            """
-            subjqa_tensor_dataset_train = create_tensor_dataset(
-                                                                subjqa_features_train,
-                                                                evaluate=False,
-            )
-
-            subjqa_tensor_dataset_dev = create_tensor_dataset(
-                                                              subjqa_features_dev,
-                                                              evaluate=False,
-            )
-            """
-            
             # load SQuAD data
             squad_data_train = get_data(
                                         source='/SQuAD/',
@@ -413,58 +393,31 @@ if __name__ == '__main__':
                                                              dataset_to_idx=dataset_to_idx,
             )
             np.random.shuffle(squad_features_train)
-            """
-            squad_tensor_dataset_train = create_tensor_dataset(
-                                                               squad_features_train,
-                                                               evaluate=False,
-            )
 
-            squad_tensor_dataset_dev = create_tensor_dataset(
-                                                             squad_features_dev,
-                                                             evaluate=False,
-            )
-            """
             squad_features_train.extend(subjqa_features_train)
             squad_features_dev.extend(subjqa_features_dev)
+
             combined_features_train = squad_features_train
             combined_features_dev = squad_features_dev
-            
-            combined_tensor_dataset_train = create_tensor_dataset(
-                                                                  combined_features_train,
-                                                                  evaluate=False,
-            )
-            
-            combined_tensor_dataset_dev = create_tensor_dataset(
-                                                                  combined_features_dev,
-                                                                  evaluate=False,
-            )
-            
-            """
-            train_dl = AlternatingBatchGenerator(
-                                                 squad_tensor_dataset_train,
-                                                 subjqa_tensor_dataset_train,
-                                                 batch_size=batch_size,
-                                                 split='train',
-            )
 
-            val_dl = AlternatingBatchGenerator(
-                                               squad_tensor_dataset_dev,
-                                               subjqa_tensor_dataset_dev,
-                                               batch_size=batch_size,
-                                               split='eval',
-            )
-            """
-            train_dl = create_batches(
+            np.random.shuffle(combined_features_train)
+            
+            combined_tensor_dataset_train = create_tensor_dataset(combined_features_train)
+            
+            combined_tensor_dataset_dev = create_tensor_dataset(combined_features_dev)
+
+            train_dl = BatchGenerator(
                                       dataset=combined_tensor_dataset_train,
                                       batch_size=batch_size,
-                                      split='train',
+                                      sort_batch=sort_batch,
             )
 
-            val_dl = create_batches(
+            val_dl = BatchGenerator(
                                     dataset=combined_tensor_dataset_dev,
                                     batch_size=batch_size,
-                                    split='eval',
+                                    sort_batch=sort_batch,
             )
+
             if args.multitask:
                 
                 assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
@@ -521,14 +474,15 @@ if __name__ == '__main__':
 
         hypers = {
                   "lr_adam": 5e-5,
-                  "warmup_steps": 0,
+                  "warmup_steps": 50,
                   "max_grad_norm": 5,
-                  "sort_batch": False, # TODO: figure out, whether we should sort batch for RNNs (not necessary for linear output layers)
+                  "sort_batch": False,
         }
 
         hypers["n_epochs"] = args.n_epochs
+        hypers["n_evals_per_epoch"] = 10 # number of times we evaluate model on dev set per epoch
         hypers["freeze_bert"] = freeze_bert
-        hypers["pretrained_model"] = 'distilbert' #OR 'bert'
+        hypers["pretrained_model"] = 'distilbert'
         hypers["optim"] = args.optim
         hypers["model_dir"] = args.sd
         hypers["model_name"] = model_name
@@ -565,25 +519,24 @@ if __name__ == '__main__':
 
         train_results  = dict()
         if isinstance(args.n_aux_tasks, type(None)):           
-            batch_losses, train_losses, train_accs_qa, train_f1s_qa, val_losses, val_accs, val_f1s, model = train(
-                                                                                                            model=model,
-                                                                                                            tokenizer=bert_tokenizer,
-                                                                                                            train_dl=train_dl,
-                                                                                                            val_dl=val_dl,
-                                                                                                            batch_size=batch_size,
-                                                                                                            n_aux_tasks=args.n_aux_tasks,
-                                                                                                            args=hypers,
-                                                                                                            optimizer=optimizer,
-                                                                                                            scheduler=scheduler,
-                                                                                                            early_stopping=True,
-                                                                                                            qa_type_weights=qa_type_weights,
-                                                                                                            domain_weights=domain_weights,
-                                                                                                            adversarial_simple=True if args.adversarial == 'simple' else False,
+            batch_losses, batch_accs_qa, batch_f1s_qa, val_losses, val_accs, val_f1s, model = train(
+                                                                                                    model=model,
+                                                                                                    tokenizer=bert_tokenizer,
+                                                                                                    train_dl=train_dl,
+                                                                                                    val_dl=val_dl,
+                                                                                                    batch_size=batch_size,
+                                                                                                    n_aux_tasks=args.n_aux_tasks,
+                                                                                                    args=hypers,
+                                                                                                    optimizer=optimizer,
+                                                                                                    scheduler=scheduler,
+                                                                                                    early_stopping=True,
+                                                                                                    qa_type_weights=qa_type_weights,
+                                                                                                    domain_weights=domain_weights,
+                                                                                                    adversarial_simple=True if args.adversarial == 'simple' else False,
             )
 
-
         elif args.n_aux_tasks == 1:           
-            batch_losses, train_losses, train_accs_qa, train_f1s_qa, train_accs_sbj, train_f1s_sbj, val_losses, val_accs, val_f1s, model = train(
+            batch_losses, batch_accs_qa, batch_f1s_qa, batch_accs_sbj, batch_f1s_sbj, val_losses, val_accs, val_f1s, model = train(
                                                                                                                                                 model=model,
                                                                                                                                                 tokenizer=bert_tokenizer,
                                                                                                                                                 train_dl=train_dl,
@@ -599,11 +552,11 @@ if __name__ == '__main__':
                                                                                                                                                 adversarial_simple=True if args.adversarial == 'simple' else False,
             )
 
-            train_results['train_accs_sbj'] = train_accs_sbj
-            train_results['train_f1s_sbj'] = train_f1s_sbj
+            train_results['batch_accs_sbj'] = batch_accs_sbj
+            train_results['batch_f1s_sbj'] = batch_f1s_sbj
         
         elif args.n_aux_tasks == 2:           
-            batch_losses, train_losses, train_accs_qa, train_f1s_qa, train_accs_sbj, train_f1s_sbj, train_accs_domain, train_f1s_domain, val_losses, val_accs, val_f1s, model = train(
+            batch_losses, batch_accs_qa, batch_f1s_qa, batch_accs_sbj, batch_f1s_sbj, batch_accs_domain, batch_f1s_domain, val_losses, val_accs, val_f1s, model = train(
                                                                                                                                                                                     model=model,
                                                                                                                                                                                     tokenizer=bert_tokenizer,
                                                                                                                                                                                     train_dl=train_dl,
@@ -619,15 +572,14 @@ if __name__ == '__main__':
                                                                                                                                                                                     adversarial_simple=True if args.adversarial == 'simple' else False,
             )
 
-            train_results['train_accs_sbj'] = train_accs_sbj
-            train_results['train_f1s_sbj'] = train_f1s_sbj
-            train_results['train_accs_domain'] = train_accs_domain
-            train_results['train_f1s_domain'] = train_f1s_domain        
+            train_results['batch_accs_sbj'] = batch_accs_sbj
+            train_results['batch_f1s_sbj'] = batch_f1s_sbj
+            train_results['batch_accs_domain'] = batch_accs_domain
+            train_results['batch_f1s_domain'] = batch_f1s_domain        
             
         train_results['batch_losses'] = batch_losses
-        train_results['train_losses'] = train_losses
-        train_results['train_accs_qa'] = train_accs_qa
-        train_results['train_f1s_qa'] = train_f1s_qa
+        train_results['batch_accs_qa'] = batch_accs_qa
+        train_results['batch_f1s_qa'] = batch_f1s_qa
         train_results['val_losses'] = val_losses
         train_results['val_accs'] = val_accs
         train_results['val_f1s'] = val_f1s
@@ -668,10 +620,7 @@ if __name__ == '__main__':
                                                                 dataset_to_idx=dataset_to_idx,
             )
             
-            subjqa_tensor_dataset_test = create_tensor_dataset(
-                                                               subjqa_features_test,
-                                                               evaluate=False,
-            )  
+            subjqa_tensor_dataset_test = create_tensor_dataset(subjqa_features_test)  
             
             test_dl = create_batches(
                                      dataset=subjqa_tensor_dataset_test,
@@ -681,7 +630,7 @@ if __name__ == '__main__':
             
             if args.not_finetuned:
                 # test (simple) BERT-QA-model fine-tuned on SQuAD without (prior) task-specific fine-tuning on SubjQA
-                model = DistilBertForQuestionAnswering.from_pretrained(pretrained_weights)
+                model = DistilBertForQuestionAnswering.from_pretrained('distilbert-base-cased-distilled-squad')
                 model_name = 'distilbert_pretrained_squad_no_fine_tuning'
                 # set model to device
                 model.to(device)
