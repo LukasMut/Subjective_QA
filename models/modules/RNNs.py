@@ -58,7 +58,7 @@ class BiLSTM(nn.Module):
     ):
         # out, hidden = self.lstm(bert_outputs, hidden)
 
-        # NOTE: we don't want to include the [PAD] token in the recurrent step
+        # NOTE: we don't want to include [PAD] tokens in the recurrent step
         #       (not useful to add hidden_i, where i is the last position of a non-[PAD] token, and input of 0s together) 
         seq_lengths = to_cpu(seq_lengths, detach=True)
         packed = nn.utils.rnn.pack_padded_sequence(bert_outputs, seq_lengths, batch_first=True)
@@ -114,7 +114,7 @@ class BiGRU(nn.Module):
     ):
         # out, hidden = self.gru(bert_outputs, hidden)
         
-        # NOTE: we don't want to include the [PAD] token in the recurrent step
+        # NOTE: we don't want to include [PAD] tokens in the recurrent step
         #       (not useful to add hidden_i, where i is the last position of a non-[PAD] token, and input of 0s together) 
         seq_lengths = to_cpu(seq_lengths, detach=True)        
         packed = nn.utils.rnn.pack_padded_sequence(bert_outputs, seq_lengths, batch_first=True)
