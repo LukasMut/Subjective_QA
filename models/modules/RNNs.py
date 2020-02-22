@@ -34,7 +34,7 @@ class BiLSTM(nn.Module):
     ):
         
         super(BiLSTM, self).__init__()
-        self.in_size = in_size # dimensionality of BERT-large attention heads (i.e, 1024)
+        self.in_size = in_size
         self.hidden_size = in_size // 2  # if hidden_size = in_size // 2 -> in_size for classification head is in_size due to bidir
         self.n_layers = n_layers
         self.dropout = dropout
@@ -56,13 +56,14 @@ class BiLSTM(nn.Module):
                 seq_lengths:torch.Tensor,
                 hidden:torch.Tensor,
     ):
-        # TODO: figure out, whether rnn.pack_padded_sequence is useful for QA (most likely, since each batch contains padded)
-        out, hidden = self.lstm(bert_outputs, hidden)
+        # out, hidden = self.lstm(bert_outputs, hidden)
 
-        #seq_lengths = to_cpu(seq_lengths, detach=True)        
-        #packed = nn.utils.rnn.pack_padded_sequence(bert_outputs, seq_lengths, batch_first=True)
-        #packed_out, hidden = self.lstm(packed, hidden)
-        #out, _ = nn.utils.rnn.pad_packed_sequence(packed_out, batch_first=True, total_length=self.max_seq_length)
+        # NOTE: we don't want to include the [PAD] token in the recurrent step
+        #       (not useful to add hidden_i, where i is the last position of a non-[PAD] token, and input of 0s together) 
+        seq_lengths = to_cpu(seq_lengths, detach=True)
+        packed = nn.utils.rnn.pack_padded_sequence(bert_outputs, seq_lengths, batch_first=True)
+        packed_out, hidden = self.lstm(packed, hidden)
+        out, _ = nn.utils.rnn.pad_packed_sequence(packed_out, batch_first=True, total_length=self.max_seq_length)
         return out, hidden
     
     def init_hidden(
@@ -88,7 +89,7 @@ class BiGRU(nn.Module):
     ):
         
         super(BiGRU, self).__init__()
-        self.in_size = in_size # dimensionality of BERT-large attention heads (i.e, 1024)
+        self.in_size = in_size
         self.hidden_size = in_size // 2 # if hidden_size = in_size // 2 -> in_size for classification head is in_size due to bidir
         self.n_layers = n_layers
         self.dropout = dropout
@@ -111,14 +112,14 @@ class BiGRU(nn.Module):
                 seq_lengths:torch.Tensor,
                 hidden:torch.Tensor,
     ):
+        # out, hidden = self.gru(bert_outputs, hidden)
         
-        # TODO: figure out, whether rnn.pack_padded_sequence is useful for QA (most likely, since each batch contains padded)
-        out, hidden = self.gru(bert_outputs, hidden)
-        
-        #seq_lengths = to_cpu(seq_lengths, detach=True)        
-        #packed = nn.utils.rnn.pack_padded_sequence(bert_outputs, seq_lengths, batch_first=True)
-        #packed_out, hidden = self.gru(packed, hidden)
-        #out, _ = nn.utils.rnn.pad_packed_sequence(packed_out, batch_first=True, total_length=self.max_seq_length)
+        # NOTE: we don't want to include the [PAD] token in the recurrent step
+        #       (not useful to add hidden_i, where i is the last position of a non-[PAD] token, and input of 0s together) 
+        seq_lengths = to_cpu(seq_lengths, detach=True)        
+        packed = nn.utils.rnn.pack_padded_sequence(bert_outputs, seq_lengths, batch_first=True)
+        packed_out, hidden = self.gru(packed, hidden)
+        out, _ = nn.utils.rnn.pad_packed_sequence(packed_out, batch_first=True, total_length=self.max_seq_length)
         return out, hidden
     
     def init_hidden(
@@ -127,6 +128,6 @@ class BiGRU(nn.Module):
     ):
         # NOTE: we need to initialise twice as many hidden states for bidirectional RNNs
         n = self.n_layers * 2 if self.bidir else self.n_layers 
-        # NOTE: in contrast to LSTMs, GRUs don't need cell state inits (GRUs work similar to simple Elman RNNs)
+        # NOTE: in contrast to LSTMs, GRUs don't need cell state initialisations (GRUs work similar to simple Elman RNNs)
         hidden_state = torch.zeros(n, batch_size, self.hidden_size, device=device)
         return nn.init.xavier_uniform_(hidden_state)
