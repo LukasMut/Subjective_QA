@@ -163,9 +163,6 @@ def train(
     val_accs = []
     val_f1s = []
     
-    # path to save models
-    model_path = args['model_dir'] 
-    
     # define loss function (Cross-Entropy is numerically more stable than LogSoftmax plus Negative-Log-Likelihood Loss)
     qa_loss_func = nn.CrossEntropyLoss()
 
@@ -416,6 +413,8 @@ def train(
                                                   model=model,
                                                   tokenizer=tokenizer,
                                                   val_dl=val_dl,
+                                                  qa_loss_func=qa_loss_func,
+                                                  args=args,
                                                   current_step=i,
                                                   epoch=epoch,
                                                   batch_size=batch_size,
@@ -470,6 +469,8 @@ def val(
         model,
         tokenizer,
         val_dl,
+        qa_loss_func,
+        args:dict,
         current_step:int,
         epoch:int,
         batch_size:int,
@@ -481,6 +482,9 @@ def val(
 
     # set model to eval mode
     model.eval()
+
+    # path to save models
+    model_path = args['model_dir'] 
     
     correct_answers_val, batch_f1_val = 0, 0
     val_loss = 0
