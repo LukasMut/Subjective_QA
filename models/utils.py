@@ -145,7 +145,7 @@ def train(
     steps_until_eval = n_steps // args['n_evals_per_epoch'] # number of steps between validations
     L = 6 # total number of transformer layers in pre-trained DistilBERT model (L = 12 for BERT base, L = 6 for DistilBERT base)
     
-    if args["freeze_bert"]:
+    if args['freeze_bert']:
       k = int(L / (args['n_epochs'] - 1))
       l = L - k
       model_name = args['pretrained_model']
