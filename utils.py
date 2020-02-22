@@ -10,8 +10,7 @@ __all__ = [
            'get_class_weights',
            'idx_to_class',
            'class_to_idx',
-           'AlternatingBatchGenerator',
-           'create_alternating_batches',
+           'BatchGenerator',
            'create_batches',
            'split_into_train_and_dev',
            'sort_dict', 
@@ -828,71 +827,52 @@ def class_to_idx(classes:list): return {c: i for i, c in enumerate(classes)}
 
 ## Generator of batches from SQuAD AND SubjQA (each batch consists of n = batch_size examples from SQuAD XOR SubjQA) ##
 
-class AlternatingBatchGenerator(object):
+class BatchGenerator(object):
     
     def __init__(
                  self,
-                 dataset_squad:torch.Tensor,
-                 dataset_subjqa:torch.Tensor,
+                 ds:torch.Tensor,
                  batch_size:int,
+                 sort_batch:bool=False,
                  split:str='train',
     ):
-        self.dataset_squad = dataset_squad
-        self.dataset_subjqa = dataset_subjqa
+        self.ds = ds
         self.batch_size = batch_size
-        self.n_batches = (len(dataset_squad) + len(dataset_subjqa)) // batch_size
+        self.n_batches = len(ds) // batch_size
+        self.sort_batch = sort_batch
         self.split = split
     
     def __len__(self):
         return self.n_batches
     
     def __iter__(self):
-        return create_alternating_batches(self.dataset_squad, self.dataset_subjqa, self.batch_size, self.n_batches, self.split)
+        return create_batches_custom(self.ds, self.batch_size, self.n_batches, self.sort_batch, self.split)
 
-def create_alternating_batches(
-                               dataset_squad:torch.Tensor,
-                               dataset_subjqa:torch.Tensor,
-                               batch_size:int,
-                               n_batches_total:int,
-                               split:str='train',
+def create_batches_custom(
+                   ds:torch.Tensor,
+                   batch_size:int,
+                   n_batches:int,
+                   sort_batch:bool=False,
+                   split:str='train',
 ):
-    n_squad_examples, n_subjqa_examples = len(dataset_squad), len(dataset_subjqa)
+    n_examples = len(ds)
     
-    def chunk_dataset(
-                      dataset:torch.Tensor,
-                      n_examples:int,
-                      batch_size:int,
-    ):
-        chunked_dataset = []
-        idx = 0
-        for _ in range(n_examples // batch_size):
-            chunked_dataset.append(dataset[idx: idx + batch_size])
-            idx += batch_size
-        return chunked_dataset
-            
-    dataset_squad_chunked = chunk_dataset(
-                                          dataset=dataset_squad,
-                                          n_examples=n_squad_examples, 
-                                          batch_size=batch_size,
-    )
-    dataset_subjqa_chunked = chunk_dataset(
-                                           dataset=dataset_subjqa,
-                                           n_examples=n_subjqa_examples,
-                                           batch_size=batch_size,
-    )
-    dataset_squad_chunked.extend(dataset_subjqa_chunked)
+    print(ds[:10])
     if split == 'train':
-        # we don't want to present SQuAD and SubjQA examples to the model always in alternation (otherwise, MTL won't work)
-        np.random.shuffle(dataset_squad_chunked)
-    dataset_combined = dataset_squad_chunked
-    # since we perfrom floor / integer division, we have to compute a window
-    n_batch_total_range = [n_batches_total - 1, n_batches_total, n_batches_total + 1]
-    print("Number of batches in combined dataset: {}".format(len(dataset_combined)))
-    print("Number of batches combined dataset should consist of: {}".format(n_batches_total))
-    print()
-    assert len(dataset_combined) in n_batch_total_range, 'Dataset does not contain correct number of chunked examples'
+        ds = ds[torch.randperm(ds.size()[0])]
+        # ds = np.random.shuffle(ds)
+        print(ds[:10])
+        raise Exception
     
-    for batch in dataset_combined:
+    idx = 0
+    for _ in range(n_examples // batch_size):
+        batch = ds[idx: idx + batch_size]
+        
+        if sort_batch:
+            sorted_idx, _ = zip(*sorted(enumerate(ds[0]), key=lambda seq: len(seq[1][seq[1] != 0]), reverse=True))
+            batch = batch[sorted_idx]
+        
+        idx += batch_size
         yield batch
 
 # create batches for SQuAD OR SubjQA separately
