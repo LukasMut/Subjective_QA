@@ -36,8 +36,8 @@ torch.manual_seed(42)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# NOTE: in case, we want to use a unidirectional LSTM (or GRU) instead of a BiLSTM
-# BERT feature representation sequences have to be reversed (special [CLS] token corresponds to semantic representation of sentence)
+## NOTE: use this function in case we want to use a unidirectional LSTM (or GRU) instead of a BiLSTM ##
+##       BERT feature representation sequences have to be reversed (special [CLS] token corresponds to semantic representation of sentence) ##
 def reverse_sequences(batch:torch.Tensor):
     return torch.tensor(list(map(lambda feat_reps: feat_reps[::-1], batch)), dtype=torch.double).to(device)
 
@@ -72,7 +72,7 @@ def freeze_transformer_layers(
                 pooling_layer = model_name + '.pooler.'
                 if re.search(r'' + transformer_layer, n):
                     n_digits = '1' if model_name == 'distilbert' else '2'
-                    if re.search(r'[0-9]{' + n_digits + '}', n):
+                    if re.search(r'[0-9]' +'{' + n_digits + '}', n):
                         layer_no = n[len(transformer_layer): len(transformer_layer) + int(n_digits)]
                         if int(layer_no) >= l:
                             p.requires_grad = True
@@ -111,7 +111,6 @@ def compute_f1_batch(
                      answers_pred:list,
 ):
     return sum([compute_f1(a_gold, a_pred) for a_gold, a_pred in zip(answers_gold, answers_pred)])
-
 
 # move tensor to CPU
 def to_cpu(
