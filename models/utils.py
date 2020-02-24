@@ -311,9 +311,6 @@ def train(
               print("--------------------------------------------")
               print()
 
-              batch_accs_qa.append(current_batch_acc)
-              batch_f1s_qa.append(current_batch_f1)
-
             else:
 
               if current_task == 'Sbj_Class':
@@ -374,14 +371,6 @@ def train(
               nb_tr_steps_aux = Counter(task_order[:i+1])[current_task]
               current_batch_acc_aux = round(100 * (batch_acc_aux / nb_tr_steps_aux), 3)
               current_batch_f1_aux = round(100 * (batch_f1_aux / nb_tr_steps_aux), 3)
-              
-              if current_task == 'Sbj_Class':
-                batch_accs_sbj.append(current_batch_acc_aux)
-                batch_f1s_sbj.append(current_batch_f1_aux)
-              
-              elif current_task == 'Domain_Class':
-                batch_accs_domain.append(current_batch_acc_aux)
-                batch_f1s_domain.append(current_batch_f1_aux)
 
               print("--------------------------------------------")
               print("----- Current batch {} acc: {} % -----".format(current_task, current_batch_acc_aux))
@@ -397,7 +386,6 @@ def train(
             # we just want to store QA losses
             if current_task == 'QA':
               tr_loss += batch_loss.item()
-              batch_losses.append(batch_loss.item())
 
             batch_loss.backward()
             
@@ -471,6 +459,20 @@ def train(
                                                     val_accs=val_accs,
                                                     val_f1s=val_f1s,
                                                     )
+          batch_losses.append(batch_loss.item())
+
+          if current_task == 'QA':
+              batch_accs_qa.append(current_batch_acc)
+              batch_f1s_qa.append(current_batch_f1)
+          else:
+            if current_task == 'Sbj_Class':
+              batch_accs_sbj.append(current_batch_acc_aux)
+              batch_f1s_sbj.append(current_batch_f1_aux)
+          
+            elif current_task == 'Domain_Class':
+              batch_accs_domain.append(current_batch_acc_aux)
+              batch_f1s_domain.append(current_batch_f1_aux)
+
           model.train()
 
         if epoch > 0 and early_stopping:
