@@ -474,6 +474,14 @@ def train(
           model.train()
 
         if epoch > 0 and early_stopping:
+          if args['n_evals'] == 'one_per_epoch':
+            if val_f1s[-1] < val_f1s[-2] and val_accs[-1] < val_accs[-2]:
+                print("------------------------------------------")
+                print("----- Early stopping after {} steps -----".format(nb_tr_steps * (epoch + 1)))
+                print("------------------------------------------")
+                break
+
+          elif args['n_evals'] == 'multiple_per_epoch':      
             if (val_f1s[-1] < val_f1s[-2] and val_f1s[-1] < val_f1s[-3]) and (val_accs[-1] < val_accs[-2] and val_accs[-1] < val_accs[-3]):
                 print("------------------------------------------")
                 print("----- Early stopping after {} steps -----".format(nb_tr_steps * (epoch + 1)))
