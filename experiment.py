@@ -117,13 +117,14 @@ if __name__ == '__main__':
     highway = 'Highway' if args.highway_connection else ''
     decoder = 'BiLSTM' if args.decoder else ''
     train_method = 'multitask' + '_' + str(args.n_aux_tasks) if args.multitask else 'singletask'
+    eval_setup = args.n_evals
 
     if isinstance(args.adversarial, type(None)):
         training = 'classic'
     else:
         training = args.adversarial if args.adversarial == 'GRL' else 'adv' + args.adversarial
 
-    model_name = 'DistilBERT' + '_' + encoding + '_' + highway + '_' + decoder + '_' + train_method + '_' + training + '_' + dataset
+    model_name = 'DistilBERT' + '_' + encoding + '_' + highway + '_' + decoder + '_' + train_method + '_' + training + '_' + dataset + '_' + eval_setup
     model_name = model_name.lower()
     
     if args.version == 'train':
@@ -482,9 +483,9 @@ if __name__ == '__main__':
         }
 
         hypers["n_epochs"] = args.n_epochs
-        hypers["n_evals"] = args.n_evaluations
+        hypers["n_evals"] = args.n_evals
 
-        if args.n_evaluations == 'multiple_per_epoch':
+        if args.n_evals == 'multiple_per_epoch':
             hypers["n_evals_per_epoch"] = 10 # number of times we evaluate model on dev set per epoch (not necessary, if we just evaluate once after an epoch)
 
         hypers["freeze_bert"] = freeze_bert
