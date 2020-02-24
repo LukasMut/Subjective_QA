@@ -629,11 +629,11 @@ if __name__ == '__main__':
             
             subjqa_tensor_dataset_test = create_tensor_dataset(subjqa_features_test)  
             
-            test_dl = create_batches(
-                                     dataset=subjqa_tensor_dataset_test,
-                                     batch_size=batch_size,
-                                     split='eval',
-            )
+            test_dl = BatchGenerator(
+                                    dataset=subjqa_tensor_dataset_test,
+                                    batch_size=batch_size,
+                                    sort_batch=sort_batch,
+                                    )
             
             if args.not_finetuned:
                 # test (simple) BERT-QA-model fine-tuned on SQuAD without (prior) task-specific fine-tuning on SubjQA
