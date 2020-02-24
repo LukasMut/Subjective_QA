@@ -142,7 +142,10 @@ def train(
     n_steps = len(train_dl)
     n_iters = n_steps * args['n_epochs']
     n_examples = n_steps * batch_size
-    steps_until_eval = n_steps // args['n_evals_per_epoch'] # number of steps between validations
+    
+    if args['n_evals'] == 'multiple_per_epoch':
+      steps_until_eval = n_steps // args['n_evals_per_epoch'] # number of steps between validations
+    
     L = 6 # total number of transformer layers in pre-trained DistilBERT model (L = 12 for BERT base, L = 6 for DistilBERT base)
     
     if args['freeze_bert']:
@@ -180,7 +183,7 @@ def train(
         # TODO: figure out, whether we need pos_weights for adversarial setting
         # loss func for auxiliary task to inform model about subjectivity (binary classification)
         
-        # NOTE: pos_weight does not work really well
+        # NOTE: pos_weight approach does not work really well (worse than BCE without higher weights for subjective questions)
         sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
         #sbj_loss_func = nn.BCEWithLogitsLoss()
         batch_accs_sbj, batch_f1s_sbj = [], []
@@ -408,20 +411,23 @@ def train(
             if args['optim'] == 'AdamW' and not isinstance(scheduler, type(None)):
                 scheduler.step()
 
-            if (i > 0 and i % steps_until_eval == 0):
-              val_losses, val_accs, val_f1s = val(
-                                                  model=model,
-                                                  tokenizer=tokenizer,
-                                                  val_dl=val_dl,
-                                                  qa_loss_func=qa_loss_func,
-                                                  args=args,
-                                                  current_step=i,
-                                                  epoch=epoch,
-                                                  batch_size=batch_size,
-                                                  val_losses=val_losses,
-                                                  val_accs=val_accs,
-                                                  val_f1s=val_f1s,
-                                                  )
+            if args['n_evals'] == 'multiple_per_epoch':
+              if (i > 0 and i % steps_until_eval == 0):
+                val_losses, val_accs, val_f1s, model = val(
+                                                          model=model,
+                                                          tokenizer=tokenizer,
+                                                          val_dl=val_dl,
+                                                          qa_loss_func=qa_loss_func,
+                                                          args=args,
+                                                          current_step=i,
+                                                          epoch=epoch,
+                                                          batch_size=batch_size,
+                                                          val_losses=val_losses,
+                                                          val_accs=val_accs,
+                                                          val_f1s=val_f1s,
+                                                          )
+                # set model back to train mode
+                model.train()
 
         tr_loss /= task_distrib['QA']
         train_exact_match = round(100 * (correct_answers / (task_distrib['QA'] * batch_size)), 3)
@@ -450,14 +456,32 @@ def train(
               print("----- Train domain F1: {} % -----".format(batch_f1s_domain[-1]))
               print("------------------------------------")
               print()
-                
+        
+        if args['n_evals'] == 'one_per_epoch':
+          val_losses, val_accs, val_f1s, model = val(
+                                                    model=model,
+                                                    tokenizer=tokenizer,
+                                                    val_dl=val_dl,
+                                                    qa_loss_func=qa_loss_func,
+                                                    args=args,
+                                                    current_step=i,
+                                                    epoch=epoch,
+                                                    batch_size=batch_size,
+                                                    val_losses=val_losses,
+                                                    val_accs=val_accs,
+                                                    val_f1s=val_f1s,
+                                                    )
+          model.train()
+
         if epoch > 0 and early_stopping:
-            if not (val_f1s[-1] >= val_f1s[-2] or val_f1s[-1] >= val_f1s[-3]) and not (val_accs[-1] >= val_accs[-2] or val_accs[-1] >= val_accs[-3]):
+            if (val_f1s[-1] < val_f1s[-2] and val_f1s[-1] < val_f1s[-3]) and (val_accs[-1] < val_accs[-2] and val_accs[-1] < val_accs[-3]):
                 print("------------------------------------------")
                 print("----- Early stopping after {} steps -----".format(nb_tr_steps * (epoch + 1)))
                 print("------------------------------------------")
                 break
 
+    # return model in eval mode
+    model.eval()
     if isinstance(n_aux_tasks, type(None)):
       return batch_losses, batch_accs_qa, batch_f1s_qa, val_losses, val_accs, val_f1s, model
     elif n_aux_tasks == 1:
@@ -578,7 +602,7 @@ def val(
     val_accs.append(val_exact_match)
     val_f1s.append(val_f1)
 
-    return val_losses, val_accs, val_f1s
+    return val_losses, val_accs, val_f1s, model
 
 def test(
           model,

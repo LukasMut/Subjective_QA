@@ -33,6 +33,8 @@ if __name__ == '__main__':
             help='If SQuAD, fine tune on SQuAD only; if SubjQA, fine tune on SubjQA only; if combined, fine tune on both SQuAD and SubjQA simultaneously.')
     parser.add_argument('--version', type=str, default='train',
             help='If train, then train model on train set(s); if test, then evaluate model on SubjQA test set.')
+    parser.add_argument('--n_evals', type=str, default='multiple_per_epoch',
+            help='Define number of evaluations during training. If "multiple_per_epoch", ten evals per epoch. If "one_per_epoch", one after a training epoch.')
     parser.add_argument('--multitask', action='store_true',
             help='If provided, MTL instead of STL setting.')
     parser.add_argument('--adversarial', type=str, default=None,
@@ -480,7 +482,11 @@ if __name__ == '__main__':
         }
 
         hypers["n_epochs"] = args.n_epochs
-        hypers["n_evals_per_epoch"] = 10 # number of times we evaluate model on dev set per epoch
+        hypers["n_evals"] = args.n_evaluations
+
+        if args.n_evaluations == 'multiple_per_epoch':
+            hypers["n_evals_per_epoch"] = 10 # number of times we evaluate model on dev set per epoch (not necessary, if we just evaluate once after an epoch)
+
         hypers["freeze_bert"] = freeze_bert
         hypers["pretrained_model"] = 'distilbert'
         hypers["optim"] = args.optim
