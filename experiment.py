@@ -34,7 +34,7 @@ if __name__ == '__main__':
     parser.add_argument('--version', type=str, default='train',
             help='If train, then train model on train set(s); if test, then evaluate model on SubjQA test set.')
     parser.add_argument('--n_evals', type=str, default='multiple_per_epoch',
-            help='Define number of evaluations during training. If "multiple_per_epoch", ten evals per epoch. If "one_per_epoch", one after a training epoch.')
+            help='Define number of evaluations during training. If "multiple_per_epoch", ten evals per epoch. If "one_per_epoch", once after a training epoch.')
     parser.add_argument('--multitask', action='store_true',
             help='If provided, MTL instead of STL setting.')
     parser.add_argument('--adversarial', type=str, default=None,
