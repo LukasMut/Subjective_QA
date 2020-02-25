@@ -183,7 +183,7 @@ def train(
         # TODO: figure out, whether we need pos_weights for adversarial setting
         # loss func for auxiliary task to inform model about subjectivity (binary classification)
         
-        # NOTE: pos_weight approach does not work really well (worse than BCE without higher weights for subjective questions)
+        # NOTE: pos_weight approach does not seem to work well (worse than BCE without higher weighting of subjective questions and answers)
         sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
         #sbj_loss_func = nn.BCEWithLogitsLoss()
         batch_accs_sbj, batch_f1s_sbj = [], []
@@ -195,7 +195,7 @@ def train(
             batch_accs_domain, batch_f1s_domain = [], []
             tasks.append('Domain_Class')
 
-    # generate uniform random sample over all entries (for MTL setting with 2 auxiliary tasks, we might want to sample QA task with a higher probability)
+    # generate uniform random sample over all entries (for MTL setting with 2 auxiliary tasks, we might want to sample QA task with a higher probability than the auxiliary tasks)
     task_order = np.random.choice(tasks, size=n_steps, replace=True, p = [1/len(tasks) for _ in tasks])
     task_distrib = Counter(task_order)
 
@@ -208,6 +208,8 @@ def train(
       plt.show()
       plt.clf()
 
+    # we want to store train exact-match accuracies and F1 scores for each task as often as we evaluate model on validation set
+    running_tasks = tasks[:]
 
     for epoch in trange(args['n_epochs'],  desc="Epoch"):
 
@@ -272,7 +274,7 @@ def train(
                              task=current_task,
                              )
 
-              # start and end loss must be computed separately
+              # start and end loss must be computed separately and then averaged
               start_loss = qa_loss_func(start_logits, b_start_pos)
               end_loss = qa_loss_func(end_logits, b_end_pos)
               batch_loss += (start_loss + end_loss) / 2
@@ -310,6 +312,11 @@ def train(
               print("----- Current batch {} F1: {} % -----".format(current_task, current_batch_f1))
               print("--------------------------------------------")
               print()
+
+              if current_task in running_tasks:
+                batch_accs_qa.append(current_batch_acc)
+                batch_f1s_qa.append(current_batch_f1)
+                running_tasks.pop(running_tasks.index(current_task))
 
             else:
 
@@ -378,29 +385,42 @@ def train(
               print("--------------------------------------------")
               print()
 
+              if current_task in running_tasks:
+
+                if current_task == 'Sbj_Class':
+                  batch_accs_sbj.append(current_batch_acc_aux)
+                  batch_f1s_sbj.append(current_batch_f1_aux)
+
+                elif current_task == 'Domain_Class':
+                  batch_accs_domain.append(current_batch_acc_aux)
+                  batch_f1s_domain.append(current_batch_f1_aux)
+
+                running_tasks.pop(running_tasks.index(current_task))
+
             print("------------------------------------")
             print("----- Current {} loss: {} -----".format(current_task, abs(round(batch_loss.item(), 3))))
             print("------------------------------------")
             print()
 
-            # we just want to store QA losses
+            # we just want to store QA losses (there's no need to store losses for auxiliary tasks since we want to observe effect on main task)
             if current_task == 'QA':
               tr_loss += batch_loss.item()
+              batch_losses.append(batch_loss.item())
 
             batch_loss.backward()
             
-            # clip gradients if gradients become larger than specified norm
+            # clip gradients if gradients become larger than predefined gradient norm
             torch.nn.utils.clip_grad_norm_(model.parameters(), args["max_grad_norm"])
 
             # take step down the valley
             optimizer.step()
             
-            # scheduler is only necessary, if we optimize with AdamW (BERT specific version of Adam)
+            # scheduler is only necessary, if we optimize with AdamW (BERT specific version of Adam with weight decay fix)
             if args['optim'] == 'AdamW' and not isinstance(scheduler, type(None)):
                 scheduler.step()
 
             if args['n_evals'] == 'multiple_per_epoch':
-              if (i > 0 and i % steps_until_eval == 0):
+              if i > 0 and i % steps_until_eval == 0:
                 val_losses, val_accs, val_f1s, model = val(
                                                           model=model,
                                                           tokenizer=tokenizer,
@@ -414,7 +434,11 @@ def train(
                                                           val_accs=val_accs,
                                                           val_f1s=val_f1s,
                                                           )
-                # set model back to train mode
+
+                # we want to store train exact-match accuracies and F1 scores for each task as often as we evaluate model on validation set
+                running_tasks = tasks[:]
+                  
+                # after evaluation on dev set, move model back to train mode
                 model.train()
 
         tr_loss /= task_distrib['QA']
@@ -459,20 +483,11 @@ def train(
                                                     val_accs=val_accs,
                                                     val_f1s=val_f1s,
                                                     )
-          batch_losses.append(batch_loss.item())
 
-          if current_task == 'QA':
-              batch_accs_qa.append(current_batch_acc)
-              batch_f1s_qa.append(current_batch_f1)
-          else:
-            if current_task == 'Sbj_Class':
-              batch_accs_sbj.append(current_batch_acc_aux)
-              batch_f1s_sbj.append(current_batch_f1_aux)
-          
-            elif current_task == 'Domain_Class':
-              batch_accs_domain.append(current_batch_acc_aux)
-              batch_f1s_domain.append(current_batch_f1_aux)
+          # we want to store train exact-match accuracies and F1 scores for each task as often as we evaluate model on validation set
+          running_tasks = tasks[:]
 
+          # after evaluation on dev set, move model back to train mode
           model.train()
 
         if epoch > 0 and early_stopping:
