@@ -645,7 +645,6 @@ def test(
     # set model to eval mode
     model.eval()
     
-    # define loss function
     loss_func = nn.CrossEntropyLoss()
 
     correct_answers_test, batch_f1_test = 0, 0
@@ -656,13 +655,13 @@ def test(
        
         batch_loss_test = 0
 
-        # add batch to current device
+        # move tensors in batch to current device (e.g., GPU)
         batch = tuple(t.to(device) for t in batch)
 
         # unpack inputs from dataloader            
         b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _, _, _, _ = batch
         
-        # if current batch_size is smaller than specified batch_size, skip batch
+        # if current batch_size is smaller than specified batch_size, skip batch (number of examples in last batche might not equal to batch_size)
         if b_input_ids.size(0) != batch_size:
             continue
 
