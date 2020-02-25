@@ -195,7 +195,7 @@ def train(
             batch_accs_domain, batch_f1s_domain = [], []
             tasks.append('Domain_Class')
 
-    # generate uniform random sample over all entries (for MTL setting with 2 auxiliary tasks, we might want to sample QA task with a higher probability than the auxiliary tasks)
+    # generate uniform random sample over all entries (TODO: for MTL setting with 2 auxiliary tasks, we might want to sample QA task with a higher probability than sampling auxiliary tasks)
     task_order = np.random.choice(tasks, size=n_steps, replace=True, p = [1/len(tasks) for _ in tasks])
     task_distrib = Counter(task_order)
 
@@ -251,6 +251,7 @@ def train(
             # unpack inputs from dataloader            
             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_cls_indexes, _, b_sbj, b_domains, _ = batch
             
+            # zero-out gradients
             optimizer.zero_grad()
 
             nb_tr_examples += b_input_ids.size(0)
