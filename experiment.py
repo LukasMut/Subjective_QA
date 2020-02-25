@@ -73,7 +73,7 @@ if __name__ == '__main__':
     doc_stride = 200
     max_query_length = 100
     batch_size = args.batch_size
-    sort_batch = True if args.encoder else False
+    sort_batch = False #True if args.encoder else False #NOTE: change this
     
     # create list of all review / paragraph domains in dataset(s)
     domains = ['books', 'tripadvisor', 'grocery', 'electronics', 'movies', 'restaurants', 'wikipedia']
@@ -479,7 +479,6 @@ if __name__ == '__main__':
                   "lr_adam": 5e-5,
                   "warmup_steps": 100 if args.finetuning == 'combined' else 50,
                   "max_grad_norm": 5,
-                  "sort_batch": False,
         }
 
         hypers["n_epochs"] = args.n_epochs
