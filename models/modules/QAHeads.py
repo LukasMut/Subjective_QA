@@ -135,13 +135,12 @@ class LinearQAHead(nn.Module):
             return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)
 
         else:
-
-            # use contextual embedding of the special [CLS] token (corresponds to the semantic representation of an input sentence X)
-            sequence_output = sequence_output[:, 0, :] 
-
             if self.adversarial:
                 # reverse gradients to learn qa-type / domain-invariant features (i.e., semi-supervised domain-adaptation)
                 sequence_output = grad_reverse(sequence_output)
+
+            # use contextual embedding of the special [CLS] token (corresponds to the semantic representation of an input sentence X)
+            sequence_output = sequence_output[:, 0, :]
 
             if task == 'Sbj_Class':
 
