@@ -849,7 +849,7 @@ def create_batches(
             seq_length_pos = 3
             sorted_indices, _ = zip(*sorted(enumerate(batch[seq_length_pos]), key=lambda seq_lengths: seq_lengths[1], reverse=True))
             sorted_indices = np.array(sorted_indices)
-            batch = tuple(el[sorted_indices] for el in batch)
+            batch = tuple(t[sorted_indices] for t in batch)
         
         yield batch
 

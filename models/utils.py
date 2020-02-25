@@ -245,7 +245,7 @@ def train(
             
             batch_loss = 0 
 
-            # add batch to GPU
+            # move all tensors in batch to GPU
             batch = tuple(t.to(device) for t in batch)
 
             # unpack inputs from dataloader            
