@@ -741,7 +741,7 @@ def create_question_answer_sequences(
     all_input_ids, all_input_masks, all_segment_ids, all_input_lengths, all_q_sbj, all_a_sbj = [], [], [], [], [], []
 
     for i, feature in enumerate(tqdm(features)):
-        qa_input_ids, qa_segment_ids, qa_input_masks  = [], [], []
+        qa_input_ids, qa_segment_ids, qa_input_masks = [], [], []
         current_input_ids = feature.input_ids
         current_sep_token_idx = current_input_ids.index(sep_token)
         
