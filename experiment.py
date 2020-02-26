@@ -477,7 +477,7 @@ if __name__ == '__main__':
 
         hypers = {
                   "lr_adam": 5e-5,
-                  "warmup_steps": 50,
+                  "warmup_steps": 100 if args.finetuning == 'combined' else 50,
                   "max_grad_norm": 5,
         }
 
