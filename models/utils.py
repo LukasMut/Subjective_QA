@@ -242,7 +242,7 @@ def train(
         # n_steps == n_updates per epoch (n_iters = n_epochs * n_steps per epoch)
         for step, batch in enumerate(tqdm(train_dl, desc="Step")):
 
-            if isinstance(n_aux_tasks, int):
+            if args['batch_presentation'] == 'alternating' and isinstance(n_aux_tasks, int):
               assert len(batch) == 2, 'In MTL, we must provide batches with different input sequences for the main and auxiliary task respectively'
               main_batch = tuple(t.to(device) for t in batch[0])
               print("Tensors in main batch: {}".format(len(main_batch)))
@@ -328,7 +328,11 @@ def train(
 
               if current_task == 'Sbj_Class':
 
-                b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj = aux_sbj_batch
+                if args['batch_presentation'] == 'alternating':
+                  b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj = aux_sbj_batch
+                else:
+                  b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _ = main_batch
+
 
                 sbj_logits_a, sbj_logits_q = model(
                                                    input_ids=b_input_ids,
@@ -505,7 +509,7 @@ def train(
 
           # after evaluation on dev set, move model back to train mode
           model.train()
-          
+
         if early_stopping:
           if args['n_evals'] == 'multiple_per_epoch':      
             if val_losses[-1] > val_losses[-2] and val_losses[-1] > val_losses[-3]:

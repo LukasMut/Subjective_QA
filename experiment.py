@@ -37,6 +37,8 @@ if __name__ == '__main__':
             help='Define number of evaluations during training. If "multiple_per_epoch", ten evals per epoch. If "one_per_epoch", once after a training epoch.')
     parser.add_argument('--multitask', action='store_true',
             help='If provided, MTL instead of STL setting.')
+    parser.add_argument('--batches', type=str, default='alternating',
+            help='If "alternating", auxiliary task conditioned on question-answer sequence; elif "normal" input is question-review sequence as usual. Only necessary, if MTL setting.')
     parser.add_argument('--adversarial', type=str, default=None,
             help='If provided, adversarial instead of classic training. Only necessary, if MTL setting. Specify which adversarial version.')
     parser.add_argument('--n_aux_tasks', type=int, default=None,
@@ -212,15 +214,18 @@ if __name__ == '__main__':
 
             if args.multitask:
 
-                subjqa_tensor_dataset_train_aux_sbj = create_tensor_dataset(subjqa_features_train, aux_sbj_batch=True)
+                if args.batches == 'alternating':
+                    
+                    # create different dataset for subjectivity auxiliary task (condition on question-answer sequence only instead of question-review sequence)
+                    subjqa_tensor_dataset_train_aux_sbj = create_tensor_dataset(combined_tensor_dataset_train, aux_sbj_batch=True)
 
-                train_dl_sbj = BatchGenerator(
-                                              dataset=subjqa_tensor_dataset_train_aux_sbj,
-                                              batch_size=batch_size,
-                                              sort_batch=sort_batch,
-                                              )
-
-                train_dl = zip(train_dl, train_dl_sbj)
+                    train_dl_sbj = BatchGenerator(
+                                                  dataset=subjqa_tensor_dataset_train_aux_sbj,
+                                                  batch_size=batch_size,
+                                                  sort_batch=sort_batch,
+                                                  )
+                    
+                    train_dl = zip(train_dl, train_dl_sbj)
 
                 assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
                 if args.n_aux_tasks == 2:
@@ -440,16 +445,19 @@ if __name__ == '__main__':
 
             if args.multitask:
 
-                subjqa_tensor_dataset_train_aux_sbj = create_tensor_dataset(combined_tensor_dataset_train, aux_sbj_batch=True)
+                if args.batches == 'alternating':
 
-                train_dl_sbj = BatchGenerator(
-                                              dataset=subjqa_tensor_dataset_train_aux_sbj,
-                                              batch_size=batch_size,
-                                              sort_batch=sort_batch,
-                                              )
-                
-                train_dl = zip(train_dl, train_dl_sbj)
-                
+                    # create different dataset for subjectivity auxiliary task (condition on question-answer sequence only instead of question-review sequence)
+                    subjqa_tensor_dataset_train_aux_sbj = create_tensor_dataset(combined_tensor_dataset_train, aux_sbj_batch=True)
+
+                    train_dl_sbj = BatchGenerator(
+                                                  dataset=subjqa_tensor_dataset_train_aux_sbj,
+                                                  batch_size=batch_size,
+                                                  sort_batch=sort_batch,
+                                                  )
+                    
+                    train_dl = zip(train_dl, train_dl_sbj)
+                    
                 assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
                 
                 if args.n_aux_tasks == 2:
@@ -511,6 +519,7 @@ if __name__ == '__main__':
         hypers["n_epochs"] = args.n_epochs
         hypers["n_steps"] = n_steps
         hypers["n_evals"] = args.n_evals
+        hypers["batch_presentation"] = args.batches
 
         if args.n_evals == 'multiple_per_epoch':
             hypers["n_evals_per_epoch"] = 10 # number of times we evaluate model on dev set per epoch (not necessary, if we just evaluate once after an epoch)
