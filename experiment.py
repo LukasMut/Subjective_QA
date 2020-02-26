@@ -37,8 +37,8 @@ if __name__ == '__main__':
             help='Define number of evaluations during training. If "multiple_per_epoch", ten evals per epoch. If "one_per_epoch", once after a training epoch.')
     parser.add_argument('--multitask', action='store_true',
             help='If provided, MTL instead of STL setting.')
-    parser.add_argument('--batches', type=str, default='alternating',
-            help='If "alternating", auxiliary task conditioned on question-answer sequence; elif "normal" input is question-review sequence as usual. Only necessary, if MTL setting.')
+    parser.add_argument('--batches', type=str, default='normal',
+            help='If "alternating", auxiliary task will be conditioned on question-answer sequence; elif "normal" input is question-review sequence as usual. Only necessary, if MTL setting.')
     parser.add_argument('--adversarial', type=str, default=None,
             help='If provided, adversarial instead of classic training. Only necessary, if MTL setting. Specify which adversarial version.')
     parser.add_argument('--n_aux_tasks', type=int, default=None,
@@ -120,13 +120,14 @@ if __name__ == '__main__':
     decoder = 'BiLSTM' if args.decoder else ''
     train_method = 'multitask' + '_' + str(args.n_aux_tasks) if args.multitask else 'singletask'
     eval_setup = args.n_evals
+    batch_presentation = args.batches if train_method == 'multitask' else ''
 
     if isinstance(args.adversarial, type(None)):
         training = 'classic'
     else:
         training = args.adversarial if args.adversarial == 'GRL' else 'adv' + args.adversarial
 
-    model_name = 'DistilBERT' + '_' + encoding + '_' + highway + '_' + decoder + '_' + train_method + '_' + training + '_' + dataset + '_' + eval_setup
+    model_name = 'DistilBERT' + '_' + encoding + '_' + highway + '_' + decoder + '_' + train_method + '_' + batch_presentation + '_' + training + '_' + dataset + '_' + eval_setup
     model_name = model_name.lower()
     
     if args.version == 'train':
