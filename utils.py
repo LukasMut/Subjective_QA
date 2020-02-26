@@ -781,13 +781,15 @@ def get_class_weights(
     class_distrib_subjqa = {idx_to_class[l]: freq for l, freq in Counter(subjqa_classes).items()}
     
     if isinstance(squad_classes, list):
-        n_squad_classes = len(squad_classes)
-        n_total = n_total_subjqa + n_squad_classes
+        n_total_squad = len(squad_classes)
+        n_total = n_total_subjqa + n_total_squad
+
         if len(class_distrib_subjqa) > 2:
-            class_distrib_subjqa['wikipedia'] = n_squad_classes
+            class_distrib_subjqa['wikipedia'] = n_total_squad
             class_distrib = class_distrib_subjqa
+
         elif len(class_distrib_subjqa) == 2:
-            class_distrib_subjqa['obj'] += n_squad_classes
+            class_distrib_subjqa['obj'] += n_total_squad
             class_distrib = class_distrib_subjqa
     else:
         n_total = n_total_subjqa

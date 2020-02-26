@@ -457,7 +457,7 @@ if __name__ == '__main__':
                                                   qa_type='answers',
                 )
 
-                qa_type_weights = torch.stack((a_type_weights, q_type_weights), dim=1)
+                qa_type_weights = torch.stack((a_type_weights, q_type_weights))
 
         # initialise QA model
         model = DistilBertForQA.from_pretrained(
@@ -477,7 +477,7 @@ if __name__ == '__main__':
 
         hypers = {
                   "lr_adam": 5e-5,
-                  "warmup_steps": 100 if args.finetuning == 'combined' else 50,
+                  "warmup_steps": 50,
                   "max_grad_norm": 5,
         }
 
