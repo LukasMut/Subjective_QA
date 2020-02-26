@@ -139,12 +139,11 @@ def train(
           adversarial_simple:bool=False,
           plot_task_distrib:bool=False,
 ):
-    n_steps = len(train_dl)
-    n_iters = n_steps * args['n_epochs']
-    n_examples = n_steps * batch_size
+    n_iters = args['n_steps'] * args['n_epochs']
+    n_examples = args['n_steps'] * batch_size
     
     if args['n_evals'] == 'multiple_per_epoch':
-      steps_until_eval = n_steps // args['n_evals_per_epoch'] # number of steps between validations
+      steps_until_eval =  args['n_steps'] // args['n_evals_per_epoch'] # number of steps between validations
     
     L = 6 # total number of transformer layers in pre-trained DistilBERT model (L = 12 for BERT base, L = 6 for DistilBERT base)
     
@@ -196,7 +195,7 @@ def train(
             tasks.append('Domain_Class')
 
     # generate uniform random sample over all entries (TODO: for MTL setting with 2 auxiliary tasks, we might want to sample QA task with a higher probability than sampling auxiliary tasks)
-    task_order = np.random.choice(tasks, size=n_steps, replace=True, p = [1/len(tasks) for _ in tasks])
+    task_order = np.random.choice(tasks, size=args['n_steps'], replace=True, p = [1/len(tasks) for _ in tasks])
     task_distrib = Counter(task_order)
 
     if plot_task_distrib:
@@ -224,7 +223,7 @@ def train(
           if epoch > 0 and (args['dataset'] == 'SubjQA' or args['dataset'] == 'combined'):
               model = freeze_transformer_layers(model, model_name=model_name, unfreeze=True, l=l)
               print("------------------------------------------------------------------------------------------")
-              print("---------- Pre-trained BERT weights of top {} transformer layers are unfrozen -----------".format(L - l ))
+              print("---------- Pre-trained BERT weights of top {} transformer layers are unfrozen -----------".format(L - l))
               print("-------------------------------------------------------------------------------------------")
               print()
               l -= k
@@ -241,24 +240,26 @@ def train(
         nb_tr_examples, nb_tr_steps = 0, 0
         
         # n_steps == n_updates per epoch (n_iters = n_epochs * n_steps per epoch)
-        for i, batch in enumerate(tqdm(train_dl, desc="Step")):
-            
-            batch_loss = 0 
+        for step, batch in enumerate(tqdm(train_dl, desc="Step")):
 
-            # move all tensors in batch to GPU
-            batch = tuple(t.to(device) for t in batch)
+            if isinstance(n_aux_tasks, int):
+              assert len(batch) == 2, 'In MTL, we must provide batches with different input sequences for the main and auxiliary task respectively'
+              main_batch = tuple(t.to(device) for t in batch[0])
+              print("Tensors in main batch: {}".format(len(main_batch)))
+              aux_sbj_batch = tuple(t.to(device) for t in batch[1])
+              print("Tensors in auxiliary batch: {}".format(len(aux_sbj_batch)))
 
-            # unpack inputs from dataloader            
-            b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_cls_indexes, _, b_sbj, b_domains, _ = batch
+            else:
+              main_batch = tuple(t.to(device) for t in batch)
             
+            # sample task from random distribution
+            current_task = task_order[step]
+
+            batch_loss = 0            
+
             # zero-out gradients
             optimizer.zero_grad()
-
-            nb_tr_examples += b_input_ids.size(0)
-            nb_tr_steps += 1
             
-            current_task = task_order[i]
-
             if isinstance(n_aux_tasks, int):
               print('------------------------------------')
               print('-------- Current task: {} --------'.format(current_task))
@@ -266,6 +267,9 @@ def train(
               print()
 
             if current_task == 'QA':
+
+              # unpack inputs from dataloader for main task           
+              b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _ = main_batch
 
               start_logits, end_logits = model(
                              input_ids=b_input_ids,
@@ -303,7 +307,7 @@ def train(
               batch_f1 += compute_f1_batch(true_answers, pred_answers)
 
               # keep track of train examples used for QA
-              nb_tr_examples_qa = Counter(task_order[:i+1])[current_task] * batch_size
+              nb_tr_examples_qa = Counter(task_order[:step+1])[current_task] * batch_size
 
               current_batch_acc = round(100 * (correct_answers / nb_tr_examples_qa), 3)
               current_batch_f1 = round(100 * (batch_f1 / nb_tr_examples_qa), 3)
@@ -314,14 +318,17 @@ def train(
               print("--------------------------------------------")
               print()
 
-              if current_task in running_tasks:
-                batch_accs_qa.append(current_batch_acc)
-                batch_f1s_qa.append(current_batch_f1)
-                running_tasks.pop(running_tasks.index(current_task))
+              if step > (steps_until_eval // 2):
+                if current_task in running_tasks:
+                  batch_accs_qa.append(current_batch_acc)
+                  batch_f1s_qa.append(current_batch_f1)
+                  running_tasks.pop(running_tasks.index(current_task))
 
             else:
 
               if current_task == 'Sbj_Class':
+
+                b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj = aux_sbj_batch
 
                 sbj_logits_a, sbj_logits_q = model(
                                                    input_ids=b_input_ids,
@@ -356,6 +363,8 @@ def train(
 
               elif current_task == 'Domain_Class':
 
+                b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, _, b_domains = main_batch
+
                 domain_logits = model(
                                       input_ids=b_input_ids,
                                       attention_masks=b_attn_masks,
@@ -376,7 +385,7 @@ def train(
                 batch_f1_aux = batch_f1_domain
               
               # keep track of steps taken per task (don't use overall steps)
-              nb_tr_steps_aux = Counter(task_order[:i+1])[current_task]
+              nb_tr_steps_aux = Counter(task_order[:step+1])[current_task]
               current_batch_acc_aux = round(100 * (batch_acc_aux / nb_tr_steps_aux), 3)
               current_batch_f1_aux = round(100 * (batch_f1_aux / nb_tr_steps_aux), 3)
 
@@ -386,17 +395,23 @@ def train(
               print("--------------------------------------------")
               print()
 
-              if current_task in running_tasks:
+              nb_tr_examples += b_input_ids.size(0)
+              nb_tr_steps += 1
 
-                if current_task == 'Sbj_Class':
-                  batch_accs_sbj.append(current_batch_acc_aux)
-                  batch_f1s_sbj.append(current_batch_f1_aux)
+              # we don't want to save F1 scores and exact-match accuracies at the very beginning of training
+              if step > (steps_until_eval // 2):
 
-                elif current_task == 'Domain_Class':
-                  batch_accs_domain.append(current_batch_acc_aux)
-                  batch_f1s_domain.append(current_batch_f1_aux)
+                if current_task in running_tasks:
 
-                running_tasks.pop(running_tasks.index(current_task))
+                  if current_task == 'Sbj_Class':
+                    batch_accs_sbj.append(current_batch_acc_aux)
+                    batch_f1s_sbj.append(current_batch_f1_aux)
+
+                  elif current_task == 'Domain_Class':
+                    batch_accs_domain.append(current_batch_acc_aux)
+                    batch_f1s_domain.append(current_batch_f1_aux)
+
+                  running_tasks.pop(running_tasks.index(current_task))
 
             print("------------------------------------")
             print("----- Current {} loss: {} -----".format(current_task, abs(round(batch_loss.item(), 3))))
@@ -421,7 +436,7 @@ def train(
                 scheduler.step()
 
             if args['n_evals'] == 'multiple_per_epoch':
-              if i > 0 and i % steps_until_eval == 0:
+              if step > 0 and step % steps_until_eval == 0:
                 val_losses, val_accs, val_f1s, model = val(
                                                           model=model,
                                                           tokenizer=tokenizer,
@@ -490,8 +505,8 @@ def train(
 
           # after evaluation on dev set, move model back to train mode
           model.train()
-
-        if epoch > 0 and early_stopping:
+          
+        if early_stopping:
           if args['n_evals'] == 'multiple_per_epoch':      
             if val_losses[-1] > val_losses[-2] and val_losses[-1] > val_losses[-3]:
               print("------------------------------------------")
@@ -499,7 +514,7 @@ def train(
               print("------------------------------------------")
               break
 
-          elif args['n_evals'] == 'one_per_epoch':
+          elif args['n_evals'] == 'one_per_epoch' and epoch > 0:
             if val_losses[-1] > val_losses[-2]:
               print("------------------------------------------")
               print("----- Early stopping after {} steps -----".format(nb_tr_steps * (epoch + 1)))
@@ -548,7 +563,7 @@ def val(
         batch = tuple(t.to(device) for t in batch)
 
         # unpack inputs from dataloader            
-        b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_cls_indexes, _, _, _, _ = batch
+        b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos,  _, _ = batch
 
          # if current batch_size is smaller than specified batch_size, skip batch
         if b_input_ids.size(0) != batch_size:
@@ -659,7 +674,7 @@ def test(
         batch = tuple(t.to(device) for t in batch)
 
         # unpack inputs from dataloader            
-        b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _, _, _, _ = batch
+        b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _ = batch
         
         # if current batch_size is smaller than specified batch_size, skip batch (number of examples in last batche might not equal to batch_size)
         if b_input_ids.size(0) != batch_size:

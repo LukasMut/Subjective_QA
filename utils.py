@@ -513,7 +513,6 @@ def convert_examples_to_features(
                 tokens.append(sep_token)
                 segment_ids.append(sequence_a_segment_id)
                 p_mask.append(1)
-
                 tokens += query_tokens
                 segment_ids += [sequence_b_segment_id] * len(query_tokens)
                 p_mask += [1] * len(query_tokens)
@@ -729,30 +728,95 @@ def split_into_train_and_dev(
     dev_set = train_examples[int(n_examples * train_proportion):]
     return train_set, dev_set
 
+def create_question_answer_sequences(
+                                    features:list,
+                                    max_seq_length:int=512,
+                                    sequence_a_segment_id:int=0,
+                                    sequence_b_segment_id:int=1,
+                                    pad_token_segment_id:int=0,
+                                    cls_token:int=101,
+                                    sep_token:int=102,
+                                    pad_token:int=0,
+                                    ):
+    all_input_ids, all_input_masks, all_segment_ids, all_input_lengths, all_q_sbj, all_a_sbj = [], [], [], [], [], []
+
+    for i, feature in enumerate(tqdm(features)):
+        qa_input_ids, qa_segment_ids, qa_input_masks  = [], [], []
+        current_input_ids = feature.input_ids
+        current_sep_token_idx = current_input_ids.index(sep_token)
+        
+        for j in range(current_sep_token_idx + 1):
+            qa_input_ids.append(current_input_ids[j])
+            qa_segment_ids.append(sequence_a_segment_id)
+            qa_input_masks.append(1)
+        
+        assert qa_input_ids[-1] == sep_token, 'question and answer must be separated through [SEP] token'
+
+        for k, input_id_answer in enumerate(current_input_ids[feature.start_position: feature.end_position + 1]):
+            qa_input_ids.append(input_id_answer)
+            qa_segment_ids.append(sequence_b_segment_id)
+            qa_input_masks.append(1)
+
+        qa_input_ids.append(sep_token)
+        qa_segment_ids.append(sequence_b_segment_id)
+        qa_input_masks.append(1)
+        all_input_lengths.append(len(qa_input_ids))
+
+        if len(qa_input_ids) < max_seq_length:
+
+            for _ in range(len(qa_input_ids), max_seq_length):
+                qa_input_ids.append(pad_token)
+                qa_segment_ids.append(pad_token_segment_id)
+                qa_input_masks.append(0)
+
+        assert qa_input_ids[0] == cls_token, 'first token in input id sequence must be [CLS] token'
+
+        all_input_ids.append(qa_input_ids)
+        all_segment_ids.append(qa_segment_ids)
+        all_input_masks.append(qa_input_masks)
+        all_q_sbj.append(feature.q_sbj)
+        all_a_sbj.append(feature.a_sbj)
+
+    all_input_ids = torch.tensor(all_input_ids, dtype=torch.long)
+    all_segment_ids = torch.tensor(all_segment_ids, dtype=torch.long)
+    all_input_masks = torch.tensor(all_input_masks, dtype=torch.long)
+    all_input_lengths = torch.tensor(all_input_lengths, dtype=torch.long)
+
+    all_q_sbj = torch.tensor(all_q_sbj, dtype=torch.long)
+    all_a_sbj = torch.tensor(all_a_sbj, dtype=torch.long)
+    all_sbj = torch.stack((all_a_sbj, all_q_sbj), dim=1)
+
+    return all_input_ids, all_input_masks, all_segment_ids, all_input_lengths, all_sbj
+
 def create_tensor_dataset(
                           features:list,
-                          evaluate:bool=False,
-):
-
+                          aux_sbj_batch:bool=False,
+                          ):
+    if aux_sbj_batch:
+        all_input_ids,  all_input_mask, all_segment_ids, all_input_lengths, all_sbj = create_question_answer_sequences(features=features)
+        
+        dataset = TensorDataset(
+                                all_input_ids,
+                                all_input_mask,
+                                all_segment_ids,
+                                all_input_lengths,
+                                all_sbj)
+    else:
         all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
         all_input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
         all_segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
-        all_input_lengths = torch.tensor([f.input_length for f in features], dtype=torch.long)
-        all_cls_index = torch.tensor([f.cls_index for f in features], dtype=torch.long)
-        all_p_mask = torch.tensor([f.p_mask for f in features], dtype=torch.float)        
+        all_input_lengths = torch.tensor([f.input_length for f in features], dtype=torch.long)       
         
-        # QA labels
         all_start_positions = torch.tensor([f.start_position for f in features], dtype=torch.long)
         all_end_positions = torch.tensor([f.end_position for f in features], dtype=torch.long)
 
-        # auxiliary task labels
         all_q_sbj = torch.tensor([f.q_sbj for f in features], dtype=torch.long)
         all_a_sbj = torch.tensor([f.a_sbj for f in features], dtype=torch.long)
         all_sbj = torch.stack((all_a_sbj, all_q_sbj), dim=1)
-        all_domains = torch.tensor([f.domain for f in features], dtype=torch.long)
-        all_datasets = torch.tensor([f.dataset for f in features], dtype=torch.long)
 
-          
+        all_domains = torch.tensor([f.domain for f in features], dtype=torch.long)
+        #all_datasets = torch.tensor([f.dataset for f in features], dtype=torch.long)
+
         dataset = TensorDataset(
                                 all_input_ids,
                                 all_input_mask,
@@ -760,14 +824,10 @@ def create_tensor_dataset(
                                 all_input_lengths,
                                 all_start_positions,
                                 all_end_positions,
-                                all_cls_index,
-                                all_p_mask,
                                 all_sbj,
                                 all_domains,
-                                all_datasets,
-            )
-        return dataset
-
+                                )
+    return dataset
     
 def get_class_weights(
                       subjqa_classes:list,

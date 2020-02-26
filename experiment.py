@@ -208,7 +208,20 @@ if __name__ == '__main__':
                                     sort_batch=sort_batch,
             )
 
+            n_steps = len(train_dl)
+
             if args.multitask:
+
+                subjqa_tensor_dataset_train_aux_sbj = create_tensor_dataset(subjqa_features_train, aux_sbj_batch=True)
+
+                train_dl_sbj = BatchGenerator(
+                                              dataset=subjqa_tensor_dataset_train_aux_sbj,
+                                              batch_size=batch_size,
+                                              sort_batch=sort_batch,
+                                              )
+
+                train_dl = zip(train_dl, train_dl_sbj)
+
                 assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
                 if args.n_aux_tasks == 2:
                     subjqa_domains = [f.domain for f in subjqa_features_train]
@@ -294,6 +307,8 @@ if __name__ == '__main__':
                                     batch_size=batch_size,
                                     sort_batch=sort_batch,
             )
+
+            n_steps = len(train_dl)
             
         elif args.finetuning == 'combined':
              
@@ -421,7 +436,19 @@ if __name__ == '__main__':
                                     sort_batch=sort_batch,
             )
 
+            n_steps = len(train_dl)
+
             if args.multitask:
+
+                subjqa_tensor_dataset_train_aux_sbj = create_tensor_dataset(combined_tensor_dataset_train, aux_sbj_batch=True)
+
+                train_dl_sbj = BatchGenerator(
+                                              dataset=subjqa_tensor_dataset_train_aux_sbj,
+                                              batch_size=batch_size,
+                                              sort_batch=sort_batch,
+                                              )
+                
+                train_dl = zip(train_dl, train_dl_sbj)
                 
                 assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
                 
@@ -482,6 +509,7 @@ if __name__ == '__main__':
         }
 
         hypers["n_epochs"] = args.n_epochs
+        hypers["n_steps"] = n_steps
         hypers["n_evals"] = args.n_evals
 
         if args.n_evals == 'multiple_per_epoch':
@@ -503,7 +531,7 @@ if __name__ == '__main__':
                               correct_bias=True,
             )
             
-            t_total = len(train_dl) * hypers['n_epochs'] # total number of training steps (i.e., step = iteration)
+            t_total = n_steps * hypers['n_epochs'] # total number of training steps (i.e., step = iteration)
             
             scheduler = get_linear_schedule_with_warmup(
                                                         optimizer, 
