@@ -491,7 +491,7 @@ def train(
           # after evaluation on dev set, move model back to train mode
           model.train()
 
-        if early_stopping:
+        if epoch > 0 and early_stopping:
           if args['n_evals'] == 'multiple_per_epoch':      
             if val_losses[-1] > val_losses[-2] and val_losses[-1] > val_losses[-3]:
               print("------------------------------------------")
@@ -499,7 +499,7 @@ def train(
               print("------------------------------------------")
               break
 
-          elif args['n_evals'] == 'one_per_epoch' and epoch > 0:
+          elif args['n_evals'] == 'one_per_epoch':
             if val_losses[-1] > val_losses[-2]:
               print("------------------------------------------")
               print("----- Early stopping after {} steps -----".format(nb_tr_steps * (epoch + 1)))
