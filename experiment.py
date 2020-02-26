@@ -120,7 +120,7 @@ if __name__ == '__main__':
     decoder = 'BiLSTM' if args.decoder else ''
     train_method = 'multitask' + '_' + str(args.n_aux_tasks) if args.multitask else 'singletask'
     eval_setup = args.n_evals
-    batch_presentation = args.batches if train_method == 'multitask' else ''
+    batch_presentation = args.batches if args.multitask else ''
 
     if isinstance(args.adversarial, type(None)):
         training = 'classic'
