@@ -464,7 +464,7 @@ def train(
                 # after evaluation on dev set, move model back to train mode
                 model.train()
 
-                if early_stopping:
+                if early_stopping and step > (args['n_steps'] // 2):
                   if val_losses[-1] > val_losses[-2] and val_losses[-1] > val_losses[-3]:
                     stop_training = True
                     break
