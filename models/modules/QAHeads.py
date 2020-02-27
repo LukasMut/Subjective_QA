@@ -14,17 +14,6 @@ from models.modules.Highway import Highway
 
 # set device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-"""
-is_cuda = torch.cuda.is_available()
-
-if is_cuda:
-    device = torch.device("cuda")
-    print("GPU is available")
-else:
-    device = torch.device("cpu")
-    print("GPU not available, CPU used")
-"""
        
 class LinearQAHead(nn.Module):
     
@@ -134,7 +123,7 @@ class LinearQAHead(nn.Module):
 
             if task == 'Sbj_Class':
 
-                # introduce skip connection (add output of previous layer to linear transformation)
+                # introduce skip connection (add output of previous layer to linear transformation) to encode more information
                 sbj_out = sequence_output + self.fc_sbj_2(F.relu(self.aux_dropout(self.fc_sbj_1(sequence_output))))
                 sbj_logits_a = self.fc_sbj_a(sbj_out)
                 sbj_logits_q = self.fc_sbj_q(sbj_out)
@@ -147,7 +136,7 @@ class LinearQAHead(nn.Module):
 
             elif task == 'Domain_Class':
 
-                # introduce skip connection (add output of previous layer to linear transformation)
+                # introduce skip connection (add output of previous layer to linear transformation) to encode more information
                 domain_out = sequence_output + self.fc_domain_2(F.relu(self.aux_dropout(self.fc_domain_1(sequence_output))))
                 domain_logits = self.fc_domain_3(domain_out)
                 domain_logits = domain_logits.squeeze(-1)
@@ -284,7 +273,7 @@ class RecurrentQAHead(nn.Module):
 
             if task == 'Sbj_Class':
 
-                # introduce skip connection (add output of previous layer to linear transformation)
+                # introduce skip connection (add output of previous layer to linear transformation) to encode more information
                 sbj_out = sequence_output + self.fc_sbj_2(F.relu(self.aux_dropout(self.fc_sbj_1(sequence_output))))
                 sbj_logits_a = self.fc_sbj_a(sbj_out)
                 sbj_logits_q = self.fc_sbj_q(sbj_out)
@@ -297,7 +286,7 @@ class RecurrentQAHead(nn.Module):
 
             elif task == 'Domain_Class':
 
-                # introduce skip connection (add output of previous layer to linear transformation)
+                # introduce skip connection (add output of previous layer to linear transformation) to encode more information
                 domain_out = sequence_output + self.fc_domain_2(F.relu(self.aux_dropout(self.fc_domain_1(sequence_output))))
                 domain_logits = self.fc_domain_3(domain_out)
                 domain_logits = domain_logits.squeeze(-1)
