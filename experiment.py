@@ -75,7 +75,7 @@ if __name__ == '__main__':
     doc_stride = 200
     max_query_length = 100
     batch_size = args.batch_size
-    sort_batch = False #True if args.encoder else False #NOTE: change this
+    sort_batch = True if args.encoder else False
     
     # create list of all review / paragraph domains in dataset(s)
     domains = ['books', 'tripadvisor', 'grocery', 'electronics', 'movies', 'restaurants', 'wikipedia']

@@ -56,14 +56,14 @@ class BiLSTM(nn.Module):
                 seq_lengths:torch.Tensor,
                 hidden:torch.Tensor,
     ):
-        out, hidden = self.lstm(bert_outputs, hidden)
+        # out, hidden = self.lstm(bert_outputs, hidden)
 
         # NOTE: we don't want to include [PAD] tokens in the recurrent step
         #       (not useful to add hidden_i, where i is the last position of a non-[PAD] token, and input of 0s together) 
-        #seq_lengths = to_cpu(seq_lengths, detach=True)
-        #packed = nn.utils.rnn.pack_padded_sequence(bert_outputs, seq_lengths, batch_first=True)
-        #packed_out, hidden = self.lstm(packed, hidden)
-        #out, _ = nn.utils.rnn.pad_packed_sequence(packed_out, batch_first=True, total_length=self.max_seq_length)
+        seq_lengths = to_cpu(seq_lengths, detach=True)
+        packed = nn.utils.rnn.pack_padded_sequence(bert_outputs, seq_lengths, batch_first=True)
+        packed_out, hidden = self.lstm(packed, hidden)
+        out, _ = nn.utils.rnn.pad_packed_sequence(packed_out, batch_first=True, total_length=self.max_seq_length)
         return out, hidden
     
     def init_hidden(
@@ -112,7 +112,7 @@ class BiGRU(nn.Module):
                 seq_lengths:torch.Tensor,
                 hidden:torch.Tensor,
     ):
-        #out, hidden = self.gru(bert_outputs, hidden)
+        # out, hidden = self.gru(bert_outputs, hidden)
         
         # NOTE: we don't want to include [PAD] tokens in the recurrent step
         #       (not useful to add hidden_i, where i is the last position of a non-[PAD] token, and input of 0s together) 
