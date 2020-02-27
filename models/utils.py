@@ -245,10 +245,7 @@ def train(
             if args['batch_presentation'] == 'alternating' and isinstance(n_aux_tasks, int):
               assert len(batch) == 2, 'In MTL, we must provide batches with different input sequences for the main and auxiliary task respectively'
               main_batch = tuple(t.to(device) for t in batch[0])
-              print("Tensors in main batch: {}".format(len(main_batch)))
               aux_sbj_batch = tuple(t.to(device) for t in batch[1])
-              print("Tensors in auxiliary batch: {}".format(len(aux_sbj_batch)))
-
             else:
               main_batch = tuple(t.to(device) for t in batch)
             
