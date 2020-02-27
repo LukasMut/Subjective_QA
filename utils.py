@@ -755,6 +755,7 @@ def create_question_answer_sequences(
 
         # NOTE: if question is not answerable, then input sequence is simply q_i instead of (q_i, a_i)
         if not (feature.start_position == 0 and feature.end_position == 0):
+            
             for k, input_id_answer in enumerate(current_input_ids[feature.start_position: feature.end_position + 1]):
                 qa_input_ids.append(input_id_answer)
                 qa_segment_ids.append(sequence_b_segment_id)
