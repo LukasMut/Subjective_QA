@@ -144,6 +144,7 @@ def train(
     
     if args['n_evals'] == 'multiple_per_epoch':
       steps_until_eval =  args['n_steps'] // args['n_evals_per_epoch'] # number of steps between validations
+      stop_training = False
     
     L = 6 # total number of transformer layers in pre-trained DistilBERT model (L = 12 for BERT base, L = 6 for DistilBERT base)
     
@@ -463,6 +464,11 @@ def train(
                 # after evaluation on dev set, move model back to train mode
                 model.train()
 
+                if early_stopping:
+                  if val_losses[-1] > val_losses[-2] and val_losses[-1] > val_losses[-3]:
+                    stop_training = True
+                    break
+
         tr_loss /= task_distrib['QA']
         train_exact_match = round(100 * (correct_answers / (task_distrib['QA'] * batch_size)), 3)
         train_f1 = round(100 * (batch_f1 / (task_distrib['QA'] * batch_size)), 3)
@@ -512,20 +518,19 @@ def train(
           # after evaluation on dev set, move model back to train mode
           model.train()
 
-        if early_stopping:
-          if args['n_evals'] == 'multiple_per_epoch':      
-            if val_losses[-1] > val_losses[-2] and val_losses[-1] > val_losses[-3]:
-              print("------------------------------------------")
-              print("----- Early stopping after {} steps -----".format(nb_tr_steps * (epoch + 1)))
-              print("------------------------------------------")
-              break
-
-          elif args['n_evals'] == 'one_per_epoch' and epoch > 0:
-            if val_losses[-1] > val_losses[-2]:
-              print("------------------------------------------")
-              print("----- Early stopping after {} steps -----".format(nb_tr_steps * (epoch + 1)))
-              print("------------------------------------------")
-              break
+          if early_stopping and epoch > 0:
+            if args['n_evals'] == 'one_per_epoch':
+              if val_losses[-1] > val_losses[-2]:
+                print("------------------------------------------")
+                print("----- Early stopping after {} steps -----".format(nb_tr_steps * (epoch + 1)))
+                print("------------------------------------------")
+                break
+        else:
+          if stop_training:
+            print("------------------------------------------")
+            print("----- Early stopping after {} steps -----".format(nb_tr_steps * (epoch + 1)))
+            print("------------------------------------------")
+            break
 
     # return model in eval mode
     model.eval()

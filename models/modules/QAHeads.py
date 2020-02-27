@@ -66,7 +66,8 @@ class LinearQAHead(nn.Module):
             self.aux_dropout = nn.Dropout(p = self.aux_dropout_p)
             
             # fully-connected subjectivity output layers (must be present in every MTL setting)
-            self.fc_sbj = nn.Linear(self.in_size, self.in_size)
+            self.fc_sbj_1 = nn.Linear(self.in_size, self.in_size)
+            self.fc_sbj_2 = nn.Linear(self.in_size, self.in_size)
             self.fc_sbj_a = nn.Linear(self.in_size, 1) # fc subj. layer for answers
             self.fc_sbj_q = nn.Linear(self.in_size, 1) # fc subj. layer for questions
 
@@ -76,7 +77,8 @@ class LinearQAHead(nn.Module):
 
                 # fully-connected review domain output layers (second auxiliary task)
                 self.fc_domain_1 = nn.Linear(self.in_size, self.in_size)
-                self.fc_domain_2 = nn.Linear(self.in_size, self.n_domain_labels)
+                self.fc_domain_2 = nn.Linear(self.in_size, self.in_size)
+                self.fc_domain_3 = nn.Linear(self.in_size, self.n_domain_labels)
 
             elif self.n_aux_tasks > 2:
                 raise ValueError("Model cannot perform more than 2 auxiliary tasks.")
@@ -132,8 +134,8 @@ class LinearQAHead(nn.Module):
 
             if task == 'Sbj_Class':
 
-                # residual connection
-                sbj_out = sequence_output + F.relu(self.aux_dropout(self.fc_sbj(sequence_output)))
+                # introduce skip connection (add output of previous layer to linear transformation)
+                sbj_out = sequence_output + self.fc_sbj_2(F.relu(self.aux_dropout(self.fc_sbj_1(sequence_output))))
                 sbj_logits_a = self.fc_sbj_a(sbj_out)
                 sbj_logits_q = self.fc_sbj_q(sbj_out)
 
@@ -145,9 +147,9 @@ class LinearQAHead(nn.Module):
 
             elif task == 'Domain_Class':
 
-                # residual connection
-                domain_out = sequence_output + F.relu(self.aux_dropout(self.fc_domain_1(sequence_output)))
-                domain_logits = self.fc_domain_2(domain_out)
+                # introduce skip connection (add output of previous layer to linear transformation)
+                domain_out = sequence_output + self.fc_domain_2(F.relu(self.aux_dropout(self.fc_domain_1(sequence_output))))
+                domain_logits = self.fc_domain_3(domain_out)
                 domain_logits = domain_logits.squeeze(-1)
 
                 return domain_logits
@@ -201,7 +203,8 @@ class RecurrentQAHead(nn.Module):
             self.aux_dropout = nn.Dropout(p = self.aux_dropout_p)
             
             # fully-connected subjectivity output layers (must be present in every MTL setting)
-            self.fc_sbj = nn.Linear(self.in_size, self.in_size)
+            self.fc_sbj_1 = nn.Linear(self.in_size, self.in_size)
+            self.fc_sbj_2 = nn.Linear(self.in_size, self.in_size)
             self.fc_sbj_a = nn.Linear(self.in_size, 1) # fc subj. layer for answers
             self.fc_sbj_q = nn.Linear(self.in_size, 1) # fc subj. layer for questions
 
@@ -211,7 +214,8 @@ class RecurrentQAHead(nn.Module):
 
                 # fully-connected review domain output layers (second auxiliary task)
                 self.fc_domain_1 = nn.Linear(self.in_size, self.in_size)
-                self.fc_domain_2 = nn.Linear(self.in_size, self.n_domain_labels)
+                self.fc_domain_2 = nn.Linear(self.in_size, self.in_size)
+                self.fc_domain_3 = nn.Linear(self.in_size, self.n_domain_labels)
 
             elif self.n_aux_tasks > 2:
                 raise ValueError("Model cannot perform more than 2 auxiliary tasks.")
@@ -278,7 +282,7 @@ class RecurrentQAHead(nn.Module):
             if task == 'Sbj_Class':
 
                 # we only need hidden states of last time step (summary of the sequence) (i.e., seq[batch_size, -1, hidden_size])
-                sbj_out = sequence_output[:, -1, :] + F.relu(self.aux_dropout(self.fc_sbj(sequence_output[:, -1, :])))
+                sbj_out = sequence_output[:, -1, :] + self.fc_sbj_2(F.relu(self.aux_dropout(self.fc_sbj_1(sequence_output[:, -1, :]))))
                 sbj_logits_a = self.fc_sbj_a(sbj_out)
                 sbj_logits_q = self.fc_sbj_q(sbj_out)
 
@@ -290,8 +294,9 @@ class RecurrentQAHead(nn.Module):
 
             elif task == 'Domain_Class':
 
-                domain_out = sequence_output[:, -1, :] + F.relu(self.aux_dropout(self.fc_domain_1(sequence_output[:, -1, :])))
-                domain_logits = self.fc_domain_2(domain_out)
+                # introduce skip connection (add output of previous layer to linear transformation)
+                domain_out = sequence_output[:, -1, :] + self.fc_domain_2(F.relu(self.aux_dropout(self.fc_domain_1(sequence_output[:, -1, :]))))
+                domain_logits = self.fc_domain_3(domain_out)
                 domain_logits = domain_logits.squeeze(-1)
 
                 return domain_logits #, hidden_rnn
