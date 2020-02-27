@@ -773,6 +773,8 @@ def create_question_answer_sequences(
                 qa_input_masks.append(0)
 
         assert qa_input_ids[0] == cls_token, 'first token in input id sequence must be [CLS] token'
+        assert len(qa_input_ids) == max_seq_length, 'each (q_i, a_i) input sequence must be of length: {}'.format(max_seq_length)
+        assert len(qa_input_ids) == len(qa_segment_ids) == len(qa_input_masks)
 
         all_input_ids.append(qa_input_ids)
         all_segment_ids.append(qa_segment_ids)
