@@ -6,6 +6,7 @@ __all__ = [
            'convert_df_to_dict',
            'create_examples',
            'convert_examples_to_features',
+           'create_question_answer_sequences',
            'create_tensor_dataset',
            'get_class_weights',
            'idx_to_class',
@@ -751,11 +752,11 @@ def create_question_answer_sequences(
             qa_segment_ids.append(sequence_a_segment_id)
             qa_input_masks.append(1)
         
-        assert qa_input_ids[-1] == sep_token, 'question and answer must be separated through [SEP] token'
+        assert qa_input_ids[0] == cls_token, '[CLS] token must be first token in input_id sequence'
+        assert qa_input_ids[-1] == sep_token, 'question and answer span must be separated through [SEP] token'
 
         # NOTE: if question is not answerable, then input sequence is simply q_i instead of (q_i, a_i)
-        if not (feature.start_position == 0 and feature.end_position == 0):
-            
+        if not feature.is_impossible:
             for k, input_id_answer in enumerate(current_input_ids[feature.start_position: feature.end_position + 1]):
                 qa_input_ids.append(input_id_answer)
                 qa_segment_ids.append(sequence_b_segment_id)
@@ -764,18 +765,17 @@ def create_question_answer_sequences(
             qa_input_ids.append(sep_token)
             qa_segment_ids.append(sequence_b_segment_id)
             qa_input_masks.append(1)
-            all_input_lengths.append(len(qa_input_ids))
+
+        # NOTE: we want to store (q_i, a_i) sequence length before padding
+        all_input_lengths.append(len(qa_input_ids))
 
         if len(qa_input_ids) < max_seq_length:
-
             for _ in range(len(qa_input_ids), max_seq_length):
                 qa_input_ids.append(pad_token)
                 qa_segment_ids.append(pad_token_segment_id)
                 qa_input_masks.append(0)
 
-        assert qa_input_ids[0] == cls_token, 'first token in input id sequence must be [CLS] token'
-        assert len(qa_input_ids) == max_seq_length, 'each (q_i, a_i) input sequence must be of length: {}'.format(max_seq_length)
-        assert len(qa_input_ids) == len(qa_segment_ids) == len(qa_input_masks)
+        assert len(qa_input_ids) == len(qa_segment_ids) == len(qa_input_masks) == max_seq_length, 'each (q_i, a_i) input sequence must be of length: {}'.format(max_seq_length)
 
         all_input_ids.append(qa_input_ids)
         all_segment_ids.append(qa_segment_ids)
