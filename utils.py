@@ -738,6 +738,7 @@ def create_question_answer_sequences(
                                     sep_token:int=102,
                                     pad_token:int=0,
                                     ):
+    # NOTE: we want to create (q_i, a_i) sequence pairs (opposed to (q_i, r_i) pairs) to better inform model about subjectivity
     all_input_ids, all_input_masks, all_segment_ids, all_input_lengths, all_q_sbj, all_a_sbj = [], [], [], [], [], []
 
     for i, feature in enumerate(tqdm(features)):
@@ -752,15 +753,17 @@ def create_question_answer_sequences(
         
         assert qa_input_ids[-1] == sep_token, 'question and answer must be separated through [SEP] token'
 
-        for k, input_id_answer in enumerate(current_input_ids[feature.start_position: feature.end_position + 1]):
-            qa_input_ids.append(input_id_answer)
+        # NOTE: if question is not answerable, then input sequence is simply q_i instead of (q_i, a_i)
+        if not (feature.start_position == 0 and feature.end_position == 0):
+            for k, input_id_answer in enumerate(current_input_ids[feature.start_position: feature.end_position + 1]):
+                qa_input_ids.append(input_id_answer)
+                qa_segment_ids.append(sequence_b_segment_id)
+                qa_input_masks.append(1)
+
+            qa_input_ids.append(sep_token)
             qa_segment_ids.append(sequence_b_segment_id)
             qa_input_masks.append(1)
-
-        qa_input_ids.append(sep_token)
-        qa_segment_ids.append(sequence_b_segment_id)
-        qa_input_masks.append(1)
-        all_input_lengths.append(len(qa_input_ids))
+            all_input_lengths.append(len(qa_input_ids))
 
         if len(qa_input_ids) < max_seq_length:
 
