@@ -218,7 +218,7 @@ if __name__ == '__main__':
                 if args.batches == 'alternating':
                     
                     # create different dataset for subjectivity auxiliary task (condition on question-answer sequence only instead of question-review sequence)
-                    subjqa_tensor_dataset_train_aux_sbj = create_tensor_dataset(subjqa_tensor_dataset_train, aux_sbj_batch=True)
+                    subjqa_tensor_dataset_train_aux_sbj = create_tensor_dataset(subjqa_features_train, aux_sbj_batch=True)
 
                     train_dl_sbj = BatchGenerator(
                                                   dataset=subjqa_tensor_dataset_train_aux_sbj,
@@ -449,7 +449,7 @@ if __name__ == '__main__':
                 if args.batches == 'alternating':
 
                     # create different dataset for subjectivity auxiliary task (condition on question-answer sequence only instead of question-review sequence)
-                    combined_tensor_dataset_train_aux_sbj = create_tensor_dataset(combined_tensor_dataset_train, aux_sbj_batch=True)
+                    combined_tensor_dataset_train_aux_sbj = create_tensor_dataset(combined_features_train, aux_sbj_batch=True)
 
                     train_dl_sbj = BatchGenerator(
                                                   dataset=combined_tensor_dataset_train_aux_sbj,
