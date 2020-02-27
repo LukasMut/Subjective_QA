@@ -43,6 +43,8 @@ if __name__ == '__main__':
             help='If provided, adversarial instead of classic training. Only necessary, if MTL setting. Specify which adversarial version.')
     parser.add_argument('--n_aux_tasks', type=int, default=None,
             help='Define number of auxiliary tasks QA model should perform during training. Only necessary, if MTL setting.')
+    parser.add_argument('--task_sampling', type=str, default='uniform',
+            help='If "uniform", main and auxiliary tasks will be sampled uniformly. If "oversampling", main task will be oversampled. Only necessary, if MTL setting.')
     parser.add_argument('--encoder', action='store_true',
             help='If provided, use BiLSTM encoder to compute temporal dependencies before passing feature representations to linear output layers.')
     parser.add_argument('--highway_connection', action='store_true',
@@ -521,6 +523,7 @@ if __name__ == '__main__':
         hypers["n_steps"] = n_steps
         hypers["n_evals"] = args.n_evals
         hypers["batch_presentation"] = args.batches
+        hypers["task_sampling"] = args.task_sampling
 
         if args.n_evals == 'multiple_per_epoch':
             hypers["n_evals_per_epoch"] = 10 # number of times we evaluate model on dev set per epoch (not necessary, if we just evaluate once after an epoch)

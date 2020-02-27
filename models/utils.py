@@ -194,8 +194,13 @@ def train(
             batch_accs_domain, batch_f1s_domain = [], []
             tasks.append('Domain_Class')
 
-    # generate uniform random sample over all entries (TODO: for MTL setting with 2 auxiliary tasks, we might want to sample QA task with a higher probability than sampling auxiliary tasks)
-    task_order = np.random.choice(tasks, size=args['n_steps'], replace=True, p = [1/len(tasks) for _ in tasks])
+    # generate random sample over all tasks (TODO: for MTL setting with 2 auxiliary tasks, we might want to sample QA task with a higher probability than auxiliary tasks)
+    if isinstance(n_aux_tasks, type(None)) or args['task_sampling'] == 'uniform':
+      distrib = [1/len(tasks) for _ in tasks]
+    elif isinstance(n_aux_tasks, int) and args['task_sampling'] == 'oversampling':
+      distrib = [2/3 if task == 'QA' else 1/(3 * (len(tasks) - 1)) for task in tasks] 
+
+    task_order = np.random.choice(tasks, size=args['n_steps'], replace=True, p = distrib)
     task_distrib = Counter(task_order)
 
     if plot_task_distrib:
