@@ -747,8 +747,9 @@ def create_question_answer_sequences(
         current_input_ids = feature.input_ids
         current_sep_token_idx = current_input_ids.index(sep_token)
         
-        for j in range(current_sep_token_idx + 1):
-            qa_input_ids.append(current_input_ids[j])
+        # create q_i
+        for j, input_id_question in enumerate(current_input_ids[:current_sep_token_idx + 1]):
+            qa_input_ids.append(input_id_question)
             qa_segment_ids.append(sequence_a_segment_id)
             qa_input_masks.append(1)
         
@@ -757,6 +758,7 @@ def create_question_answer_sequences(
 
         # NOTE: if question is not answerable, then input sequence is simply q_i instead of (q_i, a_i)
         if not feature.is_impossible:
+            # create a_i
             for k, input_id_answer in enumerate(current_input_ids[feature.start_position: feature.end_position + 1]):
                 qa_input_ids.append(input_id_answer)
                 qa_segment_ids.append(sequence_b_segment_id)
