@@ -226,7 +226,7 @@ if __name__ == '__main__':
                                                   sort_batch=sort_batch,
                                                   )
                     
-                    train_dl = zip(train_dl, train_dl_sbj)
+                    train_dl = list(zip(train_dl, train_dl_sbj))
 
                 assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
                 if args.n_aux_tasks == 2:
@@ -457,7 +457,7 @@ if __name__ == '__main__':
                                                   sort_batch=sort_batch,
                                                   )
                     
-                    train_dl = zip(train_dl, train_dl_sbj)
+                    train_dl = list(zip(train_dl, train_dl_sbj))
                     
                 assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
                 
