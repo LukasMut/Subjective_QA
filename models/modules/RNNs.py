@@ -12,16 +12,6 @@ from models.utils import to_cpu
 # set device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-"""
-is_cuda = torch.cuda.is_available()
-
-if is_cuda:
-    device = torch.device("cuda")
-    print("GPU is available")
-else:
-    device = torch.device("cpu")
-    print("GPU not available, CPU used")
-"""
 class BiLSTM(nn.Module):
     
     def __init__(
