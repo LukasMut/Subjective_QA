@@ -278,11 +278,14 @@ class RecurrentQAHead(nn.Module):
             if self.adversarial:
                 # reverse gradients to learn qa-type / domain-invariant features (i.e., semi-supervised domain-adaptation)
                 sequence_output = grad_reverse(sequence_output)
+            
+            # we need hidden states of only the last time step (summary of the sequence) (i.e., seq[batch_size, -1, hidden_size])
+            sequence_output = sequence_output[:, -1, :]
 
             if task == 'Sbj_Class':
 
-                # we only need hidden states of last time step (summary of the sequence) (i.e., seq[batch_size, -1, hidden_size])
-                sbj_out = sequence_output[:, -1, :] + self.fc_sbj_2(F.relu(self.aux_dropout(self.fc_sbj_1(sequence_output[:, -1, :]))))
+                # introduce skip connection (add output of previous layer to linear transformation)
+                sbj_out = sequence_output + self.fc_sbj_2(F.relu(self.aux_dropout(self.fc_sbj_1(sequence_output))))
                 sbj_logits_a = self.fc_sbj_a(sbj_out)
                 sbj_logits_q = self.fc_sbj_q(sbj_out)
 
@@ -295,7 +298,7 @@ class RecurrentQAHead(nn.Module):
             elif task == 'Domain_Class':
 
                 # introduce skip connection (add output of previous layer to linear transformation)
-                domain_out = sequence_output[:, -1, :] + self.fc_domain_2(F.relu(self.aux_dropout(self.fc_domain_1(sequence_output[:, -1, :]))))
+                domain_out = sequence_output + self.fc_domain_2(F.relu(self.aux_dropout(self.fc_domain_1(sequence_output))))
                 domain_logits = self.fc_domain_3(domain_out)
                 domain_logits = domain_logits.squeeze(-1)
 
