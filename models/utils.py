@@ -581,6 +581,7 @@ def val(
     
     if args['task'] == 'QA':
       correct_answers_val = 0
+      
     elif args['task'] == 'Sbj_Classification':
       batch_acc_sbj = 0
     
@@ -596,10 +597,12 @@ def val(
         batch = tuple(t.to(device) for t in batch)
 
         if args['task'] == 'Sbj_Classification':
+
           if  args['batch_presentation'] == 'alternating':
             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj = batch
           else:
             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, b_sbj, _ = batch
+
         elif args['task'] == 'QA':
             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos,  _, _ = batch
 
@@ -694,8 +697,8 @@ def val(
           nb_val_examples += b_input_ids.size(0)
           nb_val_steps += 1
 
-          current_batch_f1 = 100 * (batch_f1_val / nb_val_examples) if args['task'] == 'QA' else batch_f1_val / nb_val_steps 
-          current_batch_acc = 100 * 100 * (correct_answers_val / nb_val_examples) if args['task'] == 'QA' else batch_acc_val / nb_val_steps 
+          current_batch_f1 = 100 * (batch_f1_val / nb_val_examples) if args['task'] == 'QA' else 100 * (batch_f1_val / nb_val_steps )
+          current_batch_acc = 100 * 100 * (correct_answers_val / nb_val_examples) if args['task'] == 'QA' else 100 * (batch_acc_val / nb_val_steps)
 
     val_loss /= nb_val_steps
     print("----------------------------------")
@@ -861,8 +864,8 @@ def test(
             nb_test_examples += b_input_ids.size(0)
             nb_test_steps += 1
             
-            current_batch_f1 = 100 * (batch_f1_test / nb_test_examples) if task == 'QA' else batch_f1_test / nb_test_steps 
-            current_batch_acc = 100 * (correct_answers_test / nb_test_examples) if task == 'QA' else batch_acc_test / nb_test_steps 
+            current_batch_f1 = 100 * (batch_f1_test / nb_test_examples) if task == 'QA' else 100 * (batch_f1_test / nb_test_steps)
+            current_batch_acc = 100 * (correct_answers_test / nb_test_examples) if task == 'QA' else 100 *(batch_acc_test / nb_test_steps)
 
             print("--------------------------------------------")
             print("----- Current batch exact-match: {} % -----".format(round(current_batch_acc, 3)))
