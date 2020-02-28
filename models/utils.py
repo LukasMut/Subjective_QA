@@ -197,6 +197,11 @@ def train(
 
     elif args['task'] == 'Sbj_Classification':
       tasks = ['Sbj_Class']
+      assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
+      print("Weights for subjective Anwers: {}".format(qa_type_weights[0]))
+      print()
+      print("Weights for subjective Questions: {}".format(qa_type_weights[1]))
+      print()
       sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
       batch_accs_sbj, batch_f1s_sbj = [], []
 
@@ -501,7 +506,7 @@ def train(
                 print("------------------------------------")
                 print()
 
-          elif args['task'] == 'Sbj_Classification':
+        elif args['task'] == 'Sbj_Classification':
           print("----- Train Sbj acc: {} % -----".format(batch_accs_sbj[-1]))
           print("----- Train Sbj F1: {} % -----".format(batch_f1s_sbj[-1]))
 
@@ -661,39 +666,39 @@ def val(
 
           elif args['task'] == 'Sbj_Classification':
 
-              sbj_logits_a, sbj_logits_q = model(
-                                                 input_ids=b_input_ids,
-                                                 attention_masks=b_attn_masks,
-                                                 token_type_ids=b_token_type_ids,
-                                                 input_lengths=b_input_lengths,
-                                                 task='Sbj_Class',
-                                                 )
+            sbj_logits_a, sbj_logits_q = model(
+                                               input_ids=b_input_ids,
+                                               attention_masks=b_attn_masks,
+                                               token_type_ids=b_token_type_ids,
+                                               input_lengths=b_input_lengths,
+                                               task='Sbj_Class',
+                                               )
 
-              sbj_logits = torch.stack((sbj_logits_a, sbj_logits_q), dim=1)
-              
-              b_sbj = b_sbj.type_as(sbj_logits)
+            sbj_logits = torch.stack((sbj_logits_a, sbj_logits_q), dim=1)
+            
+            b_sbj = b_sbj.type_as(sbj_logits)
 
-              batch_loss_val += sbj_loss_func(sbj_logits, b_sbj)
+            batch_loss_val += sbj_loss_func(sbj_logits, b_sbj)
 
-              current_sbj_acc = 0
-              current_sbj_f1 = 0
+            current_sbj_acc = 0
+            current_sbj_f1 = 0
 
-              for k in range(b_sbj.size(1)):
+            for k in range(b_sbj.size(1)):
 
-                current_sbj_acc += accuracy(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')  
-                current_sbj_f1 += f1(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')
+              current_sbj_acc += accuracy(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')  
+              current_sbj_f1 += f1(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')
 
-              batch_acc_sbj += (current_sbj_acc / b_sbj.size(1))
-              batch_f1_val += (current_sbj_f1 / b_sbj.size(1))
+            batch_acc_sbj += (current_sbj_acc / b_sbj.size(1))
+            batch_f1_val += (current_sbj_f1 / b_sbj.size(1))
 
-            print("----------------------------------------")
-            print("----- Current val batch loss: {} -----".format(round(batch_loss_val.item(), 3)))
-            print("----------------------------------------")
-            print()
+          print("----------------------------------------")
+          print("----- Current val batch loss: {} -----".format(round(batch_loss_val.item(), 3)))
+          print("----------------------------------------")
+          print()
 
-            val_loss += batch_loss_val.item()
-            nb_val_examples += b_input_ids.size(0)
-            nb_val_steps += 1
+          val_loss += batch_loss_val.item()
+          nb_val_examples += b_input_ids.size(0)
+          nb_val_steps += 1
 
     val_loss /= nb_val_steps
     print("----------------------------------")

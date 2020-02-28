@@ -226,7 +226,7 @@ if __name__ == '__main__':
 
             n_steps = len(train_dl)
 
-            if args.multitask:
+            if args.multitask or args.sbj_classification:
 
                 if args.batches == 'alternating':
                     
@@ -467,7 +467,7 @@ if __name__ == '__main__':
 
             n_steps = len(train_dl)
 
-            if args.multitask:
+            if args.multitask or args.sbj_classification:
 
                 if args.batches == 'alternating':
 
