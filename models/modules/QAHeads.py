@@ -114,10 +114,10 @@ class LinearQAHead(nn.Module):
             return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)
 
         else:
-            if self.adversarial:
+            if hasattr(self, 'adversarial'):
                 # reverse gradients to learn qa-type / domain-invariant features (i.e., semi-supervised domain-adaptation)
                 sequence_output = grad_reverse(sequence_output)
-
+                
             # use contextual embedding of the special [CLS] token (corresponds to the semantic representation of an input sentence X)
             sequence_output = sequence_output[:, 0, :]
 
@@ -264,7 +264,7 @@ class RecurrentQAHead(nn.Module):
             return outputs  #, hidden_rnn  # (loss), start_logits, end_logits, (hidden_states), (attentions)
 
         else:
-            if self.adversarial:
+            if hasattr(self, 'adversarial'):
                 # reverse gradients to learn qa-type / domain-invariant features (i.e., semi-supervised domain-adaptation)
                 sequence_output = grad_reverse(sequence_output)
             
