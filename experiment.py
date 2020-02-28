@@ -610,6 +610,7 @@ if __name__ == '__main__':
                                           adversarial = True if args.adversarial == 'GRL' else False,
                                           n_aux_tasks = args.n_aux_tasks,
                                           n_domain_labels = n_domain_labels,
+                                          task = 'Sbj_Classification' if args.sbj_classification else 'QA',
         )
 
         # set model to device
@@ -795,6 +796,7 @@ if __name__ == '__main__':
                                                         adversarial = True if args.adversarial == 'GRL' else False,
                                                         n_aux_tasks = args.n_aux_tasks,
                                                         n_domain_labels = n_domain_labels,
+                                                        task = 'Sbj_Classification' if args.sbj_classification else 'QA',
                 )
                 # load fine-tuned model
                 model.load_state_dict(torch.load(args.sd + '/%s' % (model_name)))

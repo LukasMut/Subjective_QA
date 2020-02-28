@@ -28,6 +28,7 @@ class LinearQAHead(nn.Module):
                  aux_dropout_p:float=0.25,
                  n_domain_labels=None,
                  adversarial:bool=False,
+                 task:str='QA',
     ):
         
         super(LinearQAHead, self).__init__()
@@ -37,7 +38,8 @@ class LinearQAHead(nn.Module):
         self.multitask = multitask
         self.n_aux_tasks = n_aux_tasks
         self.aux_dropout_p = aux_dropout_p
-        self.qa_dropout_p = qa_dropout_p 
+        self.qa_dropout_p = qa_dropout_p
+        self.task = task 
 
         if highway_block:
             self.highway = Highway(self.in_size)
@@ -45,13 +47,9 @@ class LinearQAHead(nn.Module):
         # fully-connected QA output layer with dropout
         self.fc_qa = nn.Linear(self.in_size, self.n_labels)
         self.qa_dropout = nn.Dropout(p = self.qa_dropout_p)
-        
-        if self.multitask:
 
-            # define, whether we want to perform adversarial training with a GRL between feature extractor and classifiers
-            self.adversarial = adversarial
-
-            # define dropout layer for auxiliary classification tasks
+        if (self.task == 'QA' and self.multitask) or (self.task == 'Sbj_Classification'):
+             # define dropout layer for auxiliary classification tasks
             self.aux_dropout = nn.Dropout(p = self.aux_dropout_p)
             
             # fully-connected subjectivity output layers (must be present in every MTL setting)
@@ -59,6 +57,11 @@ class LinearQAHead(nn.Module):
             self.fc_sbj_2 = nn.Linear(self.in_size, self.in_size)
             self.fc_sbj_a = nn.Linear(self.in_size, 1) # fc subj. layer for answers
             self.fc_sbj_q = nn.Linear(self.in_size, 1) # fc subj. layer for questions
+        
+        if (self.task == 'QA' and self.multitask):
+
+            # define, whether we want to perform adversarial training with a GRL between feature extractor and classifiers
+            self.adversarial = adversarial
 
             if self.n_aux_tasks == 2:
                 assert isinstance(n_domain_labels, int), 'If model is to perform two auxiliary tasks, domain labels must be provided'
@@ -117,7 +120,7 @@ class LinearQAHead(nn.Module):
             if hasattr(self, 'adversarial'):
                 # reverse gradients to learn qa-type / domain-invariant features (i.e., semi-supervised domain-adaptation)
                 sequence_output = grad_reverse(sequence_output)
-                
+
             # use contextual embedding of the special [CLS] token (corresponds to the semantic representation of an input sentence X)
             sequence_output = sequence_output[:, 0, :]
 
@@ -159,6 +162,7 @@ class RecurrentQAHead(nn.Module):
                  aux_dropout_p:float=0.25,
                  n_domain_labels=None,
                  adversarial:bool=False,
+                 task:str='QA',
     ):
         super(RecurrentQAHead, self).__init__()
         
@@ -171,6 +175,7 @@ class RecurrentQAHead(nn.Module):
         self.aux_dropout_p = aux_dropout_p
         self.n_recurrent_layers = 2 # set number of recurrent layers to 1 or 2 (more are not necessary and computationally inefficient / costly)
         self.rnn_version = 'LSTM'
+        self.task = task
 
         self.rnn_encoder = BiLSTM(max_seq_length, in_size=self.in_size, n_layers=self.n_recurrent_layers) if self.rnn_version == 'LSTM' else BiGRU(max_seq_length, in_size=self.in_size, n_layers=self.n_recurrent_layers)
         
@@ -182,20 +187,22 @@ class RecurrentQAHead(nn.Module):
             
         # fully-connected QA output layer with dropout
         self.fc_qa = nn.Linear(self.in_size, self.n_labels)
-        self.qa_dropout = nn.Dropout(self.qa_dropout_p)
-        
-        if self.multitask:
-            # define, whether we want to perform adversarial training with a GRL between feature extractor and classifiers
-            self.adversarial = adversarial
+        self.qa_dropout = nn.Dropout(p = self.qa_dropout_p)
 
+        if (self.task == 'QA' and self.multitask) or (self.task == 'Sbj_Classification'):
+            
             # define dropout layer for auxiliary classification tasks
             self.aux_dropout = nn.Dropout(p = self.aux_dropout_p)
             
-            # fully-connected subjectivity output layers (must be present in every MTL setting)
+            # fully-connected subjectivity output layers (must be present in every MTL setting and sbj classification)
             self.fc_sbj_1 = nn.Linear(self.in_size, self.in_size)
             self.fc_sbj_2 = nn.Linear(self.in_size, self.in_size)
             self.fc_sbj_a = nn.Linear(self.in_size, 1) # fc subj. layer for answers
             self.fc_sbj_q = nn.Linear(self.in_size, 1) # fc subj. layer for questions
+        
+        if (self.task == 'QA' and self.multitask) or (self.task == 'Sbj_Classification'):
+            # define, whether we want to perform adversarial training with a GRL between feature extractor and classifiers
+            self.adversarial = adversarial
 
             if self.n_aux_tasks == 2:
                 assert isinstance(n_domain_labels, int), 'If model is to perform two auxiliary tasks, domain labels must be provided'
