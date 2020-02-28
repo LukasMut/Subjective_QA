@@ -657,9 +657,6 @@ def val(
             
             correct_answers_val += compute_exact_batch(true_answers, pred_answers)
             batch_f1_val += compute_f1_batch(true_answers, pred_answers)
-            
-            current_batch_f1 = 100 * (batch_f1_val / nb_val_examples)
-            current_batch_acc = 100 * (correct_answers_val / nb_val_examples)
 
           elif args['task'] == 'Sbj_Classification':
 
@@ -696,6 +693,9 @@ def val(
           val_loss += batch_loss_val.item()
           nb_val_examples += b_input_ids.size(0)
           nb_val_steps += 1
+
+          current_batch_f1 = 100 * (batch_f1_val / nb_val_examples) if args['task'] == 'QA' else batch_f1_val / nb_val_steps 
+          current_batch_acc = 100 * 100 * (correct_answers_val / nb_val_examples) if args['task'] == 'QA' else batch_acc_val / nb_val_steps 
 
     val_loss /= nb_val_steps
     print("----------------------------------")
