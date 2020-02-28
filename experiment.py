@@ -812,6 +812,7 @@ if __name__ == '__main__':
                                                 batch_size=batch_size,
                                                 not_finetuned=args.not_finetuned,
                                                 task= 'Sbj_Classification' if args.sbj_classification else 'QA',
+                                                input_sequence= 'question_answer' if args.batches == 'alternating' else 'question_context', 
             )
             
             test_results = dict()

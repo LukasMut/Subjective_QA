@@ -335,7 +335,7 @@ def train(
               if current_task == 'Sbj_Class':
 
                 if args['batch_presentation'] == 'alternating':
-                  b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj = aux_sbj_batch
+                  b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj = main_batch
                 else:
                   b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, b_sbj, _ = main_batch
 
