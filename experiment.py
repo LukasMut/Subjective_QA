@@ -35,6 +35,8 @@ if __name__ == '__main__':
             help='If train, then train model on train set(s); if test, then evaluate model on SubjQA test set.')
     parser.add_argument('--n_evals', type=str, default='multiple_per_epoch',
             help='Define number of evaluations during training. If "multiple_per_epoch", ten evals per epoch. If "one_per_epoch", once after a training epoch.')
+    parser.add_argument('--sbj_classification', action='store_true',
+            help='If provided, perform subjectivity classification instead of QA.')
     parser.add_argument('--multitask', action='store_true',
             help='If provided, MTL instead of STL setting.')
     parser.add_argument('--batches', type=str, default='normal',
@@ -71,13 +73,15 @@ if __name__ == '__main__':
     
     # move model and tensors to GPU, if GPU is available (device must be defined)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    if device == "cuda": torch.cuda.manual_seed_all(42)
     
+    if device == "cuda":
+        # set cuda random seeds
+        torch.cuda.manual_seed_all(42)
+
     # set some crucial hyperparameters
     max_seq_length = 512 # BERT cannot deal with sequences, where T > 512
-    doc_stride = 384
-    max_query_length = 64
+    doc_stride = 200
+    max_query_length = 100
     batch_size = args.batch_size
     sort_batch = True if args.encoder else False
     
@@ -110,13 +114,18 @@ if __name__ == '__main__':
     # NOTE: we use pre-trained cased model since both BERT and DistilBERT cased models perform significantly better on SQuAD than uncased versions     
     bert_tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-cased')
     
-    if args.bert_weights == 'not_finetuned':
+    if args.bert_weights == 'not_finetuned' or args.sbj_classification:
         pretrained_weights = 'distilbert-base-cased'
         freeze_bert = False
 
     else:
         pretrained_weights = 'distilbert-base-cased-distilled-squad'
         freeze_bert = True
+
+    if args.sbj_classification:
+        assert not args.multitask
+        assert isinstance(args.n_aux_tasks, type(None))
+        assert isinstance(args.adversarial, type(None))
 
     dataset = args.finetuning
     encoding = 'recurrent' if args.encoder else 'linear'
@@ -230,7 +239,17 @@ if __name__ == '__main__':
                                                   sort_batch=sort_batch,
                                                   )
                     
-                    train_dl = list(zip(train_dl, train_dl_sbj))
+                    train_dl = train_dl_sbj if args.sbj_classification else list(zip(train_dl, train_dl_sbj))
+
+                    if args.sbj_classification:
+                        
+                        subjqa_tensor_dataset_dev_aux_sbj = create_tensor_dataset(subjqa_features_dev, aux_sbj_batch=True)
+
+                        val_dl = BatchGenerator(
+                                               dataset=subjqa_tensor_dataset_dev_aux_sbj,
+                                               batch_size=batch_size,
+                                               sort_batch=sort_batch,
+                                              )
 
                 assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
                 if args.n_aux_tasks == 2:
@@ -461,7 +480,18 @@ if __name__ == '__main__':
                                                   sort_batch=sort_batch,
                                                   )
                     
-                    train_dl = list(zip(train_dl, train_dl_sbj))
+                    train_dl = train_dl_sbj if args.sbj_classification else list(zip(train_dl, train_dl_sbj))
+
+                    if args.sbj_classification:
+
+                        combined_tensor_dataset_dev_aux_sbj = create_tensor_dataset(combined_features_dev, aux_sbj_batch=True)
+
+                        val_dl = BatchGenerator(
+                                               dataset=combined_tensor_dataset_dev_aux_sbj,
+                                               batch_size=batch_size,
+                                               sort_batch=sort_batch,
+                                              )
+
                     
                 assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
                 
@@ -521,6 +551,7 @@ if __name__ == '__main__':
                   "max_grad_norm": 5,
         }
 
+        hypers["task"] = 'Sbj_Classification' if args.sbj_classification else 'QA'
         hypers["n_epochs"] = args.n_epochs
         hypers["n_steps"] = n_steps
         hypers["n_evals"] = args.n_evals
