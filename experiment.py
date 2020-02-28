@@ -46,11 +46,11 @@ if __name__ == '__main__':
     parser.add_argument('--task_sampling', type=str, default='uniform',
             help='If "uniform", main and auxiliary tasks will be sampled uniformly. If "oversampling", main task will be oversampled. Only necessary, if MTL setting.')
     parser.add_argument('--encoder', action='store_true',
-            help='If provided, use BiLSTM encoder to compute temporal dependencies before passing feature representations to linear output layers.')
+            help='If provided, use BiLSTM encoder to compute temporal dependencies before returning feature representations to linear output layers.')
     parser.add_argument('--highway_connection', action='store_true',
             help='If provided, put Highway connection in between BERT OR BiLSTM encoder and fc linear output head.')
     parser.add_argument('--decoder', action='store_true',
-            help='If provided, put BiLSTM or BiGRU in between Highway bridge and fc linear output layers; requires BiLSTM-Encoder and Highway bridge.')
+            help='If provided, put BiLSTM or BiGRU in between Highway bridge and fc linear output layers; requires BiLSTM-Encoder (and Highway bridge).')
     parser.add_argument('--bert_weights', type=str, default='not_finetuned',
             help='If finetuned, load pre-trained weights from DistilBERT model fine-tuned on SQuAD; else, load pre-trained weights from DistilBERT base model.')
     parser.add_argument('--batch_size', type=int, default=16,
@@ -74,7 +74,7 @@ if __name__ == '__main__':
     
     # set some crucial hyperparameters
     max_seq_length = 512 # BERT cannot deal with sequences, where T > 512
-    doc_stride = 200
+    doc_stride = 300
     max_query_length = 100
     batch_size = args.batch_size
     sort_batch = True if args.encoder else False
