@@ -118,7 +118,7 @@ if __name__ == '__main__':
         pretrained_weights = 'distilbert-base-cased'
         freeze_bert = False
 
-    elif arg.bert_weights == 'finetuned' or args.sbj_classification:
+    elif args.bert_weights == 'finetuned' or args.sbj_classification:
         pretrained_weights = 'distilbert-base-cased-distilled-squad'
         freeze_bert = True
 
