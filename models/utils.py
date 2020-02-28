@@ -471,8 +471,8 @@ def train(
                 # after evaluation on dev set, move model back to train mode
                 model.train()
 
-                # want to train model at least for half an epoch
-                if early_stopping and epoch > 0:
+                # want to train the model at least for one epoch
+                if epoch > 0 and early_stopping:
                   if val_losses[-1] > val_losses[-2] and val_losses[-1] > val_losses[-3]:
                     stop_training = True
                     break
@@ -533,7 +533,7 @@ def train(
           # after evaluation on dev set, move model back to train mode
           model.train()
 
-          if early_stopping and epoch > 0:
+          if epoch > 0 and early_stopping:
             if args['n_evals'] == 'one_per_epoch':
               if val_losses[-1] > val_losses[-2]:
                 print("------------------------------------------")
