@@ -114,15 +114,16 @@ if __name__ == '__main__':
     # NOTE: we use pre-trained cased model since both BERT and DistilBERT cased models perform significantly better on SQuAD than uncased versions     
     bert_tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-cased')
     
-    if args.bert_weights == 'not_finetuned' or args.sbj_classification:
+    if args.bert_weights == 'not_finetuned':
         pretrained_weights = 'distilbert-base-cased'
         freeze_bert = False
 
-    else:
+    elif arg.bert_weights == 'finetuned' or args.sbj_classification:
         pretrained_weights = 'distilbert-base-cased-distilled-squad'
         freeze_bert = True
 
     if args.sbj_classification:
+
         assert not args.multitask
         assert isinstance(args.n_aux_tasks, type(None))
         assert isinstance(args.adversarial, type(None))
