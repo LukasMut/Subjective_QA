@@ -74,8 +74,8 @@ if __name__ == '__main__':
     
     # set some crucial hyperparameters
     max_seq_length = 512 # BERT cannot deal with sequences, where T > 512
-    doc_stride = 300
-    max_query_length = 100
+    doc_stride = 384
+    max_query_length = 64
     batch_size = args.batch_size
     sort_batch = True if args.encoder else False
     
