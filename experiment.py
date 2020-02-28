@@ -226,7 +226,7 @@ if __name__ == '__main__':
 
             n_steps = len(train_dl)
 
-            if args.multitask or args.sbj_classification:
+            if args.multitask:
 
                 if args.batches == 'alternating':
                     
@@ -239,17 +239,7 @@ if __name__ == '__main__':
                                                   sort_batch=sort_batch,
                                                   )
                     
-                    train_dl = train_dl_sbj if args.sbj_classification else list(zip(train_dl, train_dl_sbj))
-
-                    if args.sbj_classification:
-                        
-                        subjqa_tensor_dataset_dev_aux_sbj = create_tensor_dataset(subjqa_features_dev, aux_sbj_batch=True)
-
-                        val_dl = BatchGenerator(
-                                               dataset=subjqa_tensor_dataset_dev_aux_sbj,
-                                               batch_size=batch_size,
-                                               sort_batch=sort_batch,
-                                              )
+                    train_dl = list(zip(train_dl, train_dl_sbj))
 
                 assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
                 if args.n_aux_tasks == 2:
@@ -279,7 +269,51 @@ if __name__ == '__main__':
 
                 qa_type_weights = torch.stack((a_type_weights, q_type_weights))
 
+            
+
+            elif args.sbj_classification:
+
+                if args.batches == 'alternating':
+
+                    # create different dataset for subjectivity auxiliary task (condition on question-answer sequence only instead of question-review sequence)
+                    subjqa_tensor_dataset_train_aux_sbj = create_tensor_dataset(subjqa_features_train, aux_sbj_batch=True)
+
+                    train_dl = BatchGenerator(
+                                              dataset=subjqa_tensor_dataset_train_aux_sbj,
+                                              batch_size=batch_size,
+                                              sort_batch=sort_batch,
+                                              )
+                    
+                    subjqa_tensor_dataset_dev_aux_sbj = create_tensor_dataset(subjqa_features_dev, aux_sbj_batch=True)
+
+                    val_dl = BatchGenerator(
+                                           dataset=subjqa_tensor_dataset_dev_aux_sbj,
+                                           batch_size=batch_size,
+                                           sort_batch=sort_batch,
+                                          )
+
+
+                subjqa_q_types = [f.q_sbj for f in subjqa_features_train]                 
+                subjqa_a_types = [f.a_sbj for f in subjqa_features_train]
                 
+                q_type_weights = get_class_weights(
+                                                   subjqa_classes=subjqa_q_types,
+                                                   idx_to_class=idx_to_qa_types,
+                                                   binary=True,
+                                                   qa_type='questions',
+                )
+
+                a_type_weights = get_class_weights(
+                                                  subjqa_classes=subjqa_a_types,
+                                                  idx_to_class=idx_to_qa_types,
+                                                  binary=True,
+                                                  qa_type='answers',
+                )
+
+
+                qa_type_weights = torch.stack((a_type_weights, q_type_weights)) 
+
+
         elif args.finetuning == 'SQuAD':
             
             squad_data_train = get_data(
@@ -467,7 +501,7 @@ if __name__ == '__main__':
 
             n_steps = len(train_dl)
 
-            if args.multitask or args.sbj_classification:
+            if args.multitask:
 
                 if args.batches == 'alternating':
 
@@ -480,19 +514,9 @@ if __name__ == '__main__':
                                                   sort_batch=sort_batch,
                                                   )
                     
-                    train_dl = train_dl_sbj if args.sbj_classification else list(zip(train_dl, train_dl_sbj))
+                    train_dl = list(zip(train_dl, train_dl_sbj))
 
-                    if args.sbj_classification:
-
-                        combined_tensor_dataset_dev_aux_sbj = create_tensor_dataset(combined_features_dev, aux_sbj_batch=True)
-
-                        val_dl = BatchGenerator(
-                                               dataset=combined_tensor_dataset_dev_aux_sbj,
-                                               batch_size=batch_size,
-                                               sort_batch=sort_batch,
-                                              )
-
-                    
+                   
                 assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
                 
                 if args.n_aux_tasks == 2:
@@ -505,6 +529,51 @@ if __name__ == '__main__':
                                                        squad_classes=squad_domains,
                 ) 
                 
+                subjqa_q_types = [f.q_sbj for f in subjqa_features_train] 
+                squad_q_types = [f.q_sbj for f in squad_features_train] 
+                
+                subjqa_a_types = [f.a_sbj for f in subjqa_features_train]
+                squad_a_types = [f.a_sbj for f in squad_features_train]
+                
+                q_type_weights = get_class_weights(
+                                                   subjqa_classes=subjqa_q_types,
+                                                   idx_to_class=idx_to_qa_types,
+                                                   squad_classes=squad_q_types,
+                                                   binary=True,
+                                                   qa_type='questions',
+                )
+
+                a_type_weights = get_class_weights(
+                                                  subjqa_classes=subjqa_a_types,
+                                                  idx_to_class=idx_to_qa_types,
+                                                  squad_classes=squad_a_types,
+                                                  binary=True,
+                                                  qa_type='answers',
+                )
+
+                qa_type_weights = torch.stack((a_type_weights, q_type_weights))
+
+            elif args.sbj_classification:
+
+                if args.batches == 'alternating':
+
+                    # create different dataset for subjectivity auxiliary task (condition on question-answer sequence only instead of question-review sequence)
+                    combined_tensor_dataset_train_aux_sbj = create_tensor_dataset(combined_features_train, aux_sbj_batch=True)
+
+                    train_dl = BatchGenerator(
+                                              dataset=combined_tensor_dataset_train_aux_sbj,
+                                              batch_size=batch_size,
+                                              sort_batch=sort_batch,
+                                              )
+                    
+                    combined_tensor_dataset_dev_aux_sbj = create_tensor_dataset(combined_features_dev, aux_sbj_batch=True)
+
+                    val_dl = BatchGenerator(
+                                           dataset=combined_tensor_dataset_dev_aux_sbj,
+                                           batch_size=batch_size,
+                                           sort_batch=sort_batch,
+                                          )
+
                 subjqa_q_types = [f.q_sbj for f in subjqa_features_train] 
                 squad_q_types = [f.q_sbj for f in squad_features_train] 
                 
