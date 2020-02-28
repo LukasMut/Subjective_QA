@@ -581,7 +581,7 @@ def val(
     
     if args['task'] == 'QA':
       correct_answers_val = 0
-      
+
     elif args['task'] == 'Sbj_Classification':
       batch_acc_sbj = 0
     
@@ -774,8 +774,10 @@ def test(
           b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _ = batch
 
         elif task == 'Sbj_Classification':
+
           if input_sequence == 'question_context':
             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, b_sbj, _ = batch
+            
           elif input_sequence == 'question_answer':
             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj = batch
 

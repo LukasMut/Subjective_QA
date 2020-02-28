@@ -79,8 +79,8 @@ if __name__ == '__main__':
         torch.cuda.manual_seed_all(42)
 
     # set some crucial hyperparameters
-    max_seq_length = 512 # BERT cannot deal with sequences, where T > 512
-    doc_stride = 200
+    max_seq_length = 384 # BERT cannot deal with sequences, where T > 512
+    doc_stride = 128
     max_query_length = 100
     batch_size = args.batch_size
     sort_batch = True if args.encoder else False
@@ -618,8 +618,8 @@ if __name__ == '__main__':
         model.to(device)
 
         hypers = {
-                  "lr_adam": 5e-5,
-                  "warmup_steps": 100 if args.finetuning == 'combined' else 50,
+                  "lr_adam": 3e-5,
+                  "warmup_steps": 0,
                   "max_grad_norm": 5,
         }
 
