@@ -455,7 +455,6 @@ def train(
                                                           model=model,
                                                           tokenizer=tokenizer,
                                                           val_dl=val_dl,
-                                                          qa_loss_func=qa_loss_func,
                                                           args=args,
                                                           current_step=step,
                                                           epoch=epoch,
@@ -463,7 +462,7 @@ def train(
                                                           val_losses=val_losses,
                                                           val_accs=val_accs,
                                                           val_f1s=val_f1s,
-                                                          sbj_loss_func=sbj_loss_func if args['task'] == 'Sbj_Classification' else None
+                                                          loss_func=sbj_loss_func if args['task'] == 'Sbj_Classification' else qa_loss_func,
                                                           )
 
                 # we want to store train exact-match accuracies and F1 scores for each task as often as we evaluate model on validation set
@@ -518,7 +517,6 @@ def train(
                                                     model=model,
                                                     tokenizer=tokenizer,
                                                     val_dl=val_dl,
-                                                    qa_loss_func=qa_loss_func,
                                                     args=args,
                                                     current_step=step,
                                                     epoch=epoch,
@@ -526,7 +524,7 @@ def train(
                                                     val_losses=val_losses,
                                                     val_accs=val_accs,
                                                     val_f1s=val_f1s,
-                                                    sbj_loss_func=sbj_loss_func if args['task'] == 'Sbj_Classification' else None,
+                                                    loss_func=sbj_loss_func if args['task'] == 'Sbj_Classification' else qa_loss_func,
                                                     )
 
           # we want to store train exact-match accuracies and F1 scores for each task as often as we evaluate model on validation set
@@ -564,7 +562,6 @@ def val(
         model,
         tokenizer,
         val_dl,
-        qa_loss_func,
         args:dict,
         current_step:int,
         epoch:int,
@@ -572,7 +569,7 @@ def val(
         val_losses:list,
         val_accs:list,
         val_f1s:list,
-        sbj_loss_func=None,
+        loss_func=None,
 ):
     ### Validation ###
 
@@ -630,8 +627,8 @@ def val(
             end_true_val = to_cpu(b_end_pos)
             
             # start and end loss must be computed separately
-            start_loss = qa_loss_func(start_logits_val, b_start_pos)
-            end_loss = qa_loss_func(end_logits_val, b_end_pos)
+            start_loss = loss_func(start_logits_val, b_start_pos)
+            end_loss = loss_func(end_logits_val, b_end_pos)
             batch_loss_val = (start_loss + end_loss) / 2
             
             print("----------------------------------------")
@@ -678,7 +675,7 @@ def val(
             
             b_sbj = b_sbj.type_as(sbj_logits)
 
-            batch_loss_val += sbj_loss_func(sbj_logits, b_sbj)
+            batch_loss_val += loss_func(sbj_logits, b_sbj)
 
             current_sbj_acc = 0
             current_sbj_f1 = 0
@@ -711,6 +708,9 @@ def val(
 
       print("----- Val QA exact-match: {} % -----".format(round(val_exact_match, 3)))
       print("----- Val QA F1: {} % -----".format(round(val_f1, 3)))
+
+      if epoch == 0 or (val_exact_match > val_accs[-1] and val_f1 > val_f1s[-1]):
+        torch.save(model.state_dict(), model_path + '/%s' % (args['model_name']))
     
     elif args['task'] == 'Sbj_Classification':
       val_acc = 100 * (batch_acc_sbj / nb_val_steps)
@@ -719,11 +719,11 @@ def val(
       print("----- Val Sbj acc: {} % -----".format(round(val_acc, 3)))
       print("----- Val Sbj F1: {} % -----".format(round(val_f1, 3)))
 
+      if epoch == 0 or (val_acc > val_accs[-1] and val_f1 > val_f1s[-1]):
+        torch.save(model.state_dict(), model_path + '/%s' % (args['model_name']))
+
     print("----------------------------------")
     print()
-
-    if epoch == 0 or (val_exact_match > val_accs[-1] and val_f1 > val_f1s[-1]):
-        torch.save(model.state_dict(), model_path + '/%s' % (args['model_name']))
 
     val_losses.append(val_loss)
     val_accs.append(val_exact_match if args['task'] == 'QA' else val_acc)
@@ -732,11 +732,13 @@ def val(
     return val_losses, val_accs, val_f1s, model
 
 def test(
-          model,
-          tokenizer,
-          test_dl,
-          batch_size:int,
-          not_finetuned:bool=False,
+        model,
+        tokenizer,
+        test_dl,
+        batch_size:int,
+        not_finetuned:bool=False,
+        task:str='QA',
+        input_sequence:str='question_context',
 ):
     n_steps = len(test_dl)
     n_examples = n_steps * batch_size
@@ -746,9 +748,15 @@ def test(
     # set model to eval mode
     model.eval()
     
-    loss_func = nn.CrossEntropyLoss()
+    if task == 'QA':
+      correct_answers_test = 0
+      loss_func = nn.CrossEntropyLoss()
 
-    correct_answers_test, batch_f1_test = 0, 0
+    elif args['task'] == 'Sbj_Classification':
+      batch_acc_test = 0
+      loss_func = nn.BCEWithLogitsLoss()
+    
+    batch_f1_test = 0
     test_f1, test_loss = 0, 0
     nb_test_steps, nb_test_examples = 0, 0
 
@@ -758,86 +766,132 @@ def test(
 
         # move tensors in batch to current device (e.g., GPU)
         batch = tuple(t.to(device) for t in batch)
-
-        # unpack inputs from dataloader            
-        b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _ = batch
         
+        if task == 'QA':
+          b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _ = batch
+
+        elif task == 'Sbj_Classification':
+          if input_sequence == 'question_context':
+            b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, b_sbj, _ = batch
+          elif input_sequence == 'question_answer':
+            b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj = batch
+
         # if current batch_size is smaller than specified batch_size, skip batch (number of examples in last batche might not equal to batch_size)
         if b_input_ids.size(0) != batch_size:
             continue
 
         with torch.no_grad():
             
-            if not_finetuned:
-                start_logits_test, end_logits_test = model(
+            if task == 'QA':
+
+              if not_finetuned:
+                  start_logits_test, end_logits_test = model(
+                                                             input_ids=b_input_ids,
+                                                             attention_mask=b_attn_masks,
+                  )
+
+              else:  
+                  start_logits_test, end_logits_test = model(
                                                            input_ids=b_input_ids,
-                                                           attention_mask=b_attn_masks,
-                )
+                                                           attention_masks=b_attn_masks,
+                                                           token_type_ids=b_token_type_ids,
+                                                           input_lengths=b_input_lengths,
+                                                           task='QA',
+                  )
 
-            else:  
-                start_logits_test, end_logits_test = model(
-                                                         input_ids=b_input_ids,
-                                                         attention_masks=b_attn_masks,
-                                                         token_type_ids=b_token_type_ids,
-                                                         input_lengths=b_input_lengths,
-                                                         task='QA',
-                )
+              start_true_test = to_cpu(b_start_pos)
+              end_true_test = to_cpu(b_end_pos)
 
-            start_true_test = to_cpu(b_start_pos)
-            end_true_test = to_cpu(b_end_pos)
+              # start and end loss must be computed separately
+              start_loss = loss_func(start_logits_test, b_start_pos)
+              end_loss = loss_func(end_logits_test, b_end_pos)
 
-            # start and end loss must be computed separately
-            start_loss = loss_func(start_logits_test, b_start_pos)
-            end_loss = loss_func(end_logits_test, b_end_pos)
+              batch_loss_test = (start_loss + end_loss) / 2
 
-            batch_loss_test = (start_loss + end_loss) / 2
+              start_log_probs_test = to_cpu(F.log_softmax(start_logits_test, dim=1), detach=True, to_numpy=False)
+              end_log_probs_test = to_cpu(F.log_softmax(end_logits_test, dim=1), detach=True, to_numpy=False)
 
-            start_log_probs_test = to_cpu(F.log_softmax(start_logits_test, dim=1), detach=True, to_numpy=False)
-            end_log_probs_test = to_cpu(F.log_softmax(end_logits_test, dim=1), detach=True, to_numpy=False)
+              pred_answers = get_answers(
+                                         tokenizer=tokenizer,
+                                         b_input_ids=b_input_ids,
+                                         start_logs=start_log_probs_test,
+                                         end_logs=end_log_probs_test,
+                                         predictions=True,
+              )
 
-            pred_answers = get_answers(
-                                       tokenizer=tokenizer,
-                                       b_input_ids=b_input_ids,
-                                       start_logs=start_log_probs_test,
-                                       end_logs=end_log_probs_test,
-                                       predictions=True,
-            )
+              true_answers = get_answers(
+                                         tokenizer=tokenizer,
+                                         b_input_ids=b_input_ids,
+                                         start_logs=b_start_pos,
+                                         end_logs=b_end_pos,
+                                         predictions=False,
+              )
 
-            true_answers = get_answers(
-                                       tokenizer=tokenizer,
-                                       b_input_ids=b_input_ids,
-                                       start_logs=b_start_pos,
-                                       end_logs=b_end_pos,
-                                       predictions=False,
-            )
+              correct_answers_test += compute_exact_batch(true_answers, pred_answers)
+              batch_f1_test += compute_f1_batch(true_answers, pred_answers)
 
-            correct_answers_test += compute_exact_batch(true_answers, pred_answers)
-            batch_f1_test += compute_f1_batch(true_answers, pred_answers)
+            elif task == 'Sbj_Classification':
+
+              sbj_logits_a, sbj_logits_q = model(
+                                                 input_ids=b_input_ids,
+                                                 attention_masks=b_attn_masks,
+                                                 token_type_ids=b_token_type_ids,
+                                                 input_lengths=b_input_lengths,
+                                                 task='Sbj_Class',
+                                                 )
+
+              sbj_logits = torch.stack((sbj_logits_a, sbj_logits_q), dim=1)
+              
+              b_sbj = b_sbj.type_as(sbj_logits)
+
+              batch_loss_test += loss_func(sbj_logits, b_sbj)
+
+              current_sbj_acc = 0
+              current_sbj_f1 = 0
+
+              for k in range(b_sbj.size(1)):
+
+                current_sbj_acc += accuracy(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')  
+                current_sbj_f1 += f1(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')
+
+              batch_acc_test += (current_sbj_acc / b_sbj.size(1))
+              batch_f1_test += (current_sbj_f1 / b_sbj.size(1))
 
             test_loss += batch_loss_test.item()
             nb_test_examples += b_input_ids.size(0)
             nb_test_steps += 1
-
-            current_batch_f1 = 100 * (batch_f1_test / nb_test_examples)
-            current_batch_acc = 100 * (correct_answers_test / nb_test_examples)
             
+            current_batch_f1 = 100 * (batch_f1_test / nb_test_examples) if task == 'QA' else batch_f1_test / nb_test_steps 
+            current_batch_acc = 100 * (correct_answers_test / nb_test_examples) if task == 'QA' else batch_acc_test / nb_test_steps 
+
             print("--------------------------------------------")
             print("----- Current batch exact-match: {} % -----".format(round(current_batch_acc, 3)))
             print("----- Current batch F1: {} % -----".format(round(current_batch_f1, 3)))
             print("--------------------------------------------")
             print()
 
-    test_loss = test_loss / nb_test_steps
-    test_exact_match = 100 * (correct_answers_test / nb_test_examples)
-    test_f1 = 100 * (batch_f1_test / nb_test_examples)
-    
-    print()
-    print("------------------------------------")
+    test_loss /= nb_test_steps
+
+    print("-----------------------------------")
     print("------------ Inference ------------")
     print("------- Test loss: {} -------".format(round(test_loss, 3)))
-    print("----- Test exact-match: {} % -----".format(round(test_exact_match, 3)))
-    print("------- Test F1: {} % -------".format(round(test_f1, 3)))
-    print("------------------------------------")
+
+    if task == 'QA':
+      test_acc = 100 * (correct_answers_test / nb_test_examples)
+      test_f1 = 100 * (batch_f1_test / nb_test_examples)
+
+      print("----- Test QA exact-match: {} % -----".format(round(test_acc, 3)))
+      print("----- Test QA F1: {} % -----".format(round(test_f1, 3)))
+    
+    elif task == 'Sbj_Classification':
+
+      test_acc = 100 * (batch_acc_test / nb_test_steps)
+      test_f1 = 100 * (batch_f1_test / nb_test_steps)
+
+      print("----- Test Sbj acc: {} % -----".format(round(val_acc, 3)))
+      print("----- Test Sbj F1: {} % -----".format(round(val_f1, 3)))
+
+    print("----------------------------------")
     print()
    
     return test_loss, test_exact_match, test_f1

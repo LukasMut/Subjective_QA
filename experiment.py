@@ -134,6 +134,7 @@ if __name__ == '__main__':
     decoder = 'BiLSTM' if args.decoder else ''
     train_method = 'multitask' + '_' + str(args.n_aux_tasks) if args.multitask else 'singletask'
     eval_setup = args.n_evals
+    task = 'Sbj_Class' if args.sbj_classification else 'QA'
     batch_presentation = args.batches if args.multitask else ''
 
     if isinstance(args.adversarial, type(None)):
@@ -141,7 +142,7 @@ if __name__ == '__main__':
     else:
         training = args.adversarial if args.adversarial == 'GRL' else 'adv' + args.adversarial
 
-    model_name = 'DistilBERT' + '_' + encoding + '_' + highway + '_' + decoder + '_' + train_method + '_' + batch_presentation + '_' + training + '_' + dataset + '_' + eval_setup
+    model_name = 'DistilBERT' + '_' + encoding + '_' + highway + '_' + decoder + '_' + train_method + '_' + batch_presentation + '_' + training + '_' + dataset + '_' + eval_setup + '_' + task
     model_name = model_name.lower()
     
     if args.version == 'train':
@@ -810,6 +811,7 @@ if __name__ == '__main__':
                                                 test_dl=test_dl,
                                                 batch_size=batch_size,
                                                 not_finetuned=args.not_finetuned,
+                                                task= 'Sbj_Classification' if args.sbj_classification else 'QA',
             )
             
             test_results = dict()
