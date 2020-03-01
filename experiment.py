@@ -252,7 +252,7 @@ if __name__ == '__main__':
                 
                 #TODO: figure out whether weights for positive examples (subjective questions and answers) are necessary when fine-tuning on SubjQA
 
-                """
+                
                 subjqa_q_types = [f.q_sbj for f in subjqa_features_train] 
                 subjqa_a_types = [f.a_sbj for f in subjqa_features_train]
                 
@@ -273,7 +273,7 @@ if __name__ == '__main__':
                 )
 
                 qa_type_weights = torch.stack((a_type_weights, q_type_weights))
-                """
+                
 
             elif args.sbj_classification:
 
