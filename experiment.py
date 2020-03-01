@@ -94,9 +94,6 @@ if __name__ == '__main__':
    
     qa_types = ['obj', 'sbj']
     datasets = ['SQuAD', 'SubjQA'] # not sure, whether this auxiliary task is actually useful
-
-    # define, whether we should inform model about question or answer type
-    qa_type = 'question'
     
     # create domain_to_idx, qa_type_to_idx and dataset_to_idx mappings (necessary for auxiliary tasks)
     idx_to_domains = idx_to_class(domains)
@@ -600,7 +597,6 @@ if __name__ == '__main__':
         hypers["optim"] = args.optim
         hypers["model_dir"] = args.sd
         hypers["model_name"] = model_name
-        hypers["qa_type"] = qa_type
         hypers["dataset"] = args.finetuning
         
         if args.optim == 'AdamW':

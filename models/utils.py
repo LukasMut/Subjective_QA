@@ -267,6 +267,7 @@ def train(
             # sample task from random distribution
             current_task = task_order[step]
 
+            # set loss back to 0 after every iteration
             batch_loss = 0            
 
             # zero-out gradients
@@ -477,7 +478,7 @@ def train(
                 # after evaluation on dev set, move model back to train mode
                 model.train()
 
-                # want to train the model at least for one epoch
+                # we want to train the model at least for one epoch
                 if epoch > 0 and early_stopping:
                   if val_losses[-1] > val_losses[-2] and val_losses[-1] > val_losses[-3]:
                     stop_training = True
