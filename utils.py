@@ -178,8 +178,8 @@ def convert_df_to_dict(
         example['answer']['answer_end'] = 0 if example['answer']['answer_text'] == 'ANSWERNOTFOUND' else answer_indices[1]
         example['domain'] = subjqa.loc[i, columns[5]]
         example['is_impossible'] = True if example['answer']['answer_text'] == 'ANSWERNOTFOUND' else False
-        example['question_subj'] = 1 if subjqa.loc[i, columns[6]] > 3 else 0
-        example['ans_subj'] = 1 if subjqa.loc[i, columns[7]] > 3 else 0
+        example['question_subj'] = 1 if subjqa.loc[i, columns[6]] < 3 else 0
+        example['ans_subj'] = 1 if subjqa.loc[i, columns[7]] < 3 else 0
         examples.append(dict(example))
         
     # save as .json file

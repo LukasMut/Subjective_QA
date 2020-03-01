@@ -176,38 +176,44 @@ def train(
 
       if isinstance(n_aux_tasks, int):
           tasks.append('Sbj_Class')
-          assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
-          print("Weights for subjective Anwers: {}".format(qa_type_weights[0]))
-          print()
-          print("Weights for subjective Questions: {}".format(qa_type_weights[1]))
-          print()
 
-          # TODO: figure out, whether we need pos_weights for adversarial setting
-          # loss func for auxiliary task to inform model about subjectivity (binary classification)
-          
-          sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
+          if args['dataset'] == 'combined':
+            assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
+            print("Weights for subjective Anwers: {}".format(qa_type_weights[0]))
+            print()
+            print("Weights for subjective Questions: {}".format(qa_type_weights[1]))
+            print()
+            sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
+          else:
+            sbj_loss_func = nn.BCEWithLogitsLoss()
+
           batch_accs_sbj, batch_f1s_sbj = [], []
         
           if n_aux_tasks == 2:
               assert isinstance(domain_weights, torch.Tensor), 'Tensor of class weights for different domains is not provided'
-              # loss func for auxiliary task to inform model about different review / context domains (multi-way classification)
               domain_loss_func = nn.CrossEntropyLoss(weight=domain_weights.to(device))
               batch_accs_domain, batch_f1s_domain = [], []
               tasks.append('Domain_Class')
 
     elif args['task'] == 'Sbj_Classification':
       tasks = ['Sbj_Class']
-      assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
-      print("Weights for subjective Anwers: {}".format(qa_type_weights[0]))
-      print()
-      print("Weights for subjective Questions: {}".format(qa_type_weights[1]))
-      print()
-      sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
+
+      if args['dataset'] == 'combined':
+        assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
+        print("Weights for subjective Anwers: {}".format(qa_type_weights[0]))
+        print()
+        print("Weights for subjective Questions: {}".format(qa_type_weights[1]))
+        print()
+        sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
+      else:
+        sbj_loss_func = nn.BCEWithLogitsLoss()
+
       batch_accs_sbj, batch_f1s_sbj = [], []
 
     # generate random sample over all tasks (TODO: for MTL setting with 2 auxiliary tasks, we might want to sample QA task with a higher probability than auxiliary tasks)
     if isinstance(n_aux_tasks, type(None)) or args['task_sampling'] == 'uniform' or args['task'] == 'Sbj_Classification':
       distrib = [1/len(tasks) for _ in tasks]
+      
     elif isinstance(n_aux_tasks, int) and args['task_sampling'] == 'oversampling':
       distrib = [2/3 if task == 'QA' else 1/(3 * (len(tasks) - 1)) for task in tasks] 
 

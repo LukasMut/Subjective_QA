@@ -64,7 +64,7 @@ if __name__ == '__main__':
     parser.add_argument('--sd', type=str, default='saved_models',
             help='Set model save directory for QA model.')
     parser.add_argument('--not_finetuned', action='store_true',
-            help='If provided, test pre-trained DistilBERT model on SubjQA (no prior task-specific fine-tuning); only possible in test version.')
+            help='If provided, test DistilBERT model previously pre-trained on SQuAD on SubjQA (no prior task-specific fine-tuning); only possible in test version.')
     args = parser.parse_args()
     
     # check whether arg.parser works correctly
@@ -79,7 +79,9 @@ if __name__ == '__main__':
         torch.cuda.manual_seed_all(42)
 
     # set some crucial hyperparameters
-    max_seq_length = 384 # BERT cannot deal with sequences, where T > 512
+    # NOTE: BERT cannot deal with sequences, where T > 512
+    # TODO: figure out, whether should stick to 384 (default for fine-tuning BERT on SQuAD) or move up to 512 (due to the fact that reviews in SubjQA are longer than paragraphs in SQuAD)
+    max_seq_length = 384
     doc_stride = 128
     max_query_length = 64
     batch_size = args.batch_size
@@ -118,7 +120,7 @@ if __name__ == '__main__':
         pretrained_weights = 'distilbert-base-cased'
         freeze_bert = False
 
-    elif args.bert_weights == 'finetuned' or args.sbj_classification:
+    elif args.bert_weights == 'finetuned' or args.finetuning == 'SQuAD':
         pretrained_weights = 'distilbert-base-cased-distilled-squad'
         freeze_bert = True
 
@@ -250,28 +252,7 @@ if __name__ == '__main__':
                                                        subjqa_classes=subjqa_domains,
                                                        idx_to_class=idx_to_domains,
                 ) 
-                
-                subjqa_q_types = [f.q_sbj for f in subjqa_features_train]                 
-                subjqa_a_types = [f.a_sbj for f in subjqa_features_train]
-                
-                q_type_weights = get_class_weights(
-                                                   subjqa_classes=subjqa_q_types,
-                                                   idx_to_class=idx_to_qa_types,
-                                                   binary=True,
-                                                   qa_type='questions',
-                )
-
-                a_type_weights = get_class_weights(
-                                                  subjqa_classes=subjqa_a_types,
-                                                  idx_to_class=idx_to_qa_types,
-                                                  binary=True,
-                                                  qa_type='answers',
-                )
-
-
-                qa_type_weights = torch.stack((a_type_weights, q_type_weights))
-
-            
+                            
 
             elif args.sbj_classification:
 
@@ -293,27 +274,6 @@ if __name__ == '__main__':
                                            batch_size=batch_size,
                                            sort_batch=sort_batch,
                                           )
-
-
-                subjqa_q_types = [f.q_sbj for f in subjqa_features_train]                 
-                subjqa_a_types = [f.a_sbj for f in subjqa_features_train]
-                
-                q_type_weights = get_class_weights(
-                                                   subjqa_classes=subjqa_q_types,
-                                                   idx_to_class=idx_to_qa_types,
-                                                   binary=True,
-                                                   qa_type='questions',
-                )
-
-                a_type_weights = get_class_weights(
-                                                  subjqa_classes=subjqa_a_types,
-                                                  idx_to_class=idx_to_qa_types,
-                                                  binary=True,
-                                                  qa_type='answers',
-                )
-
-
-                qa_type_weights = torch.stack((a_type_weights, q_type_weights)) 
 
 
         elif args.finetuning == 'SQuAD':
@@ -575,6 +535,8 @@ if __name__ == '__main__':
                                            batch_size=batch_size,
                                            sort_batch=sort_batch,
                                           )
+
+                # NOTE: if we fine-tune on both (SQuAD AND SubjQA), we need to weigh subjective questions higher in the auxiliary task
 
                 subjqa_q_types = [f.q_sbj for f in subjqa_features_train] 
                 squad_q_types = [f.q_sbj for f in squad_features_train] 
