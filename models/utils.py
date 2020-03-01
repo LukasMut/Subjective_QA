@@ -486,8 +486,8 @@ def train(
         if args['task'] == 'QA':
           train_exact_match = round(100 * (correct_answers / (task_distrib['QA'] * batch_size)), 3)
           train_f1 = round(100 * (batch_f1 / (task_distrib['QA'] * batch_size)), 3)
-          print("----- Train QA exact-match: {} % -----".format(round(val_exact_match, 3)))
-          print("----- Train QA F1: {} % -----".format(round(val_f1, 3)))
+          print("----- Train QA exact-match: {} % -----".format(round(train_exact_match, 3)))
+          print("----- Train QA F1: {} % -----".format(round(train_f1, 3)))
 
           if isinstance(n_aux_tasks, int):
 
@@ -899,4 +899,4 @@ def test(
     print("----------------------------------")
     print()
    
-    return test_loss, test_exact_match, test_f1
+    return test_loss, test_acc, test_f1

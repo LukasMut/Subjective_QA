@@ -620,7 +620,7 @@ if __name__ == '__main__':
         hypers = {
                   "lr_adam": 3e-5,
                   "warmup_steps": 0,
-                  "max_grad_norm": 5,
+                  "max_grad_norm": 1.0,
         }
 
         hypers["task"] = 'Sbj_Classification' if args.sbj_classification else 'QA'
