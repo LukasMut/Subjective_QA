@@ -255,7 +255,7 @@ def train(
         for step, batch in enumerate(tqdm(train_dl, desc="Step")):
 
             if args['batch_presentation'] == 'alternating' and isinstance(n_aux_tasks, int):
-              assert len(batch) == 2, 'In MTL, we must provide batches with different input sequences for the main and auxiliary task respectively'
+              assert len(batch) == 2, 'In MTL, we must provide batches with different input sequences for the main and auxiliary task when alternating'
               main_batch = tuple(t.to(device) for t in batch[0])
               aux_sbj_batch = tuple(t.to(device) for t in batch[1])
 
@@ -339,8 +339,12 @@ def train(
 
               if current_task == 'Sbj_Class':
 
-                if args['batch_presentation'] == 'alternating':
+                if args['task'] == 'QA' and args['batch_presentation'] == 'alternating':
+                  b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj = aux_sbj_batch
+
+                elif args['task'] == 'Sbj_Classification' and args['batch_presentation'] == 'alternating':
                   b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj = main_batch
+
                 else:
                   b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, b_sbj, _ = main_batch
 
