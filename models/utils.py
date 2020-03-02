@@ -176,7 +176,6 @@ def train(
 
       if isinstance(n_aux_tasks, int):
           tasks.append('Sbj_Class')
-
           if args['dataset'] == 'combined':
             assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
             print("Weights for subjective Anwers: {}".format(qa_type_weights[0]))
@@ -197,7 +196,6 @@ def train(
 
     elif args['task'] == 'Sbj_Classification':
       tasks = ['Sbj_Class']
-
       if args['dataset'] == 'combined':
         assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
         print("Weights for subjective Anwers: {}".format(qa_type_weights[0]))
