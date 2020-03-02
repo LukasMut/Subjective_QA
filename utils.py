@@ -89,21 +89,21 @@ def get_data(
             for para in f['data']:
                 for p in para['paragraphs']:
                     paragraphs.append(p)
-            
-                if compute_lengths:
-                    for qas in p['qas']:
-                        answer = qas['answers'][0]['text'] if len(qas['answers']) == 1 else ''
-                        #answer_start = qas['answers'][0]['answer_start'] if len(qas['answers']) == 1 else 0
-                        #answer_end = re.sub(r"\\", "", p['context']).split().index(answer.split()[-1]) if len(qas['answers']) == 1 else 0
-                        qas_pairs.append({'question': qas['question'], 
-                                          'answer': answer,
-                                          #'answer_span': (answer_start, answer_end),
-                                          # TODO: figure out, why regex below is not working properly
-                                          'context': re.sub(r"\\", "", p['context']), 
-                                          'is_answerable': not qas['is_impossible']})
+
+                    if compute_lengths:
+                        for qas in p['qas']:
+                            answer = qas['answers'][0]['text'] if len(qas['answers']) == 1 else ''
+                            #answer_start = qas['answers'][0]['answer_start'] if len(qas['answers']) == 1 else 0
+                            #answer_end = re.sub(r"\\", "", p['context']).split().index(answer.split()[-1]) if len(qas['answers']) == 1 else 0
+                            qas_pairs.append({'question': qas['question'], 
+                                              'answer': answer,
+                                              #'answer_span': (answer_start, answer_end),
+                                              # TODO: figure out, why regex below is not working properly
+                                              'context': re.sub(r"\\", "", p['context']), 
+                                              'is_answerable': not qas['is_impossible']})
             
             if compute_lengths:
-                return descpritive_stats_squad(qas_pairs)
+                return descriptive_stats_squad(qas_pairs)
             else:
                 return paragraphs
     elif source == '/SubjQA/':
@@ -130,6 +130,41 @@ def get_data(
                 return subjqa_df
     else:
         raise Exception('You did not provide the correct subfolder name')
+
+def descriptive_stats_squad(
+                            qas_pairs:list,
+                            docs:list=['question', 'answer', 'context'],
+):
+    desc_stats_squad = {}
+    
+    def get_mean_doc_length_squad(
+                                  qas_pairs:list,
+                                  doc:str,
+                                  ):
+        return np.mean([len(qas_pair[doc].split()) for qas_pair in qas_pairs])
+    
+    for doc in docs:
+        desc_stats_squad['avg' + '_' + doc + '_' + 'length'] = get_mean_doc_length_squad(qas_pairs, doc)
+    return desc_stats_squad
+        
+def descriptive_stats_subjqa(
+                             df:pd.DataFrame,
+                             cols:list,
+                             domains:list=None,
+):
+    if isinstance(domains, list):
+        print('Computing descriptive stats per domain...')
+        descript_stats = defaultdict(dict)
+        for domain in domains:
+            for col in cols:
+                doc_lengths = compute_doc_lengths(df, col)
+                descript_stats[domain]['avg' + '_' + col + '_' + 'length'] = np.mean(doc_lengths)
+    else:
+        descript_stats = {}
+        for col in cols:
+            doc_lengths = compute_doc_lengths(df, col)
+            descript_stats['avg' + '_' + col + '_' + 'length'] = np.mean(doc_lengths)
+    return descript_stats
         
 
 # NOTE: this function is only relevant for SubjQA data
@@ -933,40 +968,6 @@ def compute_doc_lengths(
 ):
     return [len(doc.split()) for doc in df.loc[:, col].values if isinstance(doc, str)]
 
-def descriptive_stats_squad(
-                            qas_pairs:list,
-                            docs:list=['question', 'answer', 'context'],
-):
-    desc_stats_squad = {}
-    
-    def get_mean_doc_length_squad(
-                                  qas_pairs:list,
-                                  doc:str,
-                                  ):
-        return np.mean([len(qas_pair[doc].split()) for qas_pair in qas_pairs])
-    
-    for doc in docs:
-        desc_stats_squad['avg' + '_' + doc + '_' + 'length'] = get_mean_doc_length_squad(qas_pairs, doc)
-    return desc_stats_squad
-        
-def descriptive_stats_subjqa(
-                             df:pd.DataFrame,
-                             cols:list,
-                             domains:list=None,
-):
-    if isinstance(domains, list):
-        print('Computing descriptive stats per domain...')
-        descript_stats = defaultdict(dict)
-        for domain in domains:
-            for col in cols:
-                doc_lengths = compute_doc_lengths(df, col)
-                descript_stats[domain]['avg' + '_' + col + '_' + 'length'] = np.mean(doc_lengths)
-    else:
-        descript_stats = {}
-        for col in cols:
-            doc_lengths = compute_doc_lengths(df, col)
-            descript_stats['avg' + '_' + col + '_' + 'length'] = np.mean(doc_lengths)
-    return descript_stats
 
 def filter_sbj_levels(
                       subj_levels_doc_frq:dict,
