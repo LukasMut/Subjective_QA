@@ -726,20 +726,34 @@ if __name__ == '__main__':
                                                                 dataset_to_idx=dataset_to_idx,
             )
             
-            subjqa_tensor_dataset_test = create_tensor_dataset(subjqa_features_test)  
-            
+            if not args.sbj_classification or (args.sbj_classification and args.batches == 'normal'):
+                
+                subjqa_tensor_dataset_test = create_tensor_dataset(subjqa_features_test)
+
+            elif args.sbj_classification and args.batches == 'alternating':
+
+                subjqa_tensor_dataset_test = create_tensor_dataset(subjqa_features_test, aux_sbj_batch=True)
+
             test_dl = BatchGenerator(
                                     dataset=subjqa_tensor_dataset_test,
                                     batch_size=batch_size,
                                     sort_batch=sort_batch,
                                     )
-            
-            if args.not_finetuned:
+
+            if args.not_finetuned and not args.sbj_classification:
                 # test (simple) BERT-QA-model fine-tuned on SQuAD without (prior) task-specific fine-tuning on SubjQA
                 model = DistilBertForQuestionAnswering.from_pretrained('distilbert-base-cased-distilled-squad')
                 model_name = 'distilbert_pretrained_squad_no_fine_tuning'
                 # set model to device
                 model.to(device)
+
+            #elif args.not_finetuned and args.sbj_classification:
+            #    # test (simple) BERT-QA-model fine-tuned on SQuAD without (prior) task-specific fine-tuning on SubjQA
+            #    model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-cased')
+            #    model_name = 'distilbert_pretrained_seqclass_no_fine_tuning'
+            #    # set model to device
+            #    model.to(device)
+            
             else:
                 model = DistilBertForQA.from_pretrained(
                                                         pretrained_weights,
