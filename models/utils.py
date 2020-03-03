@@ -707,7 +707,7 @@ def val(
           nb_val_steps += 1
 
           current_batch_f1 = 100 * (batch_f1_val / nb_val_examples) if args['task'] == 'QA' else 100 * (batch_f1_val / nb_val_steps )
-          current_batch_acc = 100 * 100 * (correct_answers_val / nb_val_examples) if args['task'] == 'QA' else 100 * (batch_acc_val / nb_val_steps)
+          current_batch_acc = 100 * 100 * (correct_answers_val / nb_val_examples) if args['task'] == 'QA' else 100 * (batch_acc_sbj / nb_val_steps)
 
     val_loss /= nb_val_steps
     print("----------------------------------")
