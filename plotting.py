@@ -135,7 +135,8 @@ def plot_results(
         ax.legend(fancybox=True,
                   shadow=True,
                   loc='upper right',
-                  fontsize=legend_fontsize)
+                  fontsize=legend_fontsize,
+                  ncol=2)
         
     elif model == 'adversarial' and not re.search(r'loss', metric):
         ax.legend(fancybox=True,
@@ -143,6 +144,14 @@ def plot_results(
                   bbox_to_anchor=(1.02, 0.5),
                   ncol=1,
                   fontsize=legend_fontsize)
+        
+    elif task_setting == 'multi' and re.search(r'val', metric) and not re.search(r'loss', metric):
+        ax.legend(fancybox=True,
+                  shadow=True,
+                  loc='lower right',
+                  ncol=2,
+                  fontsize=legend_fontsize)
+                                    
     else:
         ax.legend(fancybox=True,
                   shadow=True,
