@@ -50,9 +50,7 @@ if __name__ == '__main__':
     parser.add_argument('--encoder', action='store_true',
             help='If provided, use BiLSTM encoder to compute temporal dependencies before returning feature representations to linear output layers.')
     parser.add_argument('--highway_connection', action='store_true',
-            help='If provided, put Highway connection in between BERT OR BiLSTM encoder and fc linear output head.')
-    parser.add_argument('--decoder', action='store_true',
-            help='If provided, put BiLSTM or BiGRU in between Highway bridge and fc linear output layers; requires BiLSTM-Encoder (and Highway bridge).')
+            help='If provided, put Highway connection in between BERT OR BiLSTM encoder and fully-connected linear output layers.')
     parser.add_argument('--bert_weights', type=str, default='not_finetuned',
             help='If finetuned, load pre-trained weights from DistilBERT model fine-tuned on SQuAD; else, load pre-trained weights from DistilBERT base model.')
     parser.add_argument('--batch_size', type=int, default=16,
@@ -75,7 +73,7 @@ if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     if device == "cuda":
-        # set cuda random seeds
+        # if we are on GPU, set cuda random seeds
         torch.cuda.manual_seed_all(42)
 
     # set some crucial hyperparameters

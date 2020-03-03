@@ -37,7 +37,7 @@ torch.manual_seed(42)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 if device == "cuda":
-  # set cuda random seeds 
+  # if we are on GPU, set cuda random seeds 
   torch.cuda.manual_seed_all(42)
 
 ## NOTE: use this function in case we want to use a unidirectional LSTM (or GRU) instead of a BiLSTM ##

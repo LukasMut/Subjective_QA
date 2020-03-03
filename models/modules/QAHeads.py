@@ -58,7 +58,7 @@ class LinearQAHead(nn.Module):
             self.fc_sbj_a = nn.Linear(self.in_size, 1) # fc subj. layer for answers
             self.fc_sbj_q = nn.Linear(self.in_size, 1) # fc subj. layer for questions
         
-        if (self.task == 'QA' and self.multitask):
+        if self.task == 'QA' and self.multitask:
 
             # define, whether we want to perform adversarial training with a GRL between feature extractor and classifiers
             self.adversarial = adversarial
@@ -200,7 +200,7 @@ class RecurrentQAHead(nn.Module):
             self.fc_sbj_a = nn.Linear(self.in_size, 1) # fc subj. layer for answers
             self.fc_sbj_q = nn.Linear(self.in_size, 1) # fc subj. layer for questions
         
-        if (self.task == 'QA' and self.multitask) or (self.task == 'Sbj_Classification'):
+        if self.task == 'QA' and self.multitask:
             # define, whether we want to perform adversarial training with a GRL between feature extractor and classifiers
             self.adversarial = adversarial
 
