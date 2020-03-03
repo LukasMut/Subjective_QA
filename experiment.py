@@ -138,7 +138,7 @@ if __name__ == '__main__':
     else:
         training = args.adversarial if args.adversarial == 'GRL' else 'adv' + args.adversarial
 
-    model_name = 'DistilBERT' + '_' + encoding + '_' + highway + '_' + train_method + '_' + batch_presentation + '_' + training + '_' + dataset + '_' + eval_setup + '_' + task
+    model_name = 'DistilBERT' + '_' + encoding + '_' + highway + '_' + '' + '_' + train_method + '_' + batch_presentation + '_' + training + '_' + dataset + '_' + eval_setup + '_' + task
     model_name = model_name.lower()
     
     if args.version == 'train':
