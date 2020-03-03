@@ -21,11 +21,19 @@ def get_results(
                 version:str,
                 model:str,
                 task_setting:str,
+                layer=None,
                 aux=None,
 ):
     subdir = './results_train/' if version == 'train' else './results_test/'
     subsubdir = subdir + task + '/' + model + '/' + task_setting + '/'
-    subsubdir = subsubdir + aux + '/' if model == 'adversarial' else subsubdir
+    if model in ['SubjQA', 'combined'] and task_setting == 'multi':
+        assert isinstance(layer, str), 'When comparing across datasets in MTL setting, subfolder for model type must be provided'
+        subsubdir += layer + '/'
+    elif model == 'adversarial':
+        subsubdir += aux + '/'
+        if aux == 'aux_1':
+            assert isinstance(layer, str), 'When comparing across adversarial models in aux_1, subfolder for model type must be provided'
+            subsubdir += layer + '/'
     all_files = list(map(lambda f: subsubdir + f, os.listdir(subsubdir)))
     all_results = defaultdict(dict)
     for file in all_files: #islice(all_files, 1, None):
@@ -187,6 +195,7 @@ def plotting(
              version:str,
              task_setting:str,
              iv:str,
+             layer=None,
              aux=None,
 ):
     print('===========================')
@@ -196,9 +205,9 @@ def plotting(
     for i, model in enumerate(models):
         # load results
         if model == 'adversarial':
-            all_results = get_results(task=task, version=version, model=model, task_setting='multi', aux=aux)
+            all_results = get_results(task=task, version=version, model=model, task_setting='multi', layer=layer, aux=aux)
         else:
-            all_results = get_results(task=task, version=version, model=model, task_setting=task_setting, aux=None)
+            all_results = get_results(task=task, version=version, model=model, task_setting=task_setting, layer=layer, aux=None)
         print('==============================')
         print('====== Model: {} ======'.format(model.upper()))
         print('==============================')
