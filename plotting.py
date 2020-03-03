@@ -56,33 +56,49 @@ def plot_results(
                     r_plot[clf]['val'] = v
             else:
                 if re.search(r'' + metric, m):
-                    r_plot[clf] = v
+                    r_plot[clf] = v                   
                     
     if iv == 'datasets':
-        params = ['$D_{SQuAD} \cup D_{Subj}$', '$D_{Subj}$']
+        params = [r'$D_{SQuAD} \cup D_{Subj}$', r'$D_{Subj}$']
         
-    elif iv == 'models':
+    elif iv == 'models' and task_setting == 'single':
         params = ['Highway', 'Linear', 'BiLSTM + Highway', 'BiLSTM']
+    
+    elif iv == 'models' and task_setting == 'multi':
+        params = [r'Adversarial Simple $(\mathbf{q, a})$', 
+                  r'Normal $(\mathbf{q, a})$',
+                  r'Adversarial GRL $(\mathbf{q, a})$ ', 
+                  r'Adversarial Simple $(\mathbf{q, c})$',
+                  r'Normal $(\mathbf{q, c})$',
+                  r'GRL $(\mathbf{q, c})$',
+                 ]            
         
     elif model == 'adversarial' and iv == 'methods':
-        params = ['$D_{SQuAD} \cup D_{Subj}$ $(\mathbf{q, c})$(simple)', '$D_{Subj}$ $(\mathbf{q, c})$ (simple)', 
-                  '$D_{SQuAD} \cup D_{Subj}$ $(\mathbf{q, a})$(simple)', '$D_{Subj}$ $(\mathbf{q, a})$ (simple)', 
-                  '$D_{SQuAD} \cup D_{Subj}$ $(\mathbf{q, a})$ (GRL)', '$D_{Subj}$ $(\mathbf{q, a})$ (GRL)', 
-                  '$D_{SQuAD} \cup D_{Subj}$ $(\mathbf{q, c})$(GRL)', '$D_{Subj}$ $(\mathbf{q, c})$ (GRL)']
+        params = [r'$D_{SQuAD} \cup D_{Subj}$ $(\mathbf{q, c})$ Simple', 
+                  r'$D_{Subj}$ $(\mathbf{q, c})$ Simple ', 
+                  r'$D_{SQuAD} \cup D_{Subj}$ $(\mathbf{q, a})$ Simple ', 
+                  r'$D_{Subj}$ $(\mathbf{q, a})$ Simple', 
+                  r'$D_{SQuAD} \cup D_{Subj}$ $(\mathbf{q, a})$ GRL', 
+                  r'$D_{Subj}$ $(\mathbf{q, a})$ GRL', 
+                  r'$D_{SQuAD} \cup D_{Subj}$ $(\mathbf{q, c})$ GRL',
+                  r'$D_{Subj}$ $(\mathbf{q, c})$ GRL',
+                 ]
     
     if re.search(r'batch_loss', metric):
         plt.figure(figsize=(10, 6), dpi=100)
     else:
-        plt.figure(figsize=(8, 4), dpi=80)
+        plt.figure(figsize=(8, 4), dpi=90)
     
     # set font sizes
     y_lab_fontsize = 12
     x_lab_fontsize = y_lab_fontsize
     title_fontsize = 13
+    legend_fontsize = 8
     
     ax = plt.subplot(111)
         
     for idx, (clf, met) in enumerate(r_plot.items()):
+        #print(clf)
         if correlation:
             try:
                 ax.plot(met['train'], met['val'], '-o', label=params[idx])
@@ -115,17 +131,31 @@ def plot_results(
     
     ax.set_xlabel('Train F1' if correlation else 'Evaluation steps', fontsize=x_lab_fontsize)
     
-    if model == 'adversarial':
-        ax.legend(fancybox=True, shadow=True, bbox_to_anchor=(1.04, 1), ncol=2)
+    if model == 'adversarial' and re.search(r'loss', metric):
+        ax.legend(fancybox=True,
+                  shadow=True,
+                  loc='upper right',
+                  fontsize=legend_fontsize)
+        
+    elif model == 'adversarial' and not re.search(r'loss', metric):
+        ax.legend(fancybox=True,
+                  shadow=True,
+                  bbox_to_anchor=(1.02, 0.5),
+                  ncol=1,
+                  fontsize=legend_fontsize)
     else:
-        ax.legend(fancybox=True, shadow=True, loc='lower right' if re.search(r'acc', metric) or re.search(r'f1', metric) else 'best')
+        ax.legend(fancybox=True,
+                  shadow=True,
+                  loc='lower right' if re.search(r'acc', metric) or re.search(r'f1', metric) else 'best',
+                  fontsize=legend_fontsize)
     
     if model == 'SubjQA':
         ax.set_title(r'$D_{SubjQA}$', fontsize=title_fontsize)
     elif model == 'combined':
         ax.set_title(r'$D_{SubjQA} \cup D_{SQuAD}$', fontsize=title_fontsize)
     else:
-        ax.set_title('MTL' + ' ' + model.capitalize() if model == 'adversarial' else re.sub(r'_', ' ', model).strip().capitalize(), fontsize=title_fontsize)
+        ax.set_title('MTL' + ' ' + model.capitalize() if model == 'adversarial' else re.sub(r'_', ' ', model).strip().capitalize(),
+                     fontsize=title_fontsize)
     
     plt.tight_layout()
     
