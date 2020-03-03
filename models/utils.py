@@ -891,6 +891,7 @@ def test(
     print("------- Test loss: {} -------".format(round(test_loss, 3)))
 
     if task == 'QA':
+      
       test_acc = 100 * (correct_answers_test / nb_test_examples)
       test_f1 = 100 * (batch_f1_test / nb_test_examples)
 
@@ -902,8 +903,8 @@ def test(
       test_acc = 100 * (batch_acc_test / nb_test_steps)
       test_f1 = 100 * (batch_f1_test / nb_test_steps)
 
-      print("----- Test Sbj acc: {} % -----".format(round(val_acc, 3)))
-      print("----- Test Sbj F1: {} % -----".format(round(val_f1, 3)))
+      print("----- Test Sbj acc: {} % -----".format(round(test_acc, 3)))
+      print("----- Test Sbj F1: {} % -----".format(round(test_f1, 3)))
 
     print("----------------------------------")
     print()
