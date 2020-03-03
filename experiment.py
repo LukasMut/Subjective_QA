@@ -128,7 +128,6 @@ if __name__ == '__main__':
     dataset = args.finetuning
     encoding = 'recurrent' if args.encoder else 'linear'
     highway = 'Highway' if args.highway_connection else ''
-    decoder = 'BiLSTM' if args.decoder else ''
     train_method = 'multitask' + '_' + str(args.n_aux_tasks) if args.multitask else 'singletask'
     eval_setup = args.n_evals
     task = 'Sbj_Class' if args.sbj_classification else 'QA'
@@ -139,7 +138,7 @@ if __name__ == '__main__':
     else:
         training = args.adversarial if args.adversarial == 'GRL' else 'adv' + args.adversarial
 
-    model_name = 'DistilBERT' + '_' + encoding + '_' + highway + '_' + decoder + '_' + train_method + '_' + batch_presentation + '_' + training + '_' + dataset + '_' + eval_setup + '_' + task
+    model_name = 'DistilBERT' + '_' + encoding + '_' + highway + '_' + train_method + '_' + batch_presentation + '_' + training + '_' + dataset + '_' + eval_setup + '_' + task
     model_name = model_name.lower()
     
     if args.version == 'train':
@@ -563,7 +562,6 @@ if __name__ == '__main__':
                                           max_seq_length = max_seq_length,
                                           encoder = True if encoding == 'recurrent' else False,
                                           highway_connection = args.highway_connection,
-                                          decoder = args.decoder,
                                           multitask = args.multitask,
                                           adversarial = True if args.adversarial == 'GRL' else False,
                                           n_aux_tasks = args.n_aux_tasks,
@@ -748,7 +746,6 @@ if __name__ == '__main__':
                                                         max_seq_length = max_seq_length,
                                                         encoder = True if encoding == 'recurrent' else False,
                                                         highway_connection = args.highway_connection,
-                                                        decoder = args.decoder,
                                                         multitask = args.multitask,
                                                         adversarial = True if args.adversarial == 'GRL' else False,
                                                         n_aux_tasks = args.n_aux_tasks,
