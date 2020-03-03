@@ -764,7 +764,7 @@ def test(
       correct_answers_test = 0
       loss_func = nn.CrossEntropyLoss()
 
-    elif task  == 'Sbj_Classification':
+    elif task == 'Sbj_Classification':
       batch_acc_test = 0
       loss_func = nn.BCEWithLogitsLoss()
     
