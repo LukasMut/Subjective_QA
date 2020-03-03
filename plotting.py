@@ -62,7 +62,7 @@ def plot_results(
         params = [r'$D_{SQuAD} \cup D_{Subj}$', r'$D_{Subj}$']
         
     elif iv == 'models' and task_setting == 'single':
-        params = ['Highway', 'Linear', 'BiLSTM + Highway', 'BiLSTM']
+        params = ['Highway', 'Linear', 'BiLSTM + Higway + BiLSTM', 'BiLSTM + Highway', 'BiLSTM']
     
     elif iv == 'models' and task_setting == 'multi':
         params = [r'Adversarial Simple $(\mathbf{q, a})$', 
