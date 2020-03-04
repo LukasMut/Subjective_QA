@@ -499,7 +499,7 @@ def train(
 
                 # we want to train the model at least for one epoch
                 if epoch > 0 and early_stopping:
-                  if val_losses[-1] > val_losses[-2] and val_losses[-1] > val_losses[-3]:
+                  if np.argmin(val_losses) > args['early_stopping_thresh']:
                     stop_training = True
                     break
 
@@ -737,9 +737,6 @@ def val(
 
       print("----- Val QA exact-match: {} % -----".format(round(val_exact_match, 3)))
       print("----- Val QA F1: {} % -----".format(round(val_f1, 3)))
-
-      if epoch == 0 or (val_exact_match > val_accs[-1] and val_f1 > val_f1s[-1]):
-        torch.save(model.state_dict(), model_path + '/%s' % (args['model_name']))
     
     elif args['task'] == 'Sbj_Classification':
       val_acc = 100 * (batch_acc_sbj / nb_val_steps)
@@ -748,7 +745,7 @@ def val(
       print("----- Val Sbj acc: {} % -----".format(round(val_acc, 3)))
       print("----- Val Sbj F1: {} % -----".format(round(val_f1, 3)))
 
-      if epoch == 0 or (val_acc > val_accs[-1] and val_f1 > val_f1s[-1]):
+    if epoch == 0 or val_loss < val_losses[-1]:
         torch.save(model.state_dict(), model_path + '/%s' % (args['model_name']))
 
     print("----------------------------------")
