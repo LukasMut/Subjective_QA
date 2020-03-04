@@ -16,7 +16,7 @@ from collections import Counter, defaultdict
 from transformers import DistilBertTokenizer, DistilBertModel, DistilBertForQuestionAnswering
 from transformers import AdamW
 from transformers import get_cosine_with_hard_restarts_schedule_with_warmup, get_linear_schedule_with_warmup
-from torch.nn.optim import Adam
+from torch.optim import Adam
 
 from eval_squad import *
 from models.QAModels import *
