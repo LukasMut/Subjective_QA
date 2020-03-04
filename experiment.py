@@ -16,7 +16,6 @@ from collections import Counter, defaultdict
 from transformers import DistilBertTokenizer, DistilBertModel, DistilBertForQuestionAnswering
 from transformers import AdamW
 from transformers import get_cosine_with_hard_restarts_schedule_with_warmup, get_linear_schedule_with_warmup
-from torch.optim import Adam
 
 from eval_squad import *
 from models.QAModels import *
@@ -58,8 +57,6 @@ if __name__ == '__main__':
             help='Define mini-batch size.')
     parser.add_argument('--n_epochs', type=int, default=3,
             help='Set number of epochs model should be fine-tuned for. If we fine-tune on SubjQA or combined, an additional epoch will be added.')
-    parser.add_argument('--optim', type=str, default='AdamW',
-            help='Define optimizer. Must be one of {AdamW, Adam}.')
     parser.add_argument('--sd', type=str, default='saved_models',
             help='Set model save directory for QA model.')
     parser.add_argument('--not_finetuned', action='store_true',
@@ -591,41 +588,29 @@ if __name__ == '__main__':
 
         hypers["freeze_bert"] = freeze_bert
         hypers["pretrained_model"] = 'distilbert'
-        hypers["optim"] = args.optim
         hypers["model_dir"] = args.sd
         hypers["model_name"] = model_name
         hypers["dataset"] = args.finetuning
         
-        if args.optim == 'AdamW':
+        t_total = n_steps * hypers['n_epochs'] # total number of training steps (i.e., step = iteration)
             
-            optimizer_qa = AdamW(
-                              model.parameters(), 
-                              lr=hypers['lr_adam'], 
-                              correct_bias=True,
-            )
-            
-            t_total = n_steps * hypers['n_epochs'] # total number of training steps (i.e., step = iteration)
-            
-            scheduler = get_linear_schedule_with_warmup(
-                                                        optimizer_qa, 
-                                                        num_warmup_steps=hypers["warmup_steps"], 
-                                                        num_training_steps=t_total,
-            )
-            
-        elif args.optim == 'Adam':
-            
-            optimizer_qa = Adam(
-                             model.parameters(),
-                             lr=hypers['lr_adam'],
-                             amsgrad=True,
-            )
-            scheduler = None
-        
-        else:
-            raise ValueError("Optimizer must be one of {AdamW, Adam}.")
+        optimizer_qa = AdamW(
+                          model.parameters(), 
+                          lr=hypers['lr_adam'], 
+                          correct_bias=True,
+        )
 
+        scheduler_qa = get_linear_schedule_with_warmup(
+                                                    optimizer_qa, 
+                                                    num_warmup_steps=hypers["warmup_steps"], 
+                                                    num_training_steps=t_total,
+        )
+
+        # store train results in dict
         train_results  = dict()
-        if isinstance(args.n_aux_tasks, type(None)):           
+
+        if isinstance(args.n_aux_tasks, type(None)):
+
             batch_losses, batch_accs_qa, batch_f1s_qa, val_losses, val_accs, val_f1s, model = train(
                                                                                                     model=model,
                                                                                                     tokenizer=bert_tokenizer,
@@ -635,14 +620,31 @@ if __name__ == '__main__':
                                                                                                     n_aux_tasks=args.n_aux_tasks,
                                                                                                     args=hypers,
                                                                                                     optimizer_qa=optimizer_qa,
-                                                                                                    scheduler=scheduler,
+                                                                                                    optimizer_sbj=None,
+                                                                                                    optimizer_dom=None,
+                                                                                                    scheduler_qa=scheduler_qa,
+                                                                                                    scheduler_sbj=None,
+                                                                                                    scheduler_dom=None,
                                                                                                     early_stopping=True,
                                                                                                     qa_type_weights=qa_type_weights,
                                                                                                     domain_weights=domain_weights,
                                                                                                     adversarial_simple=True if args.adversarial == 'simple' else False,
             )
 
-        elif args.n_aux_tasks == 1:           
+        elif args.n_aux_tasks == 1:
+
+            optimizer_sbj = AdamW(
+                                  model.parameters(), 
+                                  lr=hypers['lr_adam'], 
+                                  correct_bias=True,
+            )
+            
+            scheduler_sbj = get_linear_schedule_with_warmup(
+                                                            optimizer_sbj, 
+                                                            num_warmup_steps=hypers["warmup_steps"], 
+                                                            num_training_steps=t_total,
+            )
+
             batch_losses, batch_accs_qa, batch_f1s_qa, batch_accs_sbj, batch_f1s_sbj, val_losses, val_accs, val_f1s, model = train(
                                                                                                                                     model=model,
                                                                                                                                     tokenizer=bert_tokenizer,
@@ -652,7 +654,11 @@ if __name__ == '__main__':
                                                                                                                                     n_aux_tasks=args.n_aux_tasks,
                                                                                                                                     args=hypers,
                                                                                                                                     optimizer_qa=optimizer_qa,
-                                                                                                                                    scheduler=scheduler,
+                                                                                                                                    optimizer_sbj=optimizer_sbj,
+                                                                                                                                    optimizer_dom=None,
+                                                                                                                                    scheduler_qa=scheduler_qa,
+                                                                                                                                    scheduler_sbj=scheduler_sbj,
+                                                                                                                                    scheduler_dom=None,
                                                                                                                                     early_stopping=True,
                                                                                                                                     qa_type_weights=qa_type_weights,
                                                                                                                                     domain_weights=domain_weights,
@@ -662,7 +668,32 @@ if __name__ == '__main__':
             train_results['batch_accs_sbj'] = batch_accs_sbj
             train_results['batch_f1s_sbj'] = batch_f1s_sbj
         
-        elif args.n_aux_tasks == 2:           
+        elif args.n_aux_tasks == 2:
+
+            optimizer_sbj = AdamW(
+                                  model.parameters(), 
+                                  lr=hypers['lr_adam'], 
+                                  correct_bias=True,
+            )
+            
+            scheduler_sbj = get_linear_schedule_with_warmup(
+                                                            optimizer_sbj, 
+                                                            num_warmup_steps=hypers["warmup_steps"], 
+                                                            num_training_steps=t_total,
+            )
+            
+            optimizer_dom = AdamW(
+                                  model.parameters(), 
+                                  lr=hypers['lr_adam'], 
+                                  correct_bias=True,
+            )
+            
+            scheduler_dom = get_linear_schedule_with_warmup(
+                                                            optimizer_dom, 
+                                                            num_warmup_steps=hypers["warmup_steps"], 
+                                                            num_training_steps=t_total,
+            )
+
             batch_losses, batch_accs_qa, batch_f1s_qa, batch_accs_sbj, batch_f1s_sbj, batch_accs_domain, batch_f1s_domain, val_losses, val_accs, val_f1s, model = train(
                                                                                                                                                                         model=model,
                                                                                                                                                                         tokenizer=bert_tokenizer,
@@ -672,7 +703,11 @@ if __name__ == '__main__':
                                                                                                                                                                         n_aux_tasks=args.n_aux_tasks,
                                                                                                                                                                         args=hypers,
                                                                                                                                                                         optimizer_qa=optimizer_qa,
-                                                                                                                                                                        scheduler=scheduler,
+                                                                                                                                                                        optimizer_sbj=optimizer_sbj,
+                                                                                                                                                                        optimizer_dom=optimizer_dom,
+                                                                                                                                                                        scheduler_qa=scheduler_qa,
+                                                                                                                                                                        scheduler_sbj=scheduler_sbj,
+                                                                                                                                                                        scheduler_dom=scheduler_dom,
                                                                                                                                                                         early_stopping=True,
                                                                                                                                                                         qa_type_weights=qa_type_weights,
                                                                                                                                                                         domain_weights=domain_weights,

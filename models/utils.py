@@ -136,7 +136,9 @@ def train(
           optimizer_qa,
           optimizer_sbj=None,
           optimizer_dom=None,
-          scheduler=None,
+          scheduler_qa=None,
+          scheduler_sbj=None,
+          scheduler_dom=None,
           early_stopping:bool=True,
           n_aux_tasks=None,
           qa_type_weights=None,
@@ -267,11 +269,18 @@ def train(
             # sample task from random distribution
             current_task = task_order[step]
 
-            # set loss back to 0 after every iteration
+            # set loss back to 0 after an iteration
             batch_loss = 0            
 
-            # zero-out gradients
-            optimizer_qa.zero_grad()
+            # zero-out gradients w.r.t. task
+            if task_order[step - 1] == 'QA':
+              optimizer_qa.zero_grad()
+
+            elif task_order[step - 1] == 'Sbj_Class':
+              optimizer_sbj.zero_grad()
+
+            elif task_order[step - 1] == 'Domain_Class':
+              optimizer_dom.zero_grad()
             
             if isinstance(n_aux_tasks, int):
               print('------------------------------------')
@@ -453,12 +462,18 @@ def train(
             # clip gradients if gradients become larger than predefined gradient norm
             torch.nn.utils.clip_grad_norm_(model.parameters(), args["max_grad_norm"])
 
-            # take step down the valley
-            optimizer_qa.step()
+            # take step down the valley w.r.t. current task
+            if current_task == 'QA':
+              optimizer_qa.step()
+              scheduler_qa.step()
             
-            # scheduler is only necessary, if we optimize with AdamW (BERT specific version of Adam with weight decay fix)
-            if args['optim'] == 'AdamW' and not isinstance(scheduler, type(None)):
-                scheduler.step()
+            elif current_task == 'Sbj_Class':
+              optimizer_sbj.step()
+              scheduler_sbj.step()
+
+            elif current_task == 'Domain_Class':
+              optimizer_sbj.step()
+              scheduler_sbj.step()
 
             if args['n_evals'] == 'multiple_per_epoch':
               if step > 0 and step % steps_until_eval == 0:
