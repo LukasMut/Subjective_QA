@@ -746,7 +746,7 @@ def val(
       print("----- Val Sbj F1: {} % -----".format(round(val_f1, 3)))
 
     if epoch == 0 or val_loss < val_losses[-1]:
-        torch.save(model.state_dict(), model_path + '/%s' % (args['model_name']))
+      torch.save(model.state_dict(), model_path + '/%s' % (args['model_name']))
 
     print("----------------------------------")
     print()
