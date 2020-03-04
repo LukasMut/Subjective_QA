@@ -130,13 +130,14 @@ if __name__ == '__main__':
     eval_setup = args.n_evals
     task = 'Sbj_Class' if args.sbj_classification else 'QA'
     batch_presentation = args.batches if args.multitask else ''
+    sampling_strategy = 'over' if args.task_sampling == 'oversampling' else 'unif'
 
     if isinstance(args.adversarial, type(None)):
         training = 'classic'
     else:
         training = args.adversarial if args.adversarial == 'GRL' else 'adv' + args.adversarial
 
-    model_name = 'DistilBERT' + '_' + encoding + '_' + highway + '_' + '' + '_' + train_method + '_' + batch_presentation + '_' + training + '_' + dataset + '_' + eval_setup + '_' + task
+    model_name = 'DistilBERT' + '_' + encoding + '_' + highway + '_' + '' + '_' + train_method + '_' + batch_presentation + '_' + training + '_' + dataset + '_' + eval_setup + '_' + task + '_' + sampling_strategy
     model_name = model_name.lower()
     
     if args.version == 'train':
