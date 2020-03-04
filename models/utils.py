@@ -133,7 +133,9 @@ def train(
           val_dl,
           batch_size:int,
           args:dict,
-          optimizer,
+          optimizer_qa,
+          optimizer_sbj=None,
+          optimizer_dom=None,
           scheduler=None,
           early_stopping:bool=True,
           n_aux_tasks=None,
@@ -269,7 +271,7 @@ def train(
             batch_loss = 0            
 
             # zero-out gradients
-            optimizer.zero_grad()
+            optimizer_qa.zero_grad()
             
             if isinstance(n_aux_tasks, int):
               print('------------------------------------')
@@ -452,7 +454,7 @@ def train(
             torch.nn.utils.clip_grad_norm_(model.parameters(), args["max_grad_norm"])
 
             # take step down the valley
-            optimizer.step()
+            optimizer_qa.step()
             
             # scheduler is only necessary, if we optimize with AdamW (BERT specific version of Adam with weight decay fix)
             if args['optim'] == 'AdamW' and not isinstance(scheduler, type(None)):

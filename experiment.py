@@ -16,6 +16,7 @@ from collections import Counter, defaultdict
 from transformers import DistilBertTokenizer, DistilBertModel, DistilBertForQuestionAnswering
 from transformers import AdamW
 from transformers import get_cosine_with_hard_restarts_schedule_with_warmup, get_linear_schedule_with_warmup
+from torch.nn.optim import Adam
 
 from eval_squad import *
 from models.QAModels import *
@@ -597,7 +598,7 @@ if __name__ == '__main__':
         
         if args.optim == 'AdamW':
             
-            optimizer = AdamW(
+            optimizer_qa = AdamW(
                               model.parameters(), 
                               lr=hypers['lr_adam'], 
                               correct_bias=True,
@@ -606,14 +607,14 @@ if __name__ == '__main__':
             t_total = n_steps * hypers['n_epochs'] # total number of training steps (i.e., step = iteration)
             
             scheduler = get_linear_schedule_with_warmup(
-                                                        optimizer, 
+                                                        optimizer_qa, 
                                                         num_warmup_steps=hypers["warmup_steps"], 
                                                         num_training_steps=t_total,
             )
             
         elif args.optim == 'Adam':
             
-            optimizer = Adam(
+            optimizer_qa = Adam(
                              model.parameters(),
                              lr=hypers['lr_adam'],
                              amsgrad=True,
@@ -633,7 +634,7 @@ if __name__ == '__main__':
                                                                                                     batch_size=batch_size,
                                                                                                     n_aux_tasks=args.n_aux_tasks,
                                                                                                     args=hypers,
-                                                                                                    optimizer=optimizer,
+                                                                                                    optimizer_qa=optimizer_qa,
                                                                                                     scheduler=scheduler,
                                                                                                     early_stopping=True,
                                                                                                     qa_type_weights=qa_type_weights,
@@ -650,7 +651,7 @@ if __name__ == '__main__':
                                                                                                                                     batch_size=batch_size,
                                                                                                                                     n_aux_tasks=args.n_aux_tasks,
                                                                                                                                     args=hypers,
-                                                                                                                                    optimizer=optimizer,
+                                                                                                                                    optimizer_qa=optimizer_qa,
                                                                                                                                     scheduler=scheduler,
                                                                                                                                     early_stopping=True,
                                                                                                                                     qa_type_weights=qa_type_weights,
@@ -670,7 +671,7 @@ if __name__ == '__main__':
                                                                                                                                                                         batch_size=batch_size,
                                                                                                                                                                         n_aux_tasks=args.n_aux_tasks,
                                                                                                                                                                         args=hypers,
-                                                                                                                                                                        optimizer=optimizer,
+                                                                                                                                                                        optimizer_qa=optimizer_qa,
                                                                                                                                                                         scheduler=scheduler,
                                                                                                                                                                         early_stopping=True,
                                                                                                                                                                         qa_type_weights=qa_type_weights,
