@@ -129,7 +129,7 @@ if __name__ == '__main__':
     train_method = 'multitask' + '_' + str(args.n_aux_tasks) if args.multitask else 'singletask'
     eval_setup = args.n_evals
     task = 'Sbj_Class' if args.sbj_classification else 'QA'
-    batch_presentation = args.batches if args.multitask else ''
+    batch_presentation = args.batches
     sampling_strategy = 'over' if args.task_sampling == 'oversampling' else 'unif'
 
     if isinstance(args.adversarial, type(None)):

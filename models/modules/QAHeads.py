@@ -178,7 +178,7 @@ class RecurrentQAHead(nn.Module):
 
         self.rnn_encoder = BiLSTM(max_seq_length, in_size=self.in_size, n_layers=self.n_recurrent_layers) if self.rnn_version == 'LSTM' else BiGRU(max_seq_length, in_size=self.in_size, n_layers=self.n_recurrent_layers)
         
-        #self.batch_norm = nn.BatchNorm1d(self.in_size)
+        self.batch_norm = nn.BatchNorm1d(self.in_size)
 
         if highway_block:
             self.highway = Highway(self.in_size) # highway bridge in-between bidirectional RNNs
@@ -271,7 +271,7 @@ class RecurrentQAHead(nn.Module):
                 sequence_output = grad_reverse(sequence_output)
             
             # we need hidden states of only the last time step (summary of the sequence) (i.e., seq[batch_size, -1, hidden_size])
-            # sequence_output = self.batch_norm(sequence_output)
+            sequence_output = self.batch_norm(sequence_output)
             sequence_output = sequence_output[:, -1, :]
 
             if task == 'Sbj_Class':
