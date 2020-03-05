@@ -22,7 +22,7 @@ class DistilBertForQA(DistilBertPreTrainedModel):
     def __init__(
                  self,
                  config,
-                 max_seq_length:int=512,
+                 max_seq_length:int,
                  encoder:bool=False,
                  highway_connection:bool=False,
                  multitask:bool=False,

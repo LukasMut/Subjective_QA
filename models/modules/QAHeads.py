@@ -154,7 +154,7 @@ class RecurrentQAHead(nn.Module):
                  in_size:int,
                  n_labels_qa:int,
                  qa_dropout_p:float,
-                 max_seq_length:int=512,
+                 max_seq_length:int,
                  highway_block:bool=False,
                  multitask:bool=False,
                  n_aux_tasks=None,
