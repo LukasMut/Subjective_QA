@@ -596,22 +596,56 @@ if __name__ == '__main__':
         
         t_total = n_steps * hypers['n_epochs'] # total number of training steps (i.e., step = iteration)
             
-        optimizer_qa = AdamW(
-                          model.parameters(), 
-                          lr=hypers['lr_adam'], 
-                          correct_bias=True,
-        )
-
-        scheduler_qa = get_linear_schedule_with_warmup(
-                                                    optimizer_qa, 
-                                                    num_warmup_steps=hypers["warmup_steps"], 
-                                                    num_training_steps=t_total,
-        )
-
         # store train results in dict
         train_results  = dict()
 
-        if isinstance(args.n_aux_tasks, type(None)):
+        if isinstance(args.n_aux_tasks, type(None)) and args.sbj_classification:
+
+            optimizer_sbj = AdamW(
+                          model.parameters(), 
+                          lr=hypers['lr_adam'], 
+                          correct_bias=True,
+            )
+
+            scheduler_sbj = get_linear_schedule_with_warmup(
+                                                            optimizer_sbj, 
+                                                            num_warmup_steps=hypers["warmup_steps"], 
+                                                            num_training_steps=t_total,
+            )
+
+            batch_losses, batch_accs_qa, batch_f1s_qa, val_losses, val_accs, val_f1s, model = train(
+                                                                                                    model=model,
+                                                                                                    tokenizer=bert_tokenizer,
+                                                                                                    train_dl=train_dl,
+                                                                                                    val_dl=val_dl,
+                                                                                                    batch_size=batch_size,
+                                                                                                    n_aux_tasks=args.n_aux_tasks,
+                                                                                                    args=hypers,
+                                                                                                    optimizer_qa=None,
+                                                                                                    optimizer_sbj=optimizer_sbj,
+                                                                                                    optimizer_dom=None,
+                                                                                                    scheduler_qa=None,
+                                                                                                    scheduler_sbj=scheduler_sbj,
+                                                                                                    scheduler_dom=None,
+                                                                                                    early_stopping=True,
+                                                                                                    qa_type_weights=qa_type_weights,
+                                                                                                    domain_weights=domain_weights,
+                                                                                                    adversarial_simple=True if args.adversarial == 'simple' else False,
+            )
+
+        elif isinstance(args.n_aux_tasks, type(None)):
+
+            optimizer_qa = AdamW(
+                          model.parameters(), 
+                          lr=hypers['lr_adam'], 
+                          correct_bias=True,
+            )
+
+            scheduler_qa = get_linear_schedule_with_warmup(
+                                                           optimizer_qa, 
+                                                           num_warmup_steps=hypers["warmup_steps"], 
+                                                           num_training_steps=t_total,
+            )
 
             batch_losses, batch_accs_qa, batch_f1s_qa, val_losses, val_accs, val_f1s, model = train(
                                                                                                     model=model,
@@ -633,7 +667,21 @@ if __name__ == '__main__':
                                                                                                     adversarial_simple=True if args.adversarial == 'simple' else False,
             )
 
+
         elif args.n_aux_tasks == 1:
+
+
+            optimizer_qa = AdamW(
+                          model.parameters(), 
+                          lr=hypers['lr_adam'], 
+                          correct_bias=True,
+            )
+
+            scheduler_qa = get_linear_schedule_with_warmup(
+                                                           optimizer_qa, 
+                                                           num_warmup_steps=hypers["warmup_steps"], 
+                                                           num_training_steps=t_total,
+            )
 
             optimizer_sbj = AdamW(
                                   model.parameters(), 
@@ -671,6 +719,19 @@ if __name__ == '__main__':
             train_results['batch_f1s_sbj'] = batch_f1s_sbj
         
         elif args.n_aux_tasks == 2:
+
+
+            optimizer_qa = AdamW(
+                          model.parameters(), 
+                          lr=hypers['lr_adam'], 
+                          correct_bias=True,
+            )
+
+            scheduler_qa = get_linear_schedule_with_warmup(
+                                                           optimizer_qa, 
+                                                           num_warmup_steps=hypers["warmup_steps"], 
+                                                           num_training_steps=t_total,
+            )
 
             optimizer_sbj = AdamW(
                                   model.parameters(), 

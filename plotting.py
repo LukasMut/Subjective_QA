@@ -23,17 +23,25 @@ def get_results(
                 task_setting:str,
                 layer=None,
                 aux=None,
+                task_sampling=None,
 ):
     subdir = './results_train/' if version == 'train' else './results_test/'
     subsubdir = subdir + task + '/' + model + '/' + task_setting + '/'
+    
     if model in ['SubjQA', 'combined'] and task_setting == 'multi':
         assert isinstance(layer, str), 'When comparing across datasets in MTL setting, subfolder for model type must be provided'
         subsubdir += layer + '/'
+        assert isinstance(task_sampling, str), 'When comparing across  datasets in MTL setting, sampling strategy must be provided'
+        subsubdir += task_sampling + '/'
+        
     elif model == 'adversarial':
         subsubdir += aux + '/'
         if aux == 'aux_1':
             assert isinstance(layer, str), 'When comparing across adversarial models in aux_1, subfolder for model type must be provided'
             subsubdir += layer + '/'
+            assert isinstance(task_sampling, str), 'When comparing across adversarial models in aux_1 sampling strategy must be provided'
+            subsubdir += task_sampling + '/'
+            
     all_files = list(map(lambda f: subsubdir + f, os.listdir(subsubdir)))
     all_results = defaultdict(dict)
     for file in all_files: #islice(all_files, 1, None):
@@ -51,7 +59,9 @@ def plot_results(
                  task_setting:str,
                  iv:str='datasets',
                  metric:str='',
+                 layer=None,
                  aux=None,
+                 task_sampling=None,
                  correlation:bool=False,
 ):
     r_plot = defaultdict(dict) if correlation else {}
@@ -177,11 +187,19 @@ def plot_results(
     plt.tight_layout()
     
     if model == 'adversarial':
-        plt.savefig('./plots/' + 'models/' + task + '/' + model + '/' + task_setting + '/' + aux + '/' + metric + '.png')
+        plt.savefig('./plots/' + 'models/' + task + '/' + model + '/' + task_setting + '/' + aux + '/' + layer
+                    + '/' + task_sampling + '/' + metric + '.png')
+    
     elif model == 'adversarial' and correlation:
         plt.savefig('./plots/' + 'models/' + task + '/' + model + '/' + task_setting + '/'  + aux + '/' +  'train_vs_val' + '.png')
+    
+    elif model in ['SubjQA', 'combined', 'linear', 'recurrent'] and task_setting == 'multi':
+        plt.savefig('./plots/' + 'models/' + task + '/' + model + '/' + task_setting + '/' + layer + '/'
+                    + task_sampling + '/' + metric + '.png')
+    
     elif correlation:
         plt.savefig('./plots/' + 'models/' + task + '/' + model + '/' + task_setting + '/'  +  'train_vs_val' + '.png')
+    
     else:
         plt.savefig('./plots/' + 'models/' + task + '/' + model + '/' + task_setting + '/' + metric + '.png')
         
@@ -197,27 +215,41 @@ def plotting(
              iv:str,
              layer=None,
              aux=None,
+             task_sampling=None,
 ):
     print('===========================')
     print('====== Task: {} ======'.format(task.upper()))
     print('===========================')
     print()
     for i, model in enumerate(models):
-        # load results
-        if model == 'adversarial':
-            all_results = get_results(task=task, version=version, model=model, task_setting='multi', layer=layer, aux=aux)
-        else:
-            all_results = get_results(task=task, version=version, model=model, task_setting=task_setting, layer=layer, aux=None)
         print('==============================')
         print('====== Model: {} ======'.format(model.upper()))
         print('==============================')
         print()
+        # load results
+        all_results = get_results(
+                                  task=task,
+                                  version=version, 
+                                  model=model,
+                                  task_setting='multi' if model == 'adversarial' else task_setting, 
+                                  layer=layer,
+                                  aux=aux if model == 'adversarial' else None,
+                                  task_sampling=task_sampling,
+        )
         for j, metric in enumerate(metrics):
-            # plot results
             print('=============================')
             print('===== Metric: {} ====='.format(metric.upper()))
             print('=============================')
-            if model == 'adversarial':
-                plot_results(all_results, task=task, metric=metric, iv='methods',  model=model, task_setting='multi', aux=aux)
-            else:
-                plot_results(all_results, task=task, metric=metric, iv=iv,  model=model, task_setting=task_setting, aux=None)
+            print()
+            # plot results
+            plot_results(
+                         all_results, 
+                         task=task, 
+                         metric=metric, 
+                         iv='methods' if model == 'adversarial' else iv,  
+                         model=model, 
+                         task_setting='multi' if model == 'adversarial' else task_setting, 
+                         layer=layer, 
+                         aux=aux if model == 'adversarial' else None,
+                         task_sampling=task_sampling,
+            )

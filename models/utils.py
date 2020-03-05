@@ -188,7 +188,7 @@ def train(
             print()
             sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
           else:
-            sbj_loss_func = nn.BCEWithLogitsLoss()
+            sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=torch.ones(2).to(device))
 
           batch_accs_sbj, batch_f1s_sbj = [], []
         
@@ -208,7 +208,7 @@ def train(
         print()
         sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
       else:
-        sbj_loss_func = nn.BCEWithLogitsLoss()
+        sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=torch.ones(2).to(device))
 
       batch_accs_sbj, batch_f1s_sbj = [], []
 
@@ -476,6 +476,7 @@ def train(
               scheduler_sbj.step()
 
             if args['n_evals'] == 'multiple_per_epoch':
+              
               if step > 0 and step % steps_until_eval == 0:
                 val_losses, val_accs, val_f1s, model = val(
                                                           model=model,
@@ -499,7 +500,8 @@ def train(
 
                 # we want to train the model at least for one epoch
                 if epoch > 0 and early_stopping:
-                  if np.argmin(val_losses) > args['early_stopping_thresh']:
+                  
+                  if np.argmin(val_losses[::-1]) > args['early_stopping_thresh']:
                     stop_training = True
                     break
 
@@ -560,7 +562,9 @@ def train(
           model.train()
 
           if epoch > 0 and early_stopping:
+            
             if args['n_evals'] == 'one_per_epoch':
+              
               if val_losses[-1] > val_losses[-2]:
                 print("------------------------------------------")
                 print("----- Early stopping after {} steps -----".format(nb_tr_steps * (epoch + 1)))
@@ -745,7 +749,7 @@ def val(
       print("----- Val Sbj acc: {} % -----".format(round(val_acc, 3)))
       print("----- Val Sbj F1: {} % -----".format(round(val_f1, 3)))
 
-    if epoch == 0 or val_loss < val_losses[-1]:
+    if epoch == 0 or val_loss < min(val_losses):
       torch.save(model.state_dict(), model_path + '/%s' % (args['model_name']))
 
     print("----------------------------------")
