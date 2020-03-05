@@ -25,7 +25,6 @@ class DistilBertForQA(DistilBertPreTrainedModel):
                  max_seq_length:int=512,
                  encoder:bool=False,
                  highway_connection:bool=False,
-                 decoder:bool=False,
                  multitask:bool=False,
                  adversarial:bool=False,
                  n_aux_tasks=None,
@@ -37,7 +36,6 @@ class DistilBertForQA(DistilBertPreTrainedModel):
         self.max_seq_length = max_seq_length
         self.encoder = encoder
         self.highway_connection = highway_connection
-        self.decoder = decoder
         self.multitask = multitask
         self.adversarial = adversarial
         self.n_aux_tasks = n_aux_tasks
@@ -54,7 +52,6 @@ class DistilBertForQA(DistilBertPreTrainedModel):
                                            max_seq_length=self.max_seq_length,
                                            highway_block=self.highway_connection,
                                            multitask=self.multitask,
-                                           decoder=self.decoder,
                                            n_aux_tasks=self.n_aux_tasks,
                                            n_domain_labels=self.n_domain_labels,
                                            adversarial=self.adversarial,

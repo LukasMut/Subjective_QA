@@ -157,7 +157,6 @@ class RecurrentQAHead(nn.Module):
                  qa_dropout_p:float,
                  max_seq_length:int=512,
                  highway_block:bool=False,
-                 decoder:bool=False,
                  multitask:bool=False,
                  n_aux_tasks=None,
                  aux_dropout_p:float=0.25,
@@ -182,9 +181,6 @@ class RecurrentQAHead(nn.Module):
         
         if highway_block:
             self.highway = Highway(self.in_size) # highway bridge in-between bidirectional RNNs
-
-        if decoder:
-            self.rnn_decoder = BiLSTM(max_seq_length, in_size=self.in_size, n_layers=self.n_recurrent_layers) if self.rnn_version == 'LSTM' else BiGRU(max_seq_length, in_size=self.in_size, n_layers=self.n_recurrent_layers)
             
         # fully-connected QA output layer with dropout
         self.fc_qa = nn.Linear(self.in_size, self.n_labels)
@@ -237,9 +233,6 @@ class RecurrentQAHead(nn.Module):
             # pass output of Bi-LSTM or Bi-GRU through a Highway connection (for better information flow)
             # TODO: figure out, whether we should pass "sequence_output[:, -1, :]" to Highway layer or simply "sequence_output"
             sequence_output = self.highway(sequence_output)
-
-        if hasattr(self, 'rnn_decoder'):
-            sequence_output, hidden_rnn = self.rnn_decoder(sequence_output, seq_lengths, hidden_rnn)
         
         if task == 'QA':
 
