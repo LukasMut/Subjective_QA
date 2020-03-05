@@ -500,7 +500,7 @@ def train(
 
                 # we want to train the model at least for one epoch
                 if epoch > 0 and early_stopping:
-                  
+                  # if loss has not decreased for the past args['early_stopping_thresh'] eval steps, stop training
                   if np.argmin(val_losses[::-1]) > args['early_stopping_thresh']:
                     stop_training = True
                     break
@@ -562,14 +562,11 @@ def train(
           model.train()
 
           if epoch > 0 and early_stopping:
-            
-            if args['n_evals'] == 'one_per_epoch':
-              
-              if val_losses[-1] > val_losses[-2]:
-                print("------------------------------------------")
-                print("----- Early stopping after {} steps -----".format(nb_tr_steps * (epoch + 1)))
-                print("------------------------------------------")
-                break
+            if val_losses[-1] > val_losses[-2]:
+              print("------------------------------------------")
+              print("----- Early stopping after {} steps -----".format(nb_tr_steps * (epoch + 1)))
+              print("------------------------------------------")
+              break
         else:
           if stop_training:
             print("------------------------------------------")
