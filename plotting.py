@@ -76,14 +76,32 @@ def plot_results(
                 if re.search(r'' + metric, m):
                     r_plot[clf] = v                   
                     
-    if iv == 'datasets':
-        params = [r'$D_{SQuAD} \cup D_{Subj}$', r'$D_{Subj}$']
+    if task =='sbj_class' and iv == 'datasets' and task_setting == 'single':
+        params = [
+                  r'$D_{SQuAD} \cup D_{Subj}$ $(\mathbf{q, a})$',
+                  r'$D_{Subj}$ $(\mathbf{q, a})$',
+                  r'$D_{SQuAD} \cup D_{Subj}$ $(\mathbf{q, c})$',
+                  r'$D_{Subj}$ $(\mathbf{q, c})$',
+        ]
+  
+    elif task == 'QA' and iv == 'datasets' and task_setting == 'single':
+        params = [
+                  r'$D_{SQuAD} \cup D_{Subj}$',
+                  r'$D_{Subj}$',
+        ]
+
         
     elif iv == 'models' and task_setting == 'single':
-        params = ['Highway', 'Linear', 'BiLSTM + Highway', 'BiLSTM']
+        params = [
+                  r'Highway',
+                  r'Linear',
+                  r'BiLSTM + Highway',
+                  r'BiLSTM',
+        ]
     
     elif iv == 'models' and task_setting == 'multi':
-        params = [r'Adversarial Simple $(\mathbf{q, a})$', 
+        params = [
+                  r'Adversarial Simple $(\mathbf{q, a})$', 
                   r'Normal $(\mathbf{q, a})$',
                   r'Adversarial GRL $(\mathbf{q, a})$ ', 
                   r'Adversarial Simple $(\mathbf{q, c})$',
@@ -92,7 +110,8 @@ def plot_results(
                  ]            
         
     elif model == 'adversarial' and iv == 'methods':
-        params = [r'$D_{SQuAD} \cup D_{Subj}$ $(\mathbf{q, c})$ Simple', 
+        params = [
+                  r'$D_{SQuAD} \cup D_{Subj}$ $(\mathbf{q, c})$ Simple', 
                   r'$D_{Subj}$ $(\mathbf{q, c})$ Simple ', 
                   r'$D_{SQuAD} \cup D_{Subj}$ $(\mathbf{q, a})$ Simple ', 
                   r'$D_{Subj}$ $(\mathbf{q, a})$ Simple', 
@@ -114,9 +133,8 @@ def plot_results(
     legend_fontsize = 8
     
     ax = plt.subplot(111)
-        
+    
     for idx, (clf, met) in enumerate(r_plot.items()):
-        #print(clf)
         if correlation:
             try:
                 ax.plot(met['train'], met['val'], '-o', label=params[idx])
