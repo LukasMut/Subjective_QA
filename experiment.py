@@ -856,8 +856,17 @@ if __name__ == '__main__':
             train_results['batch_f1s_domain'] = batch_f1s_domain        
             
         train_results['batch_losses'] = batch_losses
-        train_results['batch_accs_qa'] = batch_accs
-        train_results['batch_f1s_qa'] = batch_f1s
+
+        if args.sbj_classification:
+            train_results['batch_accs_sbj'] = batch_accs
+            train_results['batch_f1s_sbj'] = batch_f1s
+        elif args.domain_classification:
+            train_results['batch_accs_domain'] = batch_accs
+            train_results['batch_f1s_domain'] = batch_f1s
+        else:
+            train_results['batch_accs_qa'] = batch_accs
+            train_results['batch_f1s_qa'] = batch_f1s
+
         train_results['val_losses'] = val_losses
         train_results['val_accs'] = val_accs
         train_results['val_f1s'] = val_f1s
