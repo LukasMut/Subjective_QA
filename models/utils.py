@@ -198,8 +198,11 @@ def train(
               batch_accs_domain, batch_f1s_domain = [], []
               tasks.append('Domain_Class')
 
+      loss_func = qa_loss_func
+
     elif args['task'] == 'Sbj_Classification':
       tasks = ['Sbj_Class']
+
       if args['dataset'] == 'combined':
         assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
         print("Weights for subjective Anwers: {}".format(qa_type_weights[0]))
@@ -211,9 +214,18 @@ def train(
         sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=torch.ones(2).to(device))
 
       batch_accs_sbj, batch_f1s_sbj = [], []
+      loss_func = sbj_loss_func
+
+    elif args['task'] == 'Domain_Classification':
+      tasks = ['Domain_Class']
+      assert isinstance(domain_weights, torch.Tensor), 'Tensor of class weights for different domains is not provided'
+      domain_loss_func = nn.CrossEntropyLoss(weight=domain_weights.to(device))
+
+      batch_accs_domain, batch_f1s_domain = [], []
+      loss_func = domain_loss_func
 
     # generate random sample over all tasks (TODO: for MTL setting with 2 auxiliary tasks, we might want to sample QA task with a higher probability than auxiliary tasks)
-    if isinstance(n_aux_tasks, type(None)) or args['task_sampling'] == 'uniform' or args['task'] == 'Sbj_Classification':
+    if isinstance(n_aux_tasks, type(None)) or args['task_sampling'] == 'uniform' or args['task'] in ['Sbj_Classification', 'Domain_Classification']:
       distrib = [1/len(tasks) for _ in tasks]
       
     elif isinstance(n_aux_tasks, int) and args['task_sampling'] == 'oversampling':
@@ -251,6 +263,9 @@ def train(
 
         elif args['task'] == 'Sbj_Classification':
           batch_acc_sbj, batch_f1_sbj = 0, 0
+
+        elif args['task'] == 'Domain_Classification':
+          batch_acc_domain, batch_f1_domain = 0, 0
 
         tr_loss = 0
         nb_tr_examples, nb_tr_steps = 0, 0
@@ -489,7 +504,7 @@ def train(
                                                           val_losses=val_losses,
                                                           val_accs=val_accs,
                                                           val_f1s=val_f1s,
-                                                          loss_func=sbj_loss_func if args['task'] == 'Sbj_Classification' else qa_loss_func,
+                                                          loss_func=loss_func,
                                                           )
 
                 # we want to store train exact-match accuracies and F1 scores for each task as often as we evaluate model on validation set
@@ -537,6 +552,10 @@ def train(
           print("----- Train Sbj acc: {} % -----".format(batch_accs_sbj[-1]))
           print("----- Train Sbj F1: {} % -----".format(batch_f1s_sbj[-1]))
 
+        elif args['task'] == 'Domain_Classification':
+          print("----- Train Domain acc: {} % -----".format(batch_accs_domain[-1]))
+          print("----- Train Domain F1: {} % -----".format(batch_f1s_domain[-1]))
+
         print("----------------------------------")
         print()
         
@@ -552,7 +571,7 @@ def train(
                                                     val_losses=val_losses,
                                                     val_accs=val_accs,
                                                     val_f1s=val_f1s,
-                                                    loss_func=sbj_loss_func if args['task'] == 'Sbj_Classification' else qa_loss_func,
+                                                    loss_func=loss_func,
                                                     )
 
           # we want to store train exact-match accuracies and F1 scores for each task as often as we evaluate model on validation set
@@ -580,6 +599,8 @@ def train(
       return batch_losses, batch_accs_qa, batch_f1s_qa, val_losses, val_accs, val_f1s, model
     elif isinstance(n_aux_tasks, type(None)) and args['task'] == 'Sbj_Classification':
       return batch_losses, batch_accs_sbj, batch_f1s_sbj, val_losses, val_accs, val_f1s, model
+    elif isinstance(n_aux_tasks, type(None)) and args['task'] == 'Domain_Classification':
+      return batch_losses, batch_accs_domain, batch_f1s_domain, val_losses, val_accs, val_f1s, model
     elif n_aux_tasks == 1:
       return batch_losses, batch_accs_qa, batch_f1s_qa, batch_accs_sbj, batch_f1s_sbj, val_losses, val_accs, val_f1s, model
     elif n_aux_tasks == 2:
@@ -611,6 +632,9 @@ def val(
 
     elif args['task'] == 'Sbj_Classification':
       batch_acc_sbj = 0
+
+    elif args['task'] == 'Domain_Classification':
+      batch_acc_domain = 0
     
     batch_f1_val = 0
     val_loss = 0
@@ -633,6 +657,8 @@ def val(
         elif args['task'] == 'QA':
             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos,  _, _ = batch
 
+        elif args['task'] == 'Domain_Classification':
+          b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _,  _, b_domains = batch
 
          # if current batch_size is smaller than specified batch_size, skip batch
         if b_input_ids.size(0) != batch_size:
@@ -715,6 +741,23 @@ def val(
             batch_acc_sbj += (current_sbj_acc / b_sbj.size(1))
             batch_f1_val += (current_sbj_f1 / b_sbj.size(1))
 
+          elif args['task'] == 'Domain_Classification':
+
+            domain_logits = model(
+                                  input_ids=b_input_ids,
+                                  attention_masks=b_attn_masks,
+                                  token_type_ids=b_token_type_ids,
+                                  input_lengths=b_input_lengths,
+                                  task='Domain_Class',
+                  )
+
+            b_domains = b_domains.type_as(domain_logits)
+
+            batch_loss_val += domain_loss_func(domain_logits, b_domains)
+
+            batch_acc_domain += accuracy(probas=F.log_softmax(domain_logits, dim=1), y_true=b_domains, task='multi-way')  
+            batch_f1_val += f1(probas=F.log_softmax(domain_logits, dim=1), y_true=b_domains, task='multi-way')
+
           print("----------------------------------------")
           print("----- Current val batch loss: {} -----".format(round(batch_loss_val.item(), 3)))
           print("----------------------------------------")
@@ -725,7 +768,15 @@ def val(
           nb_val_steps += 1
 
           current_batch_f1 = 100 * (batch_f1_val / nb_val_examples) if args['task'] == 'QA' else 100 * (batch_f1_val / nb_val_steps )
-          current_batch_acc = 100 * 100 * (correct_answers_val / nb_val_examples) if args['task'] == 'QA' else 100 * (batch_acc_sbj / nb_val_steps)
+
+          if args['task'] == 'QA':
+            current_batch_acc = 100 * (correct_answers_val / nb_val_examples)
+
+          elif args['task'] == 'Sbj_Classification':
+            current_batch_acc = 100 * (batch_acc_sbj / nb_val_steps)
+
+          elif args['task'] == 'Domain_Classification':
+            current_batch_acc = 100 * (batch_acc_domain / nb_val_steps)
 
     val_loss /= nb_val_steps
     print("----------------------------------")
@@ -745,6 +796,13 @@ def val(
 
       print("----- Val Sbj acc: {} % -----".format(round(val_acc, 3)))
       print("----- Val Sbj F1: {} % -----".format(round(val_f1, 3)))
+
+    elif args['task'] == 'Domain_Classification':
+      val_acc = 100 * (batch_acc_domain / nb_val_steps)
+      val_f1 = 100 * (batch_f1_val / nb_val_steps)
+
+      print("----- Val Domain acc: {} % -----".format(round(val_acc, 3)))
+      print("----- Val Domain F1: {} % -----".format(round(val_f1, 3)))
 
     if epoch == 0 or val_loss < min(val_losses):
       torch.save(model.state_dict(), model_path + '/%s' % (args['model_name']))
@@ -775,7 +833,7 @@ def test(
     # set model to eval mode
     model.eval()
     
-    if task == 'QA':
+    if task == 'QA' or task == 'Domain_Classification':
       correct_answers_test = 0
       loss_func = nn.CrossEntropyLoss()
 

@@ -57,6 +57,20 @@ class LinearQAHead(nn.Module):
             self.fc_sbj_2 = nn.Linear(self.in_size, self.in_size)
             self.fc_sbj_a = nn.Linear(self.in_size, 1) # fc subj. layer for answers
             self.fc_sbj_q = nn.Linear(self.in_size, 1) # fc subj. layer for questions
+
+        
+        elif self.task == 'Domain_Classification':
+
+             # define dropout layer for auxiliary classification tasks
+            self.aux_dropout = nn.Dropout(p = self.aux_dropout_p)
+
+            assert isinstance(n_domain_labels, int), 'If model is to perform domain classification, domain labels must be provided'
+            self.n_domain_labels = n_domain_labels
+
+            # fully-connected review domain output layers (second auxiliary task)
+            self.fc_domain_1 = nn.Linear(self.in_size, self.in_size)
+            self.fc_domain_2 = nn.Linear(self.in_size, self.in_size)
+            self.fc_domain_3 = nn.Linear(self.in_size, self.n_domain_labels)
         
         if self.task == 'QA' and self.multitask:
 
@@ -199,6 +213,20 @@ class RecurrentQAHead(nn.Module):
             self.fc_sbj_2 = nn.Linear(self.in_size, self.in_size)
             self.fc_sbj_a = nn.Linear(self.in_size, 1) # fc subj. layer for answers
             self.fc_sbj_q = nn.Linear(self.in_size, 1) # fc subj. layer for questions
+
+        elif self.task == 'Domain_Classification':
+
+             # define dropout layer for auxiliary classification tasks
+            self.aux_dropout = nn.Dropout(p = self.aux_dropout_p)
+
+            assert isinstance(n_domain_labels, int), 'If model is to perform domain classification, domain labels must be provided'
+            self.n_domain_labels = n_domain_labels
+
+            # fully-connected review domain output layers (second auxiliary task)
+            self.fc_domain_1 = nn.Linear(self.in_size, self.in_size)
+            self.fc_domain_2 = nn.Linear(self.in_size, self.in_size)
+            self.fc_domain_3 = nn.Linear(self.in_size, self.n_domain_labels)
+
         
         if self.task == 'QA' and self.multitask:
             # define, whether we want to perform adversarial training with a GRL between feature extractor and classifiers

@@ -36,7 +36,9 @@ if __name__ == '__main__':
     parser.add_argument('--n_evals', type=str, default='multiple_per_epoch',
             help='Define number of evaluations during training. If "multiple_per_epoch", ten evals per epoch. If "one_per_epoch", once after a training epoch.')
     parser.add_argument('--sbj_classification', action='store_true',
-            help='If provided, perform subjectivity classification instead of QA.')
+            help='If provided, perform subjectivity classification (binary) instead of QA.')
+    parser.add_argument('--domain_classification', action='store_true',
+            help='If provided, perform domain classification (multi-class) instead of QA.')
     parser.add_argument('--multitask', action='store_true',
             help='If provided, MTL instead of STL setting.')
     parser.add_argument('--batches', type=str, default='normal',
@@ -117,7 +119,7 @@ if __name__ == '__main__':
         pretrained_weights = 'distilbert-base-cased-distilled-squad'
         freeze_bert = True
 
-    if args.sbj_classification:
+    if args.sbj_classification or args.domain_classification:
 
         assert not args.multitask
         assert isinstance(args.n_aux_tasks, type(None))
@@ -128,7 +130,14 @@ if __name__ == '__main__':
     highway = 'Highway' if args.highway_connection else ''
     train_method = 'multitask' + '_' + str(args.n_aux_tasks) if args.multitask else 'singletask'
     eval_setup = args.n_evals
-    task = 'Sbj_Class' if args.sbj_classification else 'QA'
+
+    if args.sbj_classification:
+        task = 'Sbj_Class'
+    elif args.domain_classification:
+        task = 'Dom_Class'
+    else:
+        task = 'QA'
+
     batch_presentation = args.batches
     sampling_strategy = 'over' if args.task_sampling == 'oversampling' else 'unif'
 
@@ -267,7 +276,13 @@ if __name__ == '__main__':
                                            batch_size=batch_size,
                                            sort_batch=sort_batch,
                                           )
+            elif args.domain_classification:
 
+                subjqa_domains = [f.domain for f in subjqa_features_train]
+                domain_weights = get_class_weights(
+                                                   subjqa_classes=subjqa_domains,
+                                                   idx_to_class=idx_to_domains,
+                ) 
 
         elif args.finetuning == 'SQuAD':
             
@@ -555,7 +570,25 @@ if __name__ == '__main__':
 
                 qa_type_weights = torch.stack((a_type_weights, q_type_weights))
 
+            elif args.domain_classification:
+
+                squad_domains = [f.domain for f in squad_features_train]
+                subjqa_domains = [f.domain for f in subjqa_features_train]
+                domain_weights = get_class_weights(
+                                                   subjqa_classes=subjqa_domains,
+                                                   idx_to_class=idx_to_domains,
+                                                   squad_classes=squad_domains,
+                                                   ) 
+
         # initialise QA model
+
+        if args.sbj_classification:
+            task = 'Sbj_Classification'
+        elif args.domain_classification:
+            task = 'Domain_Classification'
+        else:
+            task = 'QA'
+
         model = DistilBertForQA.from_pretrained(
                                           pretrained_weights,
                                           max_seq_length = max_seq_length,
@@ -565,7 +598,7 @@ if __name__ == '__main__':
                                           adversarial = True if args.adversarial == 'GRL' else False,
                                           n_aux_tasks = args.n_aux_tasks,
                                           n_domain_labels = n_domain_labels,
-                                          task = 'Sbj_Classification' if args.sbj_classification else 'QA',
+                                          task = task,
         )
 
         # set model to device
@@ -577,7 +610,13 @@ if __name__ == '__main__':
                   "max_grad_norm": 1.0,
         }
 
-        hypers["task"] = 'Sbj_Classification' if args.sbj_classification else 'QA'
+        if args.sbj_classification:
+            hypers["task"] = 'Sbj_Classification' 
+        elif args.domain_classification:
+            hypers["task"] = 'Domain_Classification'
+        else:
+            hypers["task"] = 'QA'
+
         hypers["n_epochs"] = args.n_epochs
         hypers["n_steps"] = n_steps
         hypers["n_evals"] = args.n_evals
@@ -630,7 +669,41 @@ if __name__ == '__main__':
                                                                                                     early_stopping=True,
                                                                                                     qa_type_weights=qa_type_weights,
                                                                                                     domain_weights=domain_weights,
-                                                                                                    adversarial_simple=True if args.adversarial == 'simple' else False,
+                                                                                                    adversarial_simple=False,
+            )
+
+        elif isinstance(args.n_aux_tasks, type(None)) and args.domain_classification:
+
+            optimizer_dom = AdamW(
+                          model.parameters(), 
+                          lr=hypers['lr_adam'], 
+                          correct_bias=True,
+            )
+
+            scheduler_dom = get_linear_schedule_with_warmup(
+                                                            optimizer_dom, 
+                                                            num_warmup_steps=hypers["warmup_steps"], 
+                                                            num_training_steps=t_total,
+            )
+
+            batch_losses, batch_accs_qa, batch_f1s_qa, val_losses, val_accs, val_f1s, model = train(
+                                                                                                    model=model,
+                                                                                                    tokenizer=bert_tokenizer,
+                                                                                                    train_dl=train_dl,
+                                                                                                    val_dl=val_dl,
+                                                                                                    batch_size=batch_size,
+                                                                                                    n_aux_tasks=args.n_aux_tasks,
+                                                                                                    args=hypers,
+                                                                                                    optimizer_qa=None,
+                                                                                                    optimizer_sbj=None,
+                                                                                                    optimizer_dom=optimizer_dom,
+                                                                                                    scheduler_qa=None,
+                                                                                                    scheduler_sbj=None,
+                                                                                                    scheduler_dom=scheduler_dom,
+                                                                                                    early_stopping=True,
+                                                                                                    qa_type_weights=qa_type_weights,
+                                                                                                    domain_weights=domain_weights,
+                                                                                                    adversarial_simple=False,
             )
 
         elif isinstance(args.n_aux_tasks, type(None)):
@@ -839,6 +912,13 @@ if __name__ == '__main__':
                                     sort_batch=sort_batch,
                                     )
 
+            if args.sbj_classification:
+                task =  'Sbj_Classification'
+            elif args.domain_classification:
+                task = 'Domain_Classification'
+            else:
+                task = 'QA'
+
             if args.not_finetuned and not args.sbj_classification:
                 # test (simple) BERT-QA-model fine-tuned on SQuAD without (prior) task-specific fine-tuning on SubjQA
                 model = DistilBertForQuestionAnswering.from_pretrained('distilbert-base-cased-distilled-squad')
@@ -863,7 +943,7 @@ if __name__ == '__main__':
                                                         adversarial = True if args.adversarial == 'GRL' else False,
                                                         n_aux_tasks = args.n_aux_tasks,
                                                         n_domain_labels = n_domain_labels,
-                                                        task = 'Sbj_Classification' if args.sbj_classification else 'QA',
+                                                        task = task,
                 )
                 # load fine-tuned model
                 model.load_state_dict(torch.load(args.sd + '/%s' % (model_name)))
@@ -877,7 +957,7 @@ if __name__ == '__main__':
                                                 test_dl=test_dl,
                                                 batch_size=batch_size,
                                                 not_finetuned=args.not_finetuned,
-                                                task= 'Sbj_Classification' if args.sbj_classification else 'QA',
+                                                task= task,
                                                 input_sequence= 'question_answer' if args.batches == 'alternating' else 'question_context', 
             )
             
