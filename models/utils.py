@@ -751,7 +751,6 @@ def val(
                                   task='Domain_Class',
                   )
 
-            b_domains = b_domains.type_as(domain_logits)
 
             batch_loss_val += loss_func(domain_logits, b_domains)
 
