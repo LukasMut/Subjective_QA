@@ -753,7 +753,7 @@ def val(
 
             b_domains = b_domains.type_as(domain_logits)
 
-            batch_loss_val += domain_loss_func(domain_logits, b_domains)
+            batch_loss_val += loss_func(domain_logits, b_domains)
 
             batch_acc_domain += accuracy(probas=F.log_softmax(domain_logits, dim=1), y_true=b_domains, task='multi-way')  
             batch_f1_val += f1(probas=F.log_softmax(domain_logits, dim=1), y_true=b_domains, task='multi-way')
