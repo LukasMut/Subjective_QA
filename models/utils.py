@@ -520,7 +520,12 @@ def train(
                     stop_training = True
                     break
 
-        tr_loss /= task_distrib['QA'] if args['task'] == 'QA' else task_distrib['Sbj_Class']
+        if args['task'] == 'QA':
+          tr_loss /= task_distrib['QA']
+        elif args['task'] == 'Sbj_Classification': 
+          tr_loss /= task_distrib['Sbj_Class']
+        elif args['task'] == 'Domain_Classification': 
+          tr_loss /= task_distrib['Sbj_Class']
 
         print("------------------------------------")
         print("---------- EPOCH {} ----------".format(epoch + 1))
