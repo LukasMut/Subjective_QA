@@ -652,24 +652,24 @@ if __name__ == '__main__':
                                                             num_training_steps=t_total,
             )
 
-            batch_losses, batch_accs_qa, batch_f1s_qa, val_losses, val_accs, val_f1s, model = train(
-                                                                                                    model=model,
-                                                                                                    tokenizer=bert_tokenizer,
-                                                                                                    train_dl=train_dl,
-                                                                                                    val_dl=val_dl,
-                                                                                                    batch_size=batch_size,
-                                                                                                    n_aux_tasks=args.n_aux_tasks,
-                                                                                                    args=hypers,
-                                                                                                    optimizer_qa=None,
-                                                                                                    optimizer_sbj=optimizer_sbj,
-                                                                                                    optimizer_dom=None,
-                                                                                                    scheduler_qa=None,
-                                                                                                    scheduler_sbj=scheduler_sbj,
-                                                                                                    scheduler_dom=None,
-                                                                                                    early_stopping=True,
-                                                                                                    qa_type_weights=qa_type_weights,
-                                                                                                    domain_weights=domain_weights,
-                                                                                                    adversarial_simple=False,
+            batch_losses, batch_accs, batch_f1s, val_losses, val_accs, val_f1s, model = train(
+                                                                                            model=model,
+                                                                                            tokenizer=bert_tokenizer,
+                                                                                            train_dl=train_dl,
+                                                                                            val_dl=val_dl,
+                                                                                            batch_size=batch_size,
+                                                                                            n_aux_tasks=args.n_aux_tasks,
+                                                                                            args=hypers,
+                                                                                            optimizer_qa=None,
+                                                                                            optimizer_sbj=optimizer_sbj,
+                                                                                            optimizer_dom=None,
+                                                                                            scheduler_qa=None,
+                                                                                            scheduler_sbj=scheduler_sbj,
+                                                                                            scheduler_dom=None,
+                                                                                            early_stopping=True,
+                                                                                            qa_type_weights=qa_type_weights,
+                                                                                            domain_weights=domain_weights,
+                                                                                            adversarial_simple=False,
             )
 
         elif isinstance(args.n_aux_tasks, type(None)) and args.domain_classification:
@@ -686,24 +686,24 @@ if __name__ == '__main__':
                                                             num_training_steps=t_total,
             )
 
-            batch_losses, batch_accs_qa, batch_f1s_qa, val_losses, val_accs, val_f1s, model = train(
-                                                                                                    model=model,
-                                                                                                    tokenizer=bert_tokenizer,
-                                                                                                    train_dl=train_dl,
-                                                                                                    val_dl=val_dl,
-                                                                                                    batch_size=batch_size,
-                                                                                                    n_aux_tasks=args.n_aux_tasks,
-                                                                                                    args=hypers,
-                                                                                                    optimizer_qa=None,
-                                                                                                    optimizer_sbj=None,
-                                                                                                    optimizer_dom=optimizer_dom,
-                                                                                                    scheduler_qa=None,
-                                                                                                    scheduler_sbj=None,
-                                                                                                    scheduler_dom=scheduler_dom,
-                                                                                                    early_stopping=True,
-                                                                                                    qa_type_weights=qa_type_weights,
-                                                                                                    domain_weights=domain_weights,
-                                                                                                    adversarial_simple=False,
+            batch_losses, batch_accs, batch_f1s, val_losses, val_accs, val_f1s, model = train(
+                                                                                            model=model,
+                                                                                            tokenizer=bert_tokenizer,
+                                                                                            train_dl=train_dl,
+                                                                                            val_dl=val_dl,
+                                                                                            batch_size=batch_size,
+                                                                                            n_aux_tasks=args.n_aux_tasks,
+                                                                                            args=hypers,
+                                                                                            optimizer_qa=None,
+                                                                                            optimizer_sbj=None,
+                                                                                            optimizer_dom=optimizer_dom,
+                                                                                            scheduler_qa=None,
+                                                                                            scheduler_sbj=None,
+                                                                                            scheduler_dom=scheduler_dom,
+                                                                                            early_stopping=True,
+                                                                                            qa_type_weights=qa_type_weights,
+                                                                                            domain_weights=domain_weights,
+                                                                                            adversarial_simple=False,
             )
 
         elif isinstance(args.n_aux_tasks, type(None)):
@@ -720,24 +720,24 @@ if __name__ == '__main__':
                                                            num_training_steps=t_total,
             )
 
-            batch_losses, batch_accs_qa, batch_f1s_qa, val_losses, val_accs, val_f1s, model = train(
-                                                                                                    model=model,
-                                                                                                    tokenizer=bert_tokenizer,
-                                                                                                    train_dl=train_dl,
-                                                                                                    val_dl=val_dl,
-                                                                                                    batch_size=batch_size,
-                                                                                                    n_aux_tasks=args.n_aux_tasks,
-                                                                                                    args=hypers,
-                                                                                                    optimizer_qa=optimizer_qa,
-                                                                                                    optimizer_sbj=None,
-                                                                                                    optimizer_dom=None,
-                                                                                                    scheduler_qa=scheduler_qa,
-                                                                                                    scheduler_sbj=None,
-                                                                                                    scheduler_dom=None,
-                                                                                                    early_stopping=True,
-                                                                                                    qa_type_weights=qa_type_weights,
-                                                                                                    domain_weights=domain_weights,
-                                                                                                    adversarial_simple=True if args.adversarial == 'simple' else False,
+            batch_losses, batch_accs, batch_f1s, val_losses, val_accs, val_f1s, model = train(
+                                                                                            model=model,
+                                                                                            tokenizer=bert_tokenizer,
+                                                                                            train_dl=train_dl,
+                                                                                            val_dl=val_dl,
+                                                                                            batch_size=batch_size,
+                                                                                            n_aux_tasks=args.n_aux_tasks,
+                                                                                            args=hypers,
+                                                                                            optimizer_qa=optimizer_qa,
+                                                                                            optimizer_sbj=None,
+                                                                                            optimizer_dom=None,
+                                                                                            scheduler_qa=scheduler_qa,
+                                                                                            scheduler_sbj=None,
+                                                                                            scheduler_dom=None,
+                                                                                            early_stopping=True,
+                                                                                            qa_type_weights=qa_type_weights,
+                                                                                            domain_weights=domain_weights,
+                                                                                            adversarial_simple=True if args.adversarial == 'simple' else False,
             )
 
 
@@ -856,8 +856,8 @@ if __name__ == '__main__':
             train_results['batch_f1s_domain'] = batch_f1s_domain        
             
         train_results['batch_losses'] = batch_losses
-        train_results['batch_accs_qa'] = batch_accs_qa
-        train_results['batch_f1s_qa'] = batch_f1s_qa
+        train_results['batch_accs_qa'] = batch_accs
+        train_results['batch_f1s_qa'] = batch_f1s
         train_results['val_losses'] = val_losses
         train_results['val_accs'] = val_accs
         train_results['val_f1s'] = val_f1s

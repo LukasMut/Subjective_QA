@@ -525,7 +525,7 @@ def train(
         elif args['task'] == 'Sbj_Classification': 
           tr_loss /= task_distrib['Sbj_Class']
         elif args['task'] == 'Domain_Classification': 
-          tr_loss /= task_distrib['Sbj_Class']
+          tr_loss /= task_distrib['Domain_Class']
 
         print("------------------------------------")
         print("---------- EPOCH {} ----------".format(epoch + 1))
