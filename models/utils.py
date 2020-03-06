@@ -487,8 +487,8 @@ def train(
               scheduler_sbj.step()
 
             elif current_task == 'Domain_Class':
-              optimizer_sbj.step()
-              scheduler_sbj.step()
+              optimizer_dom.step()
+              scheduler_dom.step()
 
             if args['n_evals'] == 'multiple_per_epoch':
               
