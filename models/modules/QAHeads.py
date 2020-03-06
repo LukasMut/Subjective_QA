@@ -278,8 +278,8 @@ class RecurrentQAHead(nn.Module):
 
                 # introduce skip connection (add output of previous layer to linear transformation) to encode more information
                 sbj_out = sequence_output + self.fc_sbj_2(F.relu(self.aux_dropout(self.fc_sbj_1(sequence_output))))
-                sbj_logits_a = self.fc_sbj_a(sbj_out)
-                sbj_logits_q = self.fc_sbj_q(sbj_out)
+                sbj_logits_a = self.fc_sbj_a(self.aux_dropout(sbj_out))
+                sbj_logits_q = self.fc_sbj_q(self.aux_dropout(sbj_out))
 
                 # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
                 sbj_logits_a = sbj_logits_a.squeeze(-1)
@@ -291,7 +291,7 @@ class RecurrentQAHead(nn.Module):
 
                 # introduce skip connection (add output of previous layer to linear transformation) to encode more information
                 domain_out = sequence_output + self.fc_domain_2(F.relu(self.aux_dropout(self.fc_domain_1(sequence_output))))
-                domain_logits = self.fc_domain_3(domain_out)
+                domain_logits = self.fc_domain_3(self.aux_dropout(domain_out))
                 domain_logits = domain_logits.squeeze(-1)
 
                 return domain_logits #, hidden_rnn
