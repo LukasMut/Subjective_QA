@@ -356,7 +356,7 @@ def train(
               print()
 
               if step > (steps_until_eval // 2):
-                
+
                 if current_task in running_tasks:
                   batch_accs_qa.append(current_batch_acc)
                   batch_f1s_qa.append(current_batch_f1)
@@ -868,6 +868,9 @@ def test(
           elif input_sequence == 'question_answer':
             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj = batch
 
+        else:
+          b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _,  _, b_domains = batch
+
         # if current batch_size is smaller than specified batch_size, skip batch (number of examples in last batche might not equal to batch_size)
         if b_input_ids.size(0) != batch_size:
             continue
@@ -949,6 +952,22 @@ def test(
               batch_acc_test += (current_sbj_acc / b_sbj.size(1))
               batch_f1_test += (current_sbj_f1 / b_sbj.size(1))
 
+            elif task == 'Domain_Classification':
+
+              domain_logits = model(
+                                    input_ids=b_input_ids,
+                                    attention_masks=b_attn_masks,
+                                    token_type_ids=b_token_type_ids,
+                                    input_lengths=b_input_lengths,
+                                    task='Domain_Class',
+                    )
+
+
+              batch_loss_test += loss_func(domain_logits, b_domains)
+
+              batch_acc_test += accuracy(probas=F.log_softmax(domain_logits, dim=1), y_true=b_domains, task='multi-way')  
+              batch_f1_test += f1(probas=F.log_softmax(domain_logits, dim=1), y_true=b_domains, task='multi-way')
+
             test_loss += batch_loss_test.item()
             nb_test_examples += b_input_ids.size(0)
             nb_test_steps += 1
@@ -976,13 +995,20 @@ def test(
       print("----- Test QA exact-match: {} % -----".format(round(test_acc, 3)))
       print("----- Test QA F1: {} % -----".format(round(test_f1, 3)))
     
-    elif task == 'Sbj_Classification':
+    else:
 
       test_acc = 100 * (batch_acc_test / nb_test_steps)
       test_f1 = 100 * (batch_f1_test / nb_test_steps)
 
-      print("----- Test Sbj acc: {} % -----".format(round(test_acc, 3)))
-      print("----- Test Sbj F1: {} % -----".format(round(test_f1, 3)))
+      if task == 'Sbj_Classification':
+
+        print("----- Test Sbj acc: {} % -----".format(round(test_acc, 3)))
+        print("----- Test Sbj F1: {} % -----".format(round(test_f1, 3)))
+
+      else:
+
+        print("----- Test Domain acc: {} % -----".format(round(test_acc, 3)))
+        print("----- Test Domain F1: {} % -----".format(round(test_f1, 3)))
 
     print("----------------------------------")
     print()
