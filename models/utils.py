@@ -872,7 +872,7 @@ def test(
           elif input_sequence == 'question_answer':
             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj = batch
 
-        else task == 'Domain_Classification':
+        else:
           b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _,  _, b_domains = batch
 
         # if current batch_size is smaller than specified batch_size, skip batch (number of examples in last batche might not equal to batch_size)
