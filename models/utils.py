@@ -838,13 +838,17 @@ def test(
     # set model to eval mode
     model.eval()
     
-    if task == 'QA' or task == 'Domain_Classification':
+    if task == 'QA':
       correct_answers_test = 0
       loss_func = nn.CrossEntropyLoss()
 
     elif task == 'Sbj_Classification':
       batch_acc_test = 0
       loss_func = nn.BCEWithLogitsLoss()
+
+    elif task == 'Domain_Classification':
+      batch_acc_test = 0
+      loss_func = nn.CrossEntropyLoss()
     
     batch_f1_test = 0
     test_f1, test_loss = 0, 0
