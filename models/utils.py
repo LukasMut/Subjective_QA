@@ -440,23 +440,23 @@ def train(
               print("--------------------------------------------")
               print()
 
-              nb_tr_examples += b_input_ids.size(0)
-              nb_tr_steps += 1
+            nb_tr_examples += b_input_ids.size(0)
+            nb_tr_steps += 1
 
-              # we don't want to save F1 scores and exact-match accuracies at the very beginning of training
-              if step > (steps_until_eval // 2):
+            # we don't want to save F1 scores and exact-match accuracies at the very beginning of training
+            if step > (steps_until_eval // 2):
 
-                if current_task in running_tasks:
+              if current_task in running_tasks:
 
-                  if current_task == 'Sbj_Class':
-                    batch_accs_sbj.append(current_batch_acc_aux)
-                    batch_f1s_sbj.append(current_batch_f1_aux)
+                if current_task == 'Sbj_Class':
+                  batch_accs_sbj.append(current_batch_acc_aux)
+                  batch_f1s_sbj.append(current_batch_f1_aux)
 
-                  elif current_task == 'Domain_Class':
-                    batch_accs_domain.append(current_batch_acc_aux)
-                    batch_f1s_domain.append(current_batch_f1_aux)
+                elif current_task == 'Domain_Class':
+                  batch_accs_domain.append(current_batch_acc_aux)
+                  batch_f1s_domain.append(current_batch_f1_aux)
 
-                  running_tasks.pop(running_tasks.index(current_task))
+                running_tasks.pop(running_tasks.index(current_task))
 
             print("------------------------------------")
             print("----- Current {} loss: {} -----".format(current_task, abs(round(batch_loss.item(), 3))))
