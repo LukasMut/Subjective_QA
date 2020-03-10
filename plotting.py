@@ -83,14 +83,26 @@ def plot_results(
                   r'$D_{SQuAD} \cup D_{Subj}$ $(\mathbf{q, c})$',
                   r'$D_{Subj}$ $(\mathbf{q, c})$',
         ]
+        
+    elif task =='domain_class' and iv == 'datasets' and task_setting == 'single':
+        params = [
+                  r'$D_{SQuAD} \cup D_{Subj}$',
+                  r'$D_{Subj}$',
+        ]
   
     elif task == 'QA' and iv == 'datasets' and task_setting == 'single':
         params = [
                   r'$D_{SQuAD} \cup D_{Subj}$',
                   r'$D_{Subj}$',
         ]
-
         
+    elif task =='domain_class' and iv == 'models' and task_setting == 'single':
+        params = [
+                  r'Highway',
+                  r'Linear',
+                  r'BiLSTM',
+        ]
+
     elif iv == 'models' and task_setting == 'single':
         params = [
                   r'Highway',
