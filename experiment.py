@@ -41,6 +41,8 @@ if __name__ == '__main__':
             help='If provided, perform domain classification (multi-class) instead of QA.')
     parser.add_argument('--multitask', action='store_true',
             help='If provided, MTL instead of STL setting.')
+    parser.add_argument('--mtl_setting', type=str, default=None,
+        help='If "domain_only", only domain classification will be performed in any MTL setting.')
     parser.add_argument('--batches', type=str, default='normal',
             help='If "alternating", auxiliary task will be conditioned on question-answer sequence; elif "normal" input is question-review sequence as usual. Only necessary, if MTL setting.')
     parser.add_argument('--adversarial', type=str, default=None,
@@ -140,13 +142,14 @@ if __name__ == '__main__':
 
     batch_presentation = args.batches
     sampling_strategy = 'over' if args.task_sampling == 'oversampling' else 'unif'
+    mtl_setting = 'domain' if args.mtl_setting == 'domain_only' else ''
 
     if isinstance(args.adversarial, type(None)):
         training = 'classic'
     else:
         training = args.adversarial if args.adversarial == 'GRL' else 'adv' + args.adversarial
 
-    model_name = 'DistilBERT' + '_' + encoding + '_' + highway + '_' + train_method + '_' + batch_presentation + '_' + training + '_' + dataset + '_' + eval_setup + '_' + task + '_' + sampling_strategy
+    model_name = 'DistilBERT' + '_' + encoding + '_' + highway + '_' + train_method + '_' + batch_presentation + '_' + training + '_' + dataset + '_' + eval_setup + '_' + task + '_' + mtl_setting + '_' + sampling_strategy
     model_name = model_name.lower()
     
     if args.version == 'train':
@@ -622,6 +625,7 @@ if __name__ == '__main__':
         hypers["n_evals"] = args.n_evals
         hypers["batch_presentation"] = args.batches
         hypers["task_sampling"] = args.task_sampling
+        hypers["mtl_setting"] = args.mtl_setting
 
         if args.n_evals == 'multiple_per_epoch':
             hypers["n_evals_per_epoch"] = 10 # number of times we evaluate model on dev set per epoch (not necessary, if we just evaluate once after an epoch)

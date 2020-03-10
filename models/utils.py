@@ -198,6 +198,9 @@ def train(
               batch_accs_domain, batch_f1s_domain = [], []
               tasks.append('Domain_Class')
 
+              if args['mtl_setting'] == 'domain_only':
+                task.pop(task.index('Sbj_Class'))
+
       loss_func = qa_loss_func
 
     elif args['task'] == 'Sbj_Classification':
