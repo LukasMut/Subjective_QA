@@ -199,7 +199,7 @@ def train(
               tasks.append('Domain_Class')
 
               if args['mtl_setting'] == 'domain_only':
-                task.pop(task.index('Sbj_Class'))
+                task.pop(tasks.index('Sbj_Class'))
 
       loss_func = qa_loss_func
 
