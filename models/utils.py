@@ -541,7 +541,7 @@ def train(
           print("----- Train QA exact-match: {} % -----".format(round(train_exact_match, 3)))
           print("----- Train QA F1: {} % -----".format(round(train_f1, 3)))
 
-          if isinstance(n_aux_tasks, int):
+          if isinstance(n_aux_tasks, int) and (len(batch_accs_sbj) > 0 and len(batch_f1s_sbj) > 0):
 
              print("------------------------------------")
              print("----- Train sbj acc: {} % -----".format(batch_accs_sbj[-1]))
