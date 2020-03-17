@@ -155,7 +155,9 @@ class LinearQAHead(nn.Module):
             elif task == 'Domain_Class':
 
                 # introduce skip connection (add output of previous layer to linear transformation) to encode more information
-                domain_out = sequence_output + self.fc_domain_2(F.relu(self.aux_dropout(self.fc_domain_1(sequence_output))))
+                domain_out = self.fc_domain_1(sequence_output)
+                domain_out = self.aux_dropout(domain_out)
+                domain_out = self.fc_domain_2(domain_out)
                 domain_out = self.aux_dropout(domain_out)
                 domain_logits = self.fc_domain_3(domain_out)
                 domain_logits = domain_logits.squeeze(-1)
