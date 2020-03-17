@@ -135,13 +135,16 @@ class LinearQAHead(nn.Module):
                 # reverse gradients to learn qa-type / domain-invariant features (i.e., semi-supervised domain-adaptation)
                 sequence_output = grad_reverse(sequence_output)
 
+            # TODO: figure out, whether we should extract contextual embedding of [CLS] token after or before reversing gradients
+            
             # use contextual embedding of the special [CLS] token (corresponds to the semantic representation of an input sentence X)
             sequence_output = sequence_output[:, 0, :]
 
             if task == 'Sbj_Class':
 
-                # introduce skip connection (add output of previous layer to linear transformation) to encode more information
-                sbj_out = sequence_output + self.fc_sbj_2(F.relu(self.aux_dropout(self.fc_sbj_1(sequence_output))))
+                sbj_out = self.fc_sbj_1(sequence_output)
+                sbj_out = self.aux_dropout(sbj_out)
+                sbj_out = self.fc_sbj_2(sbj_out)
                 sbj_out = self.aux_dropout(sbj_out)
                 sbj_logits_a = self.fc_sbj_a(sbj_out)
                 sbj_logits_q = self.fc_sbj_q(sbj_out)
@@ -154,12 +157,13 @@ class LinearQAHead(nn.Module):
 
             elif task == 'Domain_Class':
 
-                # introduce skip connection (add output of previous layer to linear transformation) to encode more information
                 domain_out = self.fc_domain_1(sequence_output)
                 domain_out = self.aux_dropout(domain_out)
                 domain_out = self.fc_domain_2(domain_out)
                 domain_out = self.aux_dropout(domain_out)
                 domain_logits = self.fc_domain_3(domain_out)
+
+                # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
                 domain_logits = domain_logits.squeeze(-1)
 
                 return domain_logits
@@ -303,8 +307,9 @@ class RecurrentQAHead(nn.Module):
 
             if task == 'Sbj_Class':
 
-                # introduce skip connection (add output of previous layer to linear transformation) to encode more information
-                sbj_out = sequence_output + self.fc_sbj_2(F.relu(self.aux_dropout(self.fc_sbj_1(sequence_output))))
+                sbj_out = self.fc_sbj_1(sequence_output)
+                sbj_out = self.aux_dropout(sbj_out)
+                sbj_out = self.fc_sbj_2(sbj_out)
                 sbj_out = self.aux_dropout(sbj_out)
                 sbj_logits_a = self.fc_sbj_a(sbj_out)
                 sbj_logits_q = self.fc_sbj_q(sbj_out)
@@ -317,10 +322,13 @@ class RecurrentQAHead(nn.Module):
 
             elif task == 'Domain_Class':
 
-                # introduce skip connection (add output of previous layer to linear transformation) to encode more information
-                domain_out = sequence_output + self.fc_domain_2(F.relu(self.aux_dropout(self.fc_domain_1(sequence_output))))
+                domain_out = self.fc_domain_1(sequence_output)
+                domain_out = self.aux_dropout(domain_out)
+                domain_out = self.fc_domain_2(domain_out)
                 domain_out = self.aux_dropout(domain_out)
                 domain_logits = self.fc_domain_3(domain_out)
+
+                # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
                 domain_logits = domain_logits.squeeze(-1)
 
                 return domain_logits #, hidden_rnn
