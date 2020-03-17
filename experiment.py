@@ -120,7 +120,6 @@ if __name__ == '__main__':
     elif args.bert_weights == 'finetuned' or args.finetuning == 'SQuAD':
         pretrained_weights = 'distilbert-base-cased-distilled-squad'
         freeze_bert = True
-        
 
     if args.sbj_classification or args.domain_classification:
 
@@ -252,14 +251,35 @@ if __name__ == '__main__':
                     train_dl = list(zip(train_dl, train_dl_sbj))
 
                 assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
+
+
+                
                 if args.n_aux_tasks == 2:
                     subjqa_domains = [f.domain for f in subjqa_features_train]
                     domain_weights = get_class_weights(
                                                        subjqa_classes=subjqa_domains,
                                                        idx_to_class=idx_to_domains,
                 ) 
-                
 
+                subjqa_a_types = [f.a_sbj for f in subjqa_features_train]
+                subjqa_q_types= [f.q_sbj for f in subjqa_features_train]
+                
+                q_type_weights = get_class_weights(
+                                                   subjqa_classes=subjqa_q_types,
+                                                   idx_to_class=idx_to_qa_types,
+                                                   binary=True,
+                                                   qa_type='questions',
+                )
+
+                a_type_weights = get_class_weights(
+                                                  subjqa_classes=subjqa_a_types,
+                                                  idx_to_class=idx_to_qa_types,
+                                                  binary=True,
+                                                  qa_type='answers',
+                )
+
+                qa_type_weights = torch.stack((a_type_weights, q_type_weights))
+                
             elif args.sbj_classification:
 
                 if args.batches == 'alternating':
@@ -280,6 +300,26 @@ if __name__ == '__main__':
                                            batch_size=batch_size,
                                            sort_batch=sort_batch,
                                           )
+                
+                subjqa_a_types = [f.a_sbj for f in subjqa_features_train]
+                subjqa_q_types= [f.q_sbj for f in subjqa_features_train]
+                
+                q_type_weights = get_class_weights(
+                                                   subjqa_classes=subjqa_q_types,
+                                                   idx_to_class=idx_to_qa_types,
+                                                   binary=True,
+                                                   qa_type='questions',
+                )
+
+                a_type_weights = get_class_weights(
+                                                  subjqa_classes=subjqa_a_types,
+                                                  idx_to_class=idx_to_qa_types,
+                                                  binary=True,
+                                                  qa_type='answers',
+                )
+
+                qa_type_weights = torch.stack((a_type_weights, q_type_weights))
+
             elif args.domain_classification:
 
                 subjqa_domains = [f.domain for f in subjqa_features_train]
@@ -423,7 +463,7 @@ if __name__ == '__main__':
             )
 
             # create train and dev examples from SQuAD train set only
-            squad_examples_train, squad_examples_dev = split_into_train_and_dev(squad_examples_train)
+            squad_examples_train, _ = split_into_train_and_dev(squad_examples_train)
             
             
             squad_features_train = convert_examples_to_features(
@@ -437,29 +477,17 @@ if __name__ == '__main__':
                                                                 dataset_to_idx=dataset_to_idx,
             )
 
-            squad_features_dev = convert_examples_to_features(
-                                                             squad_examples_dev, 
-                                                             bert_tokenizer,
-                                                             max_seq_length=max_seq_length,
-                                                             doc_stride=doc_stride,
-                                                             max_query_length=max_query_length,
-                                                             is_training=True,
-                                                             domain_to_idx=domain_to_idx,
-                                                             dataset_to_idx=dataset_to_idx,
-            )
             np.random.shuffle(squad_features_train)
 
             squad_features_train.extend(subjqa_features_train)
-            squad_features_dev.extend(subjqa_features_dev)
 
             combined_features_train = squad_features_train
-            combined_features_dev = squad_features_dev
 
             np.random.shuffle(combined_features_train)
             
             combined_tensor_dataset_train = create_tensor_dataset(combined_features_train)
             
-            combined_tensor_dataset_dev = create_tensor_dataset(combined_features_dev)
+            subjqa_tensor_dataset_dev = create_tensor_dataset(subjqa_features_dev)
 
             train_dl = BatchGenerator(
                                       dataset=combined_tensor_dataset_train,
@@ -468,7 +496,7 @@ if __name__ == '__main__':
             )
 
             val_dl = BatchGenerator(
-                                    dataset=combined_tensor_dataset_dev,
+                                    dataset=subjqa_tensor_dataset_dev,
                                     batch_size=batch_size,
                                     sort_batch=sort_batch,
             )
@@ -582,7 +610,7 @@ if __name__ == '__main__':
                                                    subjqa_classes=subjqa_domains,
                                                    idx_to_class=idx_to_domains,
                                                    squad_classes=squad_domains,
-                                                   ) 
+                                                   )
 
         # initialise QA model
 
@@ -836,23 +864,23 @@ if __name__ == '__main__':
             )
 
             batch_losses, batch_accs, batch_f1s, batch_accs_sbj, batch_f1s_sbj, batch_accs_domain, batch_f1s_domain, val_losses, val_accs, val_f1s, model = train(
-                                                                                                                                                                        model=model,
-                                                                                                                                                                        tokenizer=bert_tokenizer,
-                                                                                                                                                                        train_dl=train_dl,
-                                                                                                                                                                        val_dl=val_dl,
-                                                                                                                                                                        batch_size=batch_size,
-                                                                                                                                                                        n_aux_tasks=args.n_aux_tasks,
-                                                                                                                                                                        args=hypers,
-                                                                                                                                                                        optimizer_qa=optimizer_qa,
-                                                                                                                                                                        optimizer_sbj=optimizer_sbj,
-                                                                                                                                                                        optimizer_dom=optimizer_dom,
-                                                                                                                                                                        scheduler_qa=scheduler_qa,
-                                                                                                                                                                        scheduler_sbj=scheduler_sbj,
-                                                                                                                                                                        scheduler_dom=scheduler_dom,
-                                                                                                                                                                        early_stopping=True,
-                                                                                                                                                                        qa_type_weights=qa_type_weights,
-                                                                                                                                                                        domain_weights=domain_weights,
-                                                                                                                                                                        adversarial_simple=True if args.adversarial == 'simple' else False,
+                                                                                                                                                                    model=model,
+                                                                                                                                                                    tokenizer=bert_tokenizer,
+                                                                                                                                                                    train_dl=train_dl,
+                                                                                                                                                                    val_dl=val_dl,
+                                                                                                                                                                    batch_size=batch_size,
+                                                                                                                                                                    n_aux_tasks=args.n_aux_tasks,
+                                                                                                                                                                    args=hypers,
+                                                                                                                                                                    optimizer_qa=optimizer_qa,
+                                                                                                                                                                    optimizer_sbj=optimizer_sbj,
+                                                                                                                                                                    optimizer_dom=optimizer_dom,
+                                                                                                                                                                    scheduler_qa=scheduler_qa,
+                                                                                                                                                                    scheduler_sbj=scheduler_sbj,
+                                                                                                                                                                    scheduler_dom=scheduler_dom,
+                                                                                                                                                                    early_stopping=True,
+                                                                                                                                                                    qa_type_weights=qa_type_weights,
+                                                                                                                                                                    domain_weights=domain_weights,
+                                                                                                                                                                    adversarial_simple=True if args.adversarial == 'simple' else False,
             )
 
             train_results['batch_accs_sbj'] = batch_accs_sbj

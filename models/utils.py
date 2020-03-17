@@ -180,15 +180,12 @@ def train(
 
       if isinstance(n_aux_tasks, int):
           tasks.append('Sbj_Class')
-          if args['dataset'] == 'combined':
-            assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
-            print("Weights for subjective Anwers: {}".format(qa_type_weights[0]))
-            print()
-            print("Weights for subjective Questions: {}".format(qa_type_weights[1]))
-            print()
-            sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
-          else:
-            sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=torch.ones(2).to(device))
+          assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
+          print("Weights for subjective Anwers: {}".format(qa_type_weights[0]))
+          print()
+          print("Weights for subjective Questions: {}".format(qa_type_weights[1]))
+          print()
+          sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
 
           batch_accs_sbj, batch_f1s_sbj = [], []
         
@@ -205,16 +202,12 @@ def train(
 
     elif args['task'] == 'Sbj_Classification':
       tasks = ['Sbj_Class']
-
-      if args['dataset'] == 'combined':
-        assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
-        print("Weights for subjective Anwers: {}".format(qa_type_weights[0]))
-        print()
-        print("Weights for subjective Questions: {}".format(qa_type_weights[1]))
-        print()
-        sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
-      else:
-        sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=torch.ones(2).to(device))
+      assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
+      print("Weights for subjective Anwers: {}".format(qa_type_weights[0]))
+      print()
+      print("Weights for subjective Questions: {}".format(qa_type_weights[1]))
+      print()
+      sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
 
       batch_accs_sbj, batch_f1s_sbj = [], []
       loss_func = sbj_loss_func
@@ -393,6 +386,7 @@ def train(
 
                 if adversarial_simple:
                   batch_loss -= sbj_loss_func(sbj_logits, b_sbj)
+
                 else:
                   batch_loss += sbj_loss_func(sbj_logits, b_sbj)
 
@@ -424,6 +418,7 @@ def train(
 
                 if adversarial_simple:
                   batch_loss -= domain_loss_func(domain_logits, b_domains)
+
                 else:
                   batch_loss += domain_loss_func(domain_logits, b_domains)
 
