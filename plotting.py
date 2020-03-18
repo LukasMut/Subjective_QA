@@ -111,7 +111,6 @@ def plot_results(
         params = [
                   r'Highway',
                   r'Linear',
-                  r'BiLSTM + Highway',
                   r'BiLSTM',
         ]
     
@@ -123,7 +122,8 @@ def plot_results(
                   r'Adversarial Simple $(\mathbf{q, c})$',
                   r'Normal $(\mathbf{q, c})$',
                   r'GRL $(\mathbf{q, c})$',
-                 ]            
+                 ]
+        
     elif (model == 'adversarial' or model == 'linear') and aux == 'aux_1' and aux_task == 'domain_class':
         params = [
           r'$D_{Subj}$ $(\mathbf{q, c})$ Simple ', 
