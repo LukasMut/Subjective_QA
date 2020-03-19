@@ -115,7 +115,7 @@ class LinearQAHead(nn.Module):
                         for t, embed in enumerate(seq):
                             seq_cat_logits.append(torch.cat((embed, aux_logits[b]), dim=1).numpy().tolist())
                         seqs_cat_logits.append(seq_cat_logits)
-                    return torch.tensor(seqs_cat_logits)
+                    return torch.tensor(seqs_cat_logits).to(device)
 
                 sequence_output = concat_embeds_logits(sequence_output, aux_logits) 
 

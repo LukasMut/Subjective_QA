@@ -1288,8 +1288,8 @@ def train_all(
             current_batch_f1_aux = round(100 * (batch_f1_aux / nb_tr_steps), 3)
 
             print("--------------------------------------------")
-            print("----- Current batch {} acc: {} % -----".format(current_task, current_batch_acc_aux))
-            print("----- Current batch {} F1: {} % -----".format(current_task, current_batch_f1_aux))
+            print("----- Current batch {} acc: {} % -----".format(task, current_batch_acc_aux))
+            print("----- Current batch {} F1: {} % -----".format(task, current_batch_f1_aux))
             print("--------------------------------------------")
             print()
 
@@ -1308,7 +1308,7 @@ def train_all(
 
         if not eval_round:
           print("------------------------------------")
-          print("----- Current {} loss: {} -----".format(current_task, abs(round(batch_loss.item(), 3))))
+          print("----- Current {} loss: {} -----".format(task, abs(round(batch_loss.item(), 3))))
           print("------------------------------------")
           print()
 
