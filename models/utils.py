@@ -1454,6 +1454,10 @@ def train_all(
                   args['n_epochs'] += 1
                 model.eval()
                 eval_round = True
+                print("------------------------------------------------------------------------------------------------")
+                print("----- Performing an extra evaluation round to store logits for each (q, c) input sequence ------")
+                print("------------------------------------------------------------------------------------------------")
+                print()
               else:
                 break
         else:
@@ -1472,6 +1476,10 @@ def train_all(
                 args['n_epochs'] += 1
               model.eval()
               eval_round = True
+              print("------------------------------------------------------------------------------------------------")
+              print("----- Performing an extra evaluation round to store logits for each (q, c) input sequence ------")
+              print("------------------------------------------------------------------------------------------------")
+              print()
             else:
               break
       else:
