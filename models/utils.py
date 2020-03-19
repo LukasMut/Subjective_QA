@@ -1095,7 +1095,7 @@ def train_all(
       if len(domain_logits_all) > 0:
         model.qa_head.fc_qa.in_features += domain_logits_all[0].size(1)
 
-    # fine-tune model on every task sequentially (i.e., soft-parameter sharing)
+    # fine-tune model on every task sequentially (i.e., soft-parameter sharing) and store logits for each input sequence per auxiliary task
     model.train()
 
     eval_round = False
@@ -1238,7 +1238,7 @@ def train_all(
             sbj_logits = torch.stack((sbj_logits_a, sbj_logits_q), dim=1)
 
             if eval_round:
-              sbj_logits_all.append(sbj_logits)
+              sbj_logits_all.append(torch.stack((torch.sigmoid(sbj_logits_a), torch.sigmoid(sbj_logits_q)), dim=1))
 
             b_sbj = b_sbj.type_as(sbj_logits)
 
@@ -1278,7 +1278,7 @@ def train_all(
               )
 
             if eval_round:
-              domain_logits_all.append(domain_logits)
+              domain_logits_all.append(F.softmax(domain_logits, dim=1))
 
             else:
               if adversarial_simple:
@@ -1455,7 +1455,7 @@ def train_all(
                 model.eval()
                 eval_round = True
                 print("------------------------------------------------------------------------------------------------")
-                print("----- Performing an extra evaluation round to store logits for each (q, c) input sequence ------")
+                print("----- Performing an extra evaluation epoch to store logits for each (q, c) input sequence ------")
                 print("------------------------------------------------------------------------------------------------")
                 print()
               else:
@@ -1477,12 +1477,16 @@ def train_all(
               model.eval()
               eval_round = True
               print("------------------------------------------------------------------------------------------------")
-              print("----- Performing an extra evaluation round to store logits for each (q, c) input sequence ------")
+              print("----- Performing an extra evaluation epoch to store logits for each (q, c) input sequence ------")
               print("------------------------------------------------------------------------------------------------")
               print()
             else:
               break
       else:
+        print("---------------------------------------------------------")
+        print("----- Evaluation epoch finished. Back to training. ------")
+        print("---------------------------------------------------------")
+        print()
         break
 
   # return model in eval mode
