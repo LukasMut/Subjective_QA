@@ -654,7 +654,7 @@ def val(
 
         if args['task'] == 'Sbj_Classification':
 
-          if  args['batch_presentation'] == 'alternating':
+          if args['batch_presentation'] == 'alternating':
             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj = batch
           else:
             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, b_sbj, _ = batch
@@ -1038,6 +1038,7 @@ def train_all(
         scheduler_sbj=None,
         scheduler_dom=None,
         train_dl_sbj=None,
+        val_dl_sbj=None,
         early_stopping:bool=True,
         qa_type_weights=None,
         domain_weights=None,
@@ -1076,6 +1077,8 @@ def train_all(
   running_tasks = tasks[:]
   
   loss_funcs = [sbj_loss_func, domain_loss_func, qa_loss_func]
+  train_dl_copy = train_dl
+  val_dl_copy = val_dl
   
   sbj_logits_all = []
   domain_logits_all = []
@@ -1103,7 +1106,13 @@ def train_all(
     if task == 'Sbj_Class':
       if args['batch_presentation'] == 'alternating':
         assert not isinstance(train_dl_sbj, type(None)), 'If classifying (q, a) instead of (q, c) in T_sbj, a separate train dl for sbj class must be provided'
+        assert not isinstance(val_dl_sbj, type(None)), 'If classifying (q, a) instead of (q, c) in T_sbj, a separate val dl for sbj class must be provided'
         train_dl = train_dl_sbj
+        val_dl = val_dl_sbj
+    else:
+      if args['batch_presentation'] == 'alternating':
+        train_dl = train_dl_copy
+        val_dl = val_dl_copy
 
     val_losses = []
     val_accs = []

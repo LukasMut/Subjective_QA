@@ -251,13 +251,19 @@ if __name__ == '__main__':
                                                   sort_batch=sort_batch,
                                                   )
                     
-                    if not args.sequential_finetuning:
+                    if args.sequential_finetuning:
+                        subjqa_tensor_dataset_dev_aux_sbj = create_tensor_dataset(subjqa_features_dev, aux_sbj_batch=True)
+
+                        val_dl_sbj = BatchGenerator(
+                                                   dataset=subjqa_tensor_dataset_dev_aux_sbj,
+                                                   batch_size=batch_size,
+                                                   sort_batch=sort_batch,
+                                                  )
+                    else:
                         train_dl = list(zip(train_dl, train_dl_sbj))
 
                 if args.multitask:
                     assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
-
-
                 
                 if args.n_aux_tasks == 2 or args.sequential_finetuning:
                     subjqa_domains = [f.domain for f in subjqa_features_train]
@@ -521,7 +527,15 @@ if __name__ == '__main__':
                                                   sort_batch=sort_batch,
                                                   )
                     
-                    if not args.sequential_finetuning:
+                    if args.sequential_finetuning:
+                        combined_tensor_dataset_dev_aux_sbj = create_tensor_dataset(combined_features_dev, aux_sbj_batch=True)
+
+                        val_dl_sbj = BatchGenerator(
+                                               dataset=combined_tensor_dataset_dev_aux_sbj,
+                                               batch_size=batch_size,
+                                               sort_batch=sort_batch,
+                                              )
+                    else:
                         train_dl = list(zip(train_dl, train_dl_sbj))
 
                 if args.multitask:  
@@ -908,6 +922,7 @@ if __name__ == '__main__':
                                                                                                                                                                             scheduler_sbj=scheduler_sbj,
                                                                                                                                                                             scheduler_dom=scheduler_dom,
                                                                                                                                                                             train_dl_sbj= train_dl_sbj if args.batches == 'alternating' else None,
+                                                                                                                                                                            val_dl_sbj= val_dl_sbj if args.batches == 'alternating' else None,
                                                                                                                                                                             early_stopping=True,
                                                                                                                                                                             qa_type_weights=qa_type_weights,
                                                                                                                                                                             domain_weights=domain_weights,
