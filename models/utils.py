@@ -1440,7 +1440,6 @@ def train_all(
                   args['n_epochs'] += 1
                 model.eval()
                 eval_round = True
-
               else:
                 break
         else:
@@ -1458,7 +1457,6 @@ def train_all(
                 args['n_epochs'] += 1
               model.eval()
               eval_round = True
-            
             else:
               break
       else:
