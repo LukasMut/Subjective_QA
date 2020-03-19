@@ -1197,6 +1197,7 @@ def train_all(
 
           if task == 'Sbj_Class':
 
+            # zero-out gradients
             optimizer_sbj.zero_grad()
 
             if args['batch_presentation'] == 'alternating':
@@ -1217,7 +1218,6 @@ def train_all(
             sbj_logits = torch.stack((sbj_logits_a, sbj_logits_q), dim=1)
 
             if eval_round:
-
               sbj_logits_all.append(sbj_logits)
 
             b_sbj = b_sbj.type_as(sbj_logits)
@@ -1244,6 +1244,7 @@ def train_all(
 
           elif task == 'Domain_Class':
 
+            # zero-out gradients
             optimizer_dom.zero_grad()
 
             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, _, b_domains = batch

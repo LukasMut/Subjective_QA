@@ -48,7 +48,7 @@ class LinearQAHead(nn.Module):
         self.fc_qa = nn.Linear(self.in_size, self.n_labels)
         self.qa_dropout = nn.Dropout(p = self.qa_dropout_p)
 
-        if (self.task == 'QA' and self.multitask) or (self.task == 'Sbj_Classification'):
+        if (self.task == 'QA' and self.multitask) or (self.task == 'Sbj_Classification') or (self.task == 'all'):
              # define dropout layer for auxiliary classification tasks
             self.aux_dropout = nn.Dropout(p = self.aux_dropout_p)
             
@@ -59,7 +59,7 @@ class LinearQAHead(nn.Module):
             self.fc_sbj_q = nn.Linear(self.in_size, 1) # fc subj. layer for questions
 
         
-        elif self.task == 'Domain_Classification':
+        elif self.task == 'Domain_Classification' or self.task == 'all':
 
              # define dropout layer for auxiliary classification tasks
             self.aux_dropout = nn.Dropout(p = self.aux_dropout_p)
@@ -242,7 +242,7 @@ class RecurrentQAHead(nn.Module):
         self.fc_qa = nn.Linear(self.in_size, self.n_labels)
         self.qa_dropout = nn.Dropout(p = self.qa_dropout_p)
 
-        if (self.task == 'QA' and self.multitask) or (self.task == 'Sbj_Classification'):
+        if (self.task == 'QA' and self.multitask) or (self.task == 'Sbj_Classification') or (self.task == 'all'):
             
             # define dropout layer for auxiliary classification tasks
             self.aux_dropout = nn.Dropout(p = self.aux_dropout_p)
@@ -253,7 +253,7 @@ class RecurrentQAHead(nn.Module):
             self.fc_sbj_a = nn.Linear(self.in_size, 1) # fc subj. layer for answers
             self.fc_sbj_q = nn.Linear(self.in_size, 1) # fc subj. layer for questions
 
-        elif self.task == 'Domain_Classification':
+        elif self.task == 'Domain_Classification' or self.task == 'all':
 
              # define dropout layer for auxiliary classification tasks
             self.aux_dropout = nn.Dropout(p = self.aux_dropout_p)

@@ -624,6 +624,8 @@ if __name__ == '__main__':
             task = 'Sbj_Classification'
         elif args.domain_classification:
             task = 'Domain_Classification'
+        elif args.sequential_finetuning:
+            task = 'all'
         else:
             task = 'QA'
 
@@ -648,14 +650,10 @@ if __name__ == '__main__':
                   "max_grad_norm": 1.0,
         }
 
-        if args.sbj_classification:
-            hypers["task"] = 'Sbj_Classification' 
-        elif args.domain_classification:
-            hypers["task"] = 'Domain_Classification'
-        elif not args.sequential_finetuning:
-            hypers["task"] = 'QA'
-        else:
+        if args.sequential_finetuning:
             hypers["task"] = ''
+        else:
+            hypers["task"] = task
 
         hypers["n_epochs"] = args.n_epochs
         hypers["n_steps"] = n_steps
@@ -993,6 +991,8 @@ if __name__ == '__main__':
                 task =  'Sbj_Classification'
             elif args.domain_classification:
                 task = 'Domain_Classification'
+            elif args.sequential_finetuning:
+                task = 'all'
             else:
                 task = 'QA'
 
