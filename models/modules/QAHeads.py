@@ -48,7 +48,7 @@ class LinearQAHead(nn.Module):
         self.fc_qa = nn.Linear(self.in_size, self.n_labels)
         self.qa_dropout = nn.Dropout(p = self.qa_dropout_p)
 
-        if (self.task == 'QA' and self.multitask) or (self.task == 'Sbj_Classification') or (self.task == 'all'):
+        if (self.task == 'QA' and self.multitask) or self.task == 'Sbj_Classification' or self.task == 'all':
              # define dropout layer for auxiliary classification tasks
             self.aux_dropout = nn.Dropout(p = self.aux_dropout_p)
             
@@ -59,7 +59,7 @@ class LinearQAHead(nn.Module):
             self.fc_sbj_q = nn.Linear(self.in_size, 1) # fc subj. layer for questions
 
         
-        elif self.task == 'Domain_Classification' or self.task == 'all':
+        elif self.task == 'Domain_Classification':
 
              # define dropout layer for auxiliary classification tasks
             self.aux_dropout = nn.Dropout(p = self.aux_dropout_p)
@@ -72,12 +72,12 @@ class LinearQAHead(nn.Module):
             self.fc_domain_2 = nn.Linear(self.in_size, self.in_size)
             self.fc_domain_3 = nn.Linear(self.in_size, self.n_domain_labels)
         
-        if self.task == 'QA' and self.multitask:
+        if (self.task == 'QA' and self.multitask) or self.task == 'all'::
 
             # define, whether we want to perform adversarial training with a GRL between feature extractor and classifiers
             self.adversarial = adversarial
 
-            if self.n_aux_tasks == 2:
+            if self.n_aux_tasks == 2 or self.task == 'all':
                 assert isinstance(n_domain_labels, int), 'If model is to perform two auxiliary tasks, domain labels must be provided'
                 self.n_domain_labels = n_domain_labels
 
@@ -242,7 +242,7 @@ class RecurrentQAHead(nn.Module):
         self.fc_qa = nn.Linear(self.in_size, self.n_labels)
         self.qa_dropout = nn.Dropout(p = self.qa_dropout_p)
 
-        if (self.task == 'QA' and self.multitask) or (self.task == 'Sbj_Classification') or (self.task == 'all'):
+        if (self.task == 'QA' and self.multitask) or self.task == 'Sbj_Classification' or self.task == 'all':
             
             # define dropout layer for auxiliary classification tasks
             self.aux_dropout = nn.Dropout(p = self.aux_dropout_p)
@@ -253,7 +253,7 @@ class RecurrentQAHead(nn.Module):
             self.fc_sbj_a = nn.Linear(self.in_size, 1) # fc subj. layer for answers
             self.fc_sbj_q = nn.Linear(self.in_size, 1) # fc subj. layer for questions
 
-        elif self.task == 'Domain_Classification' or self.task == 'all':
+        elif self.task == 'Domain_Classification':
 
              # define dropout layer for auxiliary classification tasks
             self.aux_dropout = nn.Dropout(p = self.aux_dropout_p)
@@ -267,11 +267,11 @@ class RecurrentQAHead(nn.Module):
             self.fc_domain_3 = nn.Linear(self.in_size, self.n_domain_labels)
 
         
-        if self.task == 'QA' and self.multitask:
+        if (self.task == 'QA' and self.multitask) or self.task == 'all':
             # define, whether we want to perform adversarial training with a GRL between feature extractor and classifiers
             self.adversarial = adversarial
 
-            if self.n_aux_tasks == 2:
+            if self.n_aux_tasks == 2 or self.task == 'all':
                 assert isinstance(n_domain_labels, int), 'If model is to perform two auxiliary tasks, domain labels must be provided'
                 self.n_domain_labels = n_domain_labels
 
