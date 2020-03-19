@@ -834,6 +834,11 @@ def test(
        
     ### Inference ###
 
+    try:
+      assert model.qa_head.fc_qa.in_features == 768
+    except AssertionError:
+      model.qa_head.fc_qa.in_features = 768
+
     # set model to eval mode
     model.eval()
     
