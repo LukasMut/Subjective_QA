@@ -1304,7 +1304,7 @@ def train_all(
                   batch_accs_domain.append(current_batch_acc_aux)
                   batch_f1s_domain.append(current_batch_f1_aux)
 
-              running_tasks.pop(running_tasks.index(task))
+                running_tasks.pop(running_tasks.index(task))
 
         if not eval_round:
           print("------------------------------------")
