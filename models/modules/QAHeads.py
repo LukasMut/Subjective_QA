@@ -72,7 +72,7 @@ class LinearQAHead(nn.Module):
             self.fc_domain_2 = nn.Linear(self.in_size, self.in_size)
             self.fc_domain_3 = nn.Linear(self.in_size, self.n_domain_labels)
         
-        if (self.task == 'QA' and self.multitask) or self.task == 'all'::
+        if (self.task == 'QA' and self.multitask) or self.task == 'all':
 
             # define, whether we want to perform adversarial training with a GRL between feature extractor and classifiers
             self.adversarial = adversarial
