@@ -92,7 +92,8 @@ class LinearQAHead(nn.Module):
     def forward(
                 self,
                 distilbert_output:torch.Tensor,
-                task:str, 
+                task:str,
+                aux_logits=None,
                 start_positions=None,
                 end_positions=None,
     ):
@@ -103,6 +104,20 @@ class LinearQAHead(nn.Module):
             sequence_output = self.highway(sequence_output) # pass BERT representations through highway-connection (for better information flow)
        
         if task == 'QA':
+
+            if isinstance(aux_logits, torch.Tensor):
+                
+                def concat_embeds_logits(seq_out:torch.Tensor, aux_logits:torch.Tensor):
+                    seqs_cat_logits = []
+                    assert seq_out.size(0) == aux_logits.size(0)
+                    for b, seq in enumerate(seq_out):
+                        seq_cat_logits = []
+                        for t, embed in enumerate(seq):
+                            seq_cat_logits.append(torch.cat((embed, aux_logits[b]), dim=1).numpy().tolist())
+                        seqs_cat_logits.append(seq_cat_logits)
+                    return torch.tensor(seqs_cat_logits)
+
+                sequence_output = concat_embeds_logits(sequence_output, aux_logits) 
 
             logits = self.fc_qa(sequence_output)
             start_logits, end_logits = logits.split(1, dim=-1)
@@ -142,12 +157,22 @@ class LinearQAHead(nn.Module):
 
             if task == 'Sbj_Class':
 
+                """
+                ## version without residual connection ##
+
                 sbj_out = self.fc_sbj_1(sequence_output)
                 sbj_out = self.aux_dropout(sbj_out)
                 sbj_out = self.fc_sbj_2(sbj_out)
                 sbj_out = self.aux_dropout(sbj_out)
                 sbj_logits_a = self.fc_sbj_a(sbj_out)
                 sbj_logits_q = self.fc_sbj_q(sbj_out)
+                """
+
+                # introduce skip connection (add output of previous layer to linear transformation) to encode more information
+                domain_out = sequence_output + self.fc_domain_2(F.relu(self.aux_dropout(self.fc_domain_1(sequence_output))))
+                domain_out = self.aux_dropout(domain_out)
+                domain_logits = self.fc_domain_3(domain_out)
+                domain_logits = domain_logits.squeeze(-1)
 
                 # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
                 sbj_logits_a = sbj_logits_a.squeeze(-1)
@@ -157,11 +182,21 @@ class LinearQAHead(nn.Module):
 
             elif task == 'Domain_Class':
 
+                """
+                ## version without residual connection ##
+
                 domain_out = self.fc_domain_1(sequence_output)
                 domain_out = self.aux_dropout(domain_out)
                 domain_out = self.fc_domain_2(domain_out)
                 domain_out = self.aux_dropout(domain_out)
                 domain_logits = self.fc_domain_3(domain_out)
+                """
+
+                # introduce skip connection (add output of previous layer to linear transformation) to encode more information
+                domain_out = sequence_output + self.fc_domain_2(F.relu(self.aux_dropout(self.fc_domain_1(sequence_output))))
+                domain_out = self.aux_dropout(domain_out)
+                domain_logits = self.fc_domain_3(domain_out)
+                domain_logits = domain_logits.squeeze(-1)
 
                 # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
                 domain_logits = domain_logits.squeeze(-1)
@@ -253,6 +288,7 @@ class RecurrentQAHead(nn.Module):
                 distilbert_output:torch.Tensor,
                 seq_lengths:torch.Tensor,
                 task:str,
+                aux_logits=None,
                 start_positions=None,
                 end_positions=None,
     ):
@@ -307,9 +343,19 @@ class RecurrentQAHead(nn.Module):
 
             if task == 'Sbj_Class':
 
+                """
+                ## version without residual connection ##
+
                 sbj_out = self.fc_sbj_1(sequence_output)
                 sbj_out = self.aux_dropout(sbj_out)
                 sbj_out = self.fc_sbj_2(sbj_out)
+                sbj_out = self.aux_dropout(sbj_out)
+                sbj_logits_a = self.fc_sbj_a(sbj_out)
+                sbj_logits_q = self.fc_sbj_q(sbj_out)
+                """
+
+                # introduce skip connection (add output of previous layer to linear transformation) to encode more information
+                sbj_out = sequence_output + self.fc_sbj_2(F.relu(self.aux_dropout(self.fc_sbj_1(sequence_output))))
                 sbj_out = self.aux_dropout(sbj_out)
                 sbj_logits_a = self.fc_sbj_a(sbj_out)
                 sbj_logits_q = self.fc_sbj_q(sbj_out)
@@ -322,11 +368,21 @@ class RecurrentQAHead(nn.Module):
 
             elif task == 'Domain_Class':
 
+                """
+                ## version without residual connection ##
+
                 domain_out = self.fc_domain_1(sequence_output)
                 domain_out = self.aux_dropout(domain_out)
                 domain_out = self.fc_domain_2(domain_out)
                 domain_out = self.aux_dropout(domain_out)
                 domain_logits = self.fc_domain_3(domain_out)
+                """
+
+                # introduce skip connection (add output of previous layer to linear transformation) to encode more information
+                domain_out = sequence_output + self.fc_domain_2(F.relu(self.aux_dropout(self.fc_domain_1(sequence_output))))
+                domain_out = self.aux_dropout(domain_out)
+                domain_logits = self.fc_domain_3(domain_out)
+                domain_logits = domain_logits.squeeze(-1)
 
                 # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
                 domain_logits = domain_logits.squeeze(-1)

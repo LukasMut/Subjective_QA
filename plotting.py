@@ -32,7 +32,9 @@ def get_results(
     if model in ['SubjQA', 'combined'] and task_setting == 'multi':
         assert isinstance(layer, str), 'When comparing across datasets in MTL setting, subfolder for model type must be provided'
         subsubdir += layer + '/'
-        assert isinstance(task_sampling, str), 'When comparing across  datasets in MTL setting, sampling strategy must be provided'
+        assert isinstance(aux, str), 'When comparing across datasets in MTL setting, subfolder for number of aux tasks must be provided'
+        subsubdir += aux + '/'
+        assert isinstance(task_sampling, str), 'When comparing across datasets in MTL setting, sampling strategy must be provided'
         subsubdir += task_sampling + '/'
         
     elif model == 'adversarial':

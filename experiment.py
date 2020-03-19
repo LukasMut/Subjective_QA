@@ -29,7 +29,7 @@ torch.manual_seed(42)
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--finetuning', type=str, default='SQuAD',
+    parser.add_argument('--finetuning', type=str, default='SubjQA',
             help='If SQuAD, fine tune on SQuAD only; if SubjQA, fine tune on SubjQA only; if combined, fine tune on both SQuAD and SubjQA simultaneously.')
     parser.add_argument('--version', type=str, default='train',
             help='If train, then train model on train set(s); if test, then evaluate model on SubjQA test set.')
@@ -41,6 +41,8 @@ if __name__ == '__main__':
             help='If provided, perform domain classification (multi-class) instead of QA.')
     parser.add_argument('--multitask', action='store_true',
             help='If provided, MTL instead of STL setting.')
+    parser.add_argument('--sequential_finetuning', action='store_true',
+            help='If provided, model will be fine-tuned sequentially on all tasks until convergence.')
     parser.add_argument('--mtl_setting', type=str, default=None,
         help='If "domain_only", only domain classification will be performed in any MTL setting.')
     parser.add_argument('--batches', type=str, default='normal',
@@ -132,6 +134,7 @@ if __name__ == '__main__':
     highway = 'Highway' if args.highway_connection else ''
     train_method = 'multitask' + '_' + str(args.n_aux_tasks) if args.multitask else 'singletask'
     eval_setup = args.n_evals
+    sequential_finetuning = 'finetune_all' if args.sequential_finetuning else ''
 
     if args.sbj_classification:
         task = 'Sbj_Class'
@@ -149,7 +152,7 @@ if __name__ == '__main__':
     else:
         training = args.adversarial if args.adversarial == 'GRL' else 'adv' + args.adversarial
 
-    model_name = 'DistilBERT' + '_' + encoding + '_' + highway + '_' + train_method + '_' + batch_presentation + '_' + training + '_' + dataset + '_' + eval_setup + '_' + task + '_' + mtl_setting + '_' + sampling_strategy
+    model_name = 'DistilBERT' + '_' + encoding + '_' + highway + '_' + train_method + '_' + batch_presentation + '_' + training + '_' + dataset + '_' + eval_setup + '_' + task + '_' + mtl_setting + '_' + sampling_strategy + '_' + sequential_finetuning
     model_name = model_name.lower()
     
     if args.version == 'train':
@@ -235,7 +238,7 @@ if __name__ == '__main__':
 
             n_steps = len(train_dl)
 
-            if args.multitask:
+            if args.multitask or args.sequential_finetuning:
 
                 if args.batches == 'alternating':
                     
@@ -248,13 +251,15 @@ if __name__ == '__main__':
                                                   sort_batch=sort_batch,
                                                   )
                     
-                    train_dl = list(zip(train_dl, train_dl_sbj))
+                    if not args.sequential_finetuning:
+                        train_dl = list(zip(train_dl, train_dl_sbj))
 
-                assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
+                if args.multitask:
+                    assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
 
 
                 
-                if args.n_aux_tasks == 2:
+                if args.n_aux_tasks == 2 or args.sequential_finetuning:
                     subjqa_domains = [f.domain for f in subjqa_features_train]
                     domain_weights = get_class_weights(
                                                        subjqa_classes=subjqa_domains,
@@ -503,7 +508,7 @@ if __name__ == '__main__':
 
             n_steps = len(train_dl)
 
-            if args.multitask:
+            if args.multitask or args.sequential_finetuning:
 
                 if args.batches == 'alternating':
 
@@ -516,12 +521,13 @@ if __name__ == '__main__':
                                                   sort_batch=sort_batch,
                                                   )
                     
-                    train_dl = list(zip(train_dl, train_dl_sbj))
+                    if not args.sequential_finetuning:
+                        train_dl = list(zip(train_dl, train_dl_sbj))
 
-                   
-                assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
+                if args.multitask:  
+                    assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
                 
-                if args.n_aux_tasks == 2:
+                if args.n_aux_tasks == 2 or args.sequential_finetuning:
                     
                     squad_domains = [f.domain for f in squad_features_train]
                     subjqa_domains = [f.domain for f in subjqa_features_train]
@@ -622,15 +628,15 @@ if __name__ == '__main__':
             task = 'QA'
 
         model = DistilBertForQA.from_pretrained(
-                                          pretrained_weights,
-                                          max_seq_length = max_seq_length,
-                                          encoder = True if encoding == 'recurrent' else False,
-                                          highway_connection = args.highway_connection,
-                                          multitask = args.multitask,
-                                          adversarial = True if args.adversarial == 'GRL' else False,
-                                          n_aux_tasks = args.n_aux_tasks,
-                                          n_domain_labels = n_domain_labels,
-                                          task = task,
+                                              pretrained_weights,
+                                              max_seq_length = max_seq_length,
+                                              encoder = True if encoding == 'recurrent' else False,
+                                              highway_connection = args.highway_connection,
+                                              multitask = args.multitask,
+                                              adversarial = True if args.adversarial == 'GRL' else False,
+                                              n_aux_tasks = args.n_aux_tasks,
+                                              n_domain_labels = n_domain_labels,
+                                              task = task,
         )
 
         # set model to device
@@ -646,8 +652,10 @@ if __name__ == '__main__':
             hypers["task"] = 'Sbj_Classification' 
         elif args.domain_classification:
             hypers["task"] = 'Domain_Classification'
-        else:
+        elif not args.sequential_finetuning:
             hypers["task"] = 'QA'
+        else:
+            hypers["task"] = ''
 
         hypers["n_epochs"] = args.n_epochs
         hypers["n_steps"] = n_steps
@@ -739,7 +747,7 @@ if __name__ == '__main__':
                                                                                             adversarial_simple=False,
             )
 
-        elif isinstance(args.n_aux_tasks, type(None)):
+        elif isinstance(args.n_aux_tasks, type(None)) and not args.sequential_finetuning:
 
             optimizer_qa = AdamW(
                           model.parameters(), 
@@ -824,7 +832,7 @@ if __name__ == '__main__':
             train_results['batch_accs_sbj'] = batch_accs_sbj
             train_results['batch_f1s_sbj'] = batch_f1s_sbj
         
-        elif args.n_aux_tasks == 2:
+        elif args.n_aux_tasks == 2 or args.sequential_finetuning:
 
 
             optimizer_qa = AdamW(
@@ -863,25 +871,50 @@ if __name__ == '__main__':
                                                             num_training_steps=t_total,
             )
 
-            batch_losses, batch_accs, batch_f1s, batch_accs_sbj, batch_f1s_sbj, batch_accs_domain, batch_f1s_domain, val_losses, val_accs, val_f1s, model = train(
-                                                                                                                                                                    model=model,
-                                                                                                                                                                    tokenizer=bert_tokenizer,
-                                                                                                                                                                    train_dl=train_dl,
-                                                                                                                                                                    val_dl=val_dl,
-                                                                                                                                                                    batch_size=batch_size,
-                                                                                                                                                                    n_aux_tasks=args.n_aux_tasks,
-                                                                                                                                                                    args=hypers,
-                                                                                                                                                                    optimizer_qa=optimizer_qa,
-                                                                                                                                                                    optimizer_sbj=optimizer_sbj,
-                                                                                                                                                                    optimizer_dom=optimizer_dom,
-                                                                                                                                                                    scheduler_qa=scheduler_qa,
-                                                                                                                                                                    scheduler_sbj=scheduler_sbj,
-                                                                                                                                                                    scheduler_dom=scheduler_dom,
-                                                                                                                                                                    early_stopping=True,
-                                                                                                                                                                    qa_type_weights=qa_type_weights,
-                                                                                                                                                                    domain_weights=domain_weights,
-                                                                                                                                                                    adversarial_simple=True if args.adversarial == 'simple' else False,
-            )
+
+            if args.n_aux_tasks == 2:
+
+                batch_losses, batch_accs, batch_f1s, batch_accs_sbj, batch_f1s_sbj, batch_accs_domain, batch_f1s_domain, val_losses, val_accs, val_f1s, model = train(
+                                                                                                                                                                        model=model,
+                                                                                                                                                                        tokenizer=bert_tokenizer,
+                                                                                                                                                                        train_dl=train_dl,
+                                                                                                                                                                        val_dl=val_dl,
+                                                                                                                                                                        batch_size=batch_size,
+                                                                                                                                                                        n_aux_tasks=args.n_aux_tasks,
+                                                                                                                                                                        args=hypers,
+                                                                                                                                                                        optimizer_qa=optimizer_qa,
+                                                                                                                                                                        optimizer_sbj=optimizer_sbj,
+                                                                                                                                                                        optimizer_dom=optimizer_dom,
+                                                                                                                                                                        scheduler_qa=scheduler_qa,
+                                                                                                                                                                        scheduler_sbj=scheduler_sbj,
+                                                                                                                                                                        scheduler_dom=scheduler_dom,
+                                                                                                                                                                        early_stopping=True,
+                                                                                                                                                                        qa_type_weights=qa_type_weights,
+                                                                                                                                                                        domain_weights=domain_weights,
+                                                                                                                                                                        adversarial_simple=True if args.adversarial == 'simple' else False,
+                )
+
+            elif args.sequential_finetuning:
+
+                batch_losses, batch_accs, batch_f1s, batch_accs_sbj, batch_f1s_sbj, batch_accs_domain, batch_f1s_domain, val_losses, val_accs, val_f1s, model =  train_all(
+                                                                                                                                                                            model=model,
+                                                                                                                                                                            tokenizer=bert_tokenizer,
+                                                                                                                                                                            train_dl=train_dl,
+                                                                                                                                                                            val_dl=val_dl,
+                                                                                                                                                                            batch_size=batch_size,
+                                                                                                                                                                            args=hypers,
+                                                                                                                                                                            optimizer_qa=optimizer_qa,
+                                                                                                                                                                            optimizer_sbj=optimizer_sbj,
+                                                                                                                                                                            optimizer_dom=optimizer_dom,
+                                                                                                                                                                            scheduler_qa=scheduler_qa,
+                                                                                                                                                                            scheduler_sbj=scheduler_sbj,
+                                                                                                                                                                            scheduler_dom=scheduler_dom,
+                                                                                                                                                                            train_dl_sbj= train_dl_sbj if args.batches == 'alternating' else None,
+                                                                                                                                                                            early_stopping=True,
+                                                                                                                                                                            qa_type_weights=qa_type_weights,
+                                                                                                                                                                            domain_weights=domain_weights,
+                                                                                                                                                                            adversarial_simple=True if args.adversarial == 'simple' else False,
+                )
 
             train_results['batch_accs_sbj'] = batch_accs_sbj
             train_results['batch_f1s_sbj'] = batch_f1s_sbj
