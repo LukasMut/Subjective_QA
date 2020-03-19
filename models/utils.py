@@ -1089,6 +1089,7 @@ def train_all(
   for i, task in enumerate(tqdm(tasks, desc="Task")):
 
     if task == 'QA':
+      # TODO: figure out, whether this is the correct way to modify the in_size of a fc layer on the fly
       model.qa_head.fc_qa.in_features += sbj_logits_all[0].size(1)
 
       if len(domain_logits_all) > 0:
