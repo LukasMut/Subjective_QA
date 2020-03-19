@@ -1352,7 +1352,7 @@ def train_all(
                                                         )
 
               # we want to store train exact-match accuracies and F1 scores for each task as often as we evaluate model on validation set
-              running_tasks = task[:]
+              running_tasks = tasks[:]
                 
               # after evaluation on dev set, move model back to train mode
               model.train()
