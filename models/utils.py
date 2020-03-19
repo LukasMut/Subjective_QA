@@ -1077,8 +1077,11 @@ def train_all(
   running_tasks = tasks[:]
   
   loss_funcs = [sbj_loss_func, domain_loss_func, qa_loss_func]
-  train_dl_copy = train_dl
-  val_dl_copy = val_dl
+  
+  if args['batch_presentation'] == 'alternating':
+    # create copy of data loaders, when using (q, a) instead of (q, c) sequence pairs for sbj classification
+    train_dl_copy = train_dl
+    val_dl_copy = val_dl
   
   sbj_logits_all = []
   domain_logits_all = []
