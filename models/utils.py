@@ -1083,13 +1083,12 @@ def train_all(
   for i, task in enumerate(tqdm(tasks, desc="Task")):
 
     if task == 'QA':
-
       model.qa_head.fc_qa.in_features += sbj_logits_all[0].size(1)
 
       if len(domain_logits_all) > 0:
         model.qa_head.fc_qa.in_features += domain_logits_all[0].size(1)
 
-    # fine-tune model on every task separately
+    # fine-tune model on every task sequentially (i.e., soft-parameter sharing)
     model.train()
 
     eval_round = False
@@ -1103,7 +1102,7 @@ def train_all(
 
     if task == 'Sbj_Class':
       if args['batch_presentation'] == 'alternating':
-        assert not isinstance(train_dl_sbj, type(None)), 'If classifying (q, a) instead of (q, c) in T_sbj, a separate train dl must be provided'
+        assert not isinstance(train_dl_sbj, type(None)), 'If classifying (q, a) instead of (q, c) in T_sbj, a separate train dl for sbj class must be provided'
         train_dl = train_dl_sbj
 
     val_losses = []
@@ -1181,6 +1180,9 @@ def train_all(
         
           correct_answers += compute_exact_batch(true_answers, pred_answers)
           batch_f1 += compute_f1_batch(true_answers, pred_answers)
+
+          nb_tr_examples += b_input_ids.size(0)
+          nb_tr_steps += 1
 
           current_batch_acc = round(100 * (correct_answers / nb_tr_examples), 3)
           current_batch_f1 = round(100 * (batch_f1 / nb_tr_examples), 3)
@@ -1279,6 +1281,9 @@ def train_all(
               batch_f1_aux = batch_f1_domain
           
           if not eval_round:
+            nb_tr_examples += b_input_ids.size(0)
+            nb_tr_steps += 1
+
             current_batch_acc_aux = round(100 * (batch_acc_aux / nb_tr_steps), 3)
             current_batch_f1_aux = round(100 * (batch_f1_aux / nb_tr_steps), 3)
 
@@ -1302,9 +1307,6 @@ def train_all(
               running_tasks.pop(running_tasks.index(task))
 
         if not eval_round:
-          nb_tr_examples += b_input_ids.size(0)
-          nb_tr_steps += 1
-
           print("------------------------------------")
           print("----- Current {} loss: {} -----".format(current_task, abs(round(batch_loss.item(), 3))))
           print("------------------------------------")
