@@ -1430,6 +1430,7 @@ def train_all(
               print("------------------------------------------")
               print("----- Early stopping after {} steps -----".format(nb_tr_steps * (epoch + 1)))
               print("------------------------------------------")
+              print()
 
               val_losses_all_tasks.append(val_losses)
               val_accs_all_tasks.append(val_accs)
@@ -1447,6 +1448,7 @@ def train_all(
             print("------------------------------------------")
             print("----- Early stopping after {} steps -----".format(nb_tr_steps * (epoch + 1)))
             print("------------------------------------------")
+            print()
 
             val_losses_all_tasks.append(val_losses)
             val_accs_all_tasks.append(val_accs)
