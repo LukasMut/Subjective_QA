@@ -1163,13 +1163,13 @@ def train_all(
 
           # perform QA task
           start_logits, end_logits = model(
-                         input_ids=b_input_ids,
-                         attention_masks=b_attn_masks,
-                         token_type_ids=b_token_type_ids,
-                         input_lengths=b_input_lengths,
-                         task=task,
-                         aux_logits=b_aux_logits,
-                         )
+                                           input_ids=b_input_ids,
+                                           attention_masks=b_attn_masks,
+                                           token_type_ids=b_token_type_ids,
+                                           input_lengths=b_input_lengths,
+                                           task=task,
+                                           aux_logits=b_aux_logits,
+                                           )
 
           # start and end loss must be computed separately and then averaged
           start_loss = qa_loss_func(start_logits, b_start_pos)
@@ -1246,12 +1246,12 @@ def train_all(
               optimizer_sbj.zero_grad()
               # perform classification task
               sbj_logits_a, sbj_logits_q = model(
-                                   input_ids=b_input_ids,
-                                   attention_masks=b_attn_masks,
-                                   token_type_ids=b_token_type_ids,
-                                   input_lengths=b_input_lengths,
-                                   task=task,
-                                   )
+                                                 input_ids=b_input_ids,
+                                                 attention_masks=b_attn_masks,
+                                                 token_type_ids=b_token_type_ids,
+                                                 input_lengths=b_input_lengths,
+                                                 task=task,
+                                                 )
 
               sbj_logits = torch.stack((sbj_logits_a, sbj_logits_q), dim=1)
               b_sbj = b_sbj.type_as(sbj_logits)
