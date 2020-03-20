@@ -679,7 +679,7 @@ if __name__ == '__main__':
         if args.n_evals == 'multiple_per_epoch':
             hypers["n_evals_per_epoch"] = 10 # number of times we evaluate model on dev set per epoch (not necessary, if we just evaluate once after an epoch)
 
-        hypers["early_stopping_thresh"] = 5 # if validation loss does not decrease for 5 evaluation steps (i.e., half an epoch), perform early stopping
+        hypers["early_stopping_thresh"] = 5 # if validation loss does not decrease for 5 evaluation steps (i.e., half an epoch), stop training early
         hypers["freeze_bert"] = freeze_bert
         hypers["pretrained_model"] = 'distilbert'
         hypers["model_dir"] = args.sd

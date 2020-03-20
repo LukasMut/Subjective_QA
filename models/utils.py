@@ -1047,6 +1047,15 @@ def train_all(
   if args['n_evals'] == 'multiple_per_epoch':
     steps_until_eval =  args['n_steps'] // args['n_evals_per_epoch'] # number of steps between validations
     stop_training = False
+
+  # freeze transformer layers for debugging
+  if args['freeze_bert']:
+    model_name = args['pretrained_model']
+    model = freeze_transformer_layers(model, model_name=model_name, unfreeze=False)
+    print("--------------------------------------------------")
+    print("------ Pre-trained BERT weights are frozen -------")
+    print("--------------------------------------------------")
+    print()
         
   # keep track of batch losses, accuracies and F1s for plotting
   batch_losses = []
