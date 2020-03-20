@@ -281,7 +281,7 @@ def train(
             # sample task from random distribution
             current_task = task_order[step]
 
-            # set loss back to 0 after an iteration
+            # set loss back to 0 after each training iteration
             batch_loss = 0            
 
             # zero-out gradients w.r.t. task
@@ -1219,7 +1219,6 @@ def train_all(
 
         else:
           if task == 'Sbj_Class':
-
             if args['batch_presentation'] == 'alternating':
               # unpack inputs from data loader for (q, a) sequence pair inputs
               b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj = batch
