@@ -111,9 +111,7 @@ class LinearQAHead(nn.Module):
                     seqs_cat_logits = []
                     assert seq_out.size(0) == aux_logits.size(0)
                     for b, seq in enumerate(seq_out):
-                        seq_cat_logits = []
-                        for t, embed in enumerate(seq):
-                            seq_cat_logits.append(torch.cat((embed, aux_logits[b]), dim=1).numpy().tolist())
+                        seq_cat_logits = [torch.cat((seq[t], aux_logits[b])).numpy().tolist() for t, _ in enumerate(seq)]
                         seqs_cat_logits.append(seq_cat_logits)
                     return torch.tensor(seqs_cat_logits).to(device)
 

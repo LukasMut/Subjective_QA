@@ -1094,6 +1094,7 @@ def train_all(
       if len(domain_logits_all) > 0:
         model.qa_head.fc_qa.in_features += domain_logits_all[0].size(1)
 
+    # make sure, we fine-tune model on every task
     model.train()
 
     eval_round = False
