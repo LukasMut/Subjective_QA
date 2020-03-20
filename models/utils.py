@@ -869,30 +869,26 @@ def test(
           b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _ = batch
 
         elif task == 'Sbj_Classification':
-
           if input_sequence == 'question_context':
             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, b_sbj, _ = batch
-            
+
           elif input_sequence == 'question_answer':
             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj = batch
 
-        else:
+        elif task == 'Domain_Classification':
           b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _,  _, b_domains = batch
 
-        # if current batch_size is smaller than specified batch_size, skip batch (number of examples in last batche might not equal to batch_size)
+        # if current batch_size is smaller than specified batch_size, skip batch (number of examples in last batch might not be equal to batch_size)
         if b_input_ids.size(0) != batch_size:
             continue
 
         with torch.no_grad():
-            
             if task == 'QA':
-
               if not_finetuned:
                   start_logits_test, end_logits_test = model(
                                                              input_ids=b_input_ids,
                                                              attention_mask=b_attn_masks,
-                  )
-
+                                                             )
               else:  
                   start_logits_test, end_logits_test = model(
                                                            input_ids=b_input_ids,
@@ -900,7 +896,7 @@ def test(
                                                            token_type_ids=b_token_type_ids,
                                                            input_lengths=b_input_lengths,
                                                            task='QA',
-                  )
+                                                           )
 
               start_true_test = to_cpu(b_start_pos)
               end_true_test = to_cpu(b_end_pos)
