@@ -1255,7 +1255,7 @@ def train_all(
                                                    task=task,
                                                    )
                 # pass model's raw output logits through sigmoid function and store probability scores for each mini-batch of input sequences
-                sbj_logits_all.append(torch.stack((torch.sigmoid(sbj_logits_a), torch.sigmoid(sbj_logits_q)), dim=1, requires_grad=False))
+                sbj_logits_all.append(torch.stack((torch.sigmoid(sbj_logits_a), torch.sigmoid(sbj_logits_q)), dim=1))
             else:
               # after each training iteration, zero-out gradients
               optimizer_sbj.zero_grad()
