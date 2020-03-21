@@ -484,11 +484,13 @@ def train(
             
             elif current_task == 'Sbj_Class':
               optimizer_sbj.step()
-              scheduler_sbj.step()
+              if not isinstance(scheduler_sbj, type(None)):
+                scheduler_sbj.step()
 
             elif current_task == 'Domain_Class':
               optimizer_dom.step()
-              scheduler_dom.step()
+              if not isinstance(scheduler_dom, type(None)):
+                scheduler_dom.step()
 
             if args['n_evals'] == 'multiple_per_epoch':
               
@@ -1373,11 +1375,13 @@ def train_all(
           
           elif task == 'Sbj_Class':
             optimizer_sbj.step()
-            scheduler_sbj.step()
+            if not isinstance(scheduler_sbj, type(None)):
+              scheduler_sbj.step()
 
           elif task == 'Domain_Class':
             optimizer_dom.step()
-            scheduler_dom.step()
+            if not isinstance(scheduler_dom, type(None)):
+              scheduler_dom.step()
 
           if args['n_evals'] == 'multiple_per_epoch':
             if step > 0 and step % steps_until_eval == 0:
