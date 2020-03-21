@@ -701,7 +701,7 @@ if __name__ == '__main__':
 
             scheduler_sbj = get_linear_schedule_with_warmup(
                                                             optimizer_sbj, 
-                                                            num_warmup_steps=100, #hypers["warmup_steps"], 
+                                                            num_warmup_steps=hypers["warmup_steps"], 
                                                             num_training_steps=t_total,
                                  )
 
