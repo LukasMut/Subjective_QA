@@ -166,13 +166,14 @@ def plot_results(
     ax = plt.subplot(111)
     
     for idx, (clf, met) in enumerate(r_plot.items()):
+        #print(clf)
         if correlation:
             try:
-                ax.plot(met['train'], met['val'], '-o', label=params[idx])
+                ax.plot(met['train'], met['val'], '-^', label=params[idx])
             except ValueError:
-                ax.plot(met['train'][:-1], met['val'], '-o', label=params[idx])
+                ax.plot(met['train'][:-1], met['val'], '-^', label=params[idx])
         else:
-            ax.plot(range(1, len(met) + 1), met, '-o', label=params[idx])
+            ax.plot(range(1, len(met) + 1), met, '-^', label=params[idx])
     
     # hide the right and top spines
     ax.spines['right'].set_visible(False)
