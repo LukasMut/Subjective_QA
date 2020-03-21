@@ -699,11 +699,11 @@ if __name__ == '__main__':
                                   correct_bias=True,
             )
 
-            scheduler_sbj = get_linear_schedule_with_warmup(
-                                                            optimizer_sbj, 
-                                                            num_warmup_steps=hypers["warmup_steps"], 
-                                                            num_training_steps=t_total,
-            )
+            scheduler_sbj = None #get_linear_schedule_with_warmup(
+                                 #                           optimizer_sbj, 
+                                 #                           num_warmup_steps=hypers["warmup_steps"], 
+                                 #                           num_training_steps=t_total,
+                                 #)
 
             batch_losses, batch_accs, batch_f1s, val_losses, val_accs, val_f1s, model = train(
                                                                                             model=model,
