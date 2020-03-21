@@ -1073,12 +1073,16 @@ def train_all(
   qa_loss_func = nn.CrossEntropyLoss()
   batch_accs_qa, batch_f1s_qa = [], []
 
-  assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
-  print("Weights for subjective Anwers: {}".format(qa_type_weights[0]))
-  print()
-  print("Weights for subjective Questions: {}".format(qa_type_weights[1]))
-  print()
-  sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
+  if args['dataset'] == 'combined':
+    assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
+    print("Weights for subjective Anwers: {}".format(qa_type_weights[0]))
+    print()
+    print("Weights for subjective Questions: {}".format(qa_type_weights[1]))
+    print()
+    sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
+  else:
+    sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=torch.ones(2).to(device))
+
   batch_accs_sbj, batch_f1s_sbj = [], []
       
   assert isinstance(domain_weights, torch.Tensor), 'Tensor of class weights for different domains is not provided'
