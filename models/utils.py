@@ -1046,7 +1046,6 @@ def train_all(
   
   if args['n_evals'] == 'multiple_per_epoch':
     steps_until_eval =  args['n_steps'] // args['n_evals_per_epoch'] # number of steps between validations
-    stop_training = False
 
   # freeze transformer layers for debugging
   if args['freeze_bert']:
@@ -1107,6 +1106,7 @@ def train_all(
     model.train()
 
     eval_round = False
+    stop_training = False
 
     print('------------------------------------')
     print('-------- Current task: {} --------'.format(task))
@@ -1253,7 +1253,7 @@ def train_all(
               # after each training iteration, zero-out gradients
               optimizer_sbj.zero_grad()
               # perform classification task
-              sbj_logits_a, sbj_logits_q = model(
+              sbj_logits_a, sbj_logits_q = model( 
                                                  input_ids=b_input_ids,
                                                  attention_masks=b_attn_masks,
                                                  token_type_ids=b_token_type_ids,

@@ -660,8 +660,8 @@ if __name__ == '__main__':
 
         hypers = {
                   "lr_adam": 3e-5,
-                  "warmup_steps": 0,
-                  "max_grad_norm": 1.0,
+                  "warmup_steps": 0, # TODO: figure out, whether we should increase number of warmup steps 
+                  "max_grad_norm": 5.0, # TODO: might it beneficial to modify max_grad_norm per task?
         }
 
         if args.sequential_finetuning:
@@ -694,9 +694,9 @@ if __name__ == '__main__':
         if isinstance(args.n_aux_tasks, type(None)) and args.sbj_classification:
 
             optimizer_sbj = AdamW(
-                          model.parameters(), 
-                          lr=hypers['lr_adam'], 
-                          correct_bias=True,
+                                  model.parameters(), 
+                                  lr=hypers['lr_adam'], 
+                                  correct_bias=True,
             )
 
             scheduler_sbj = get_linear_schedule_with_warmup(
@@ -728,9 +728,9 @@ if __name__ == '__main__':
         elif isinstance(args.n_aux_tasks, type(None)) and args.domain_classification:
 
             optimizer_dom = AdamW(
-                          model.parameters(), 
-                          lr=hypers['lr_adam'], 
-                          correct_bias=True,
+                                  model.parameters(), 
+                                  lr=hypers['lr_adam'], 
+                                  correct_bias=True,
             )
 
             scheduler_dom = get_linear_schedule_with_warmup(
@@ -762,9 +762,9 @@ if __name__ == '__main__':
         elif isinstance(args.n_aux_tasks, type(None)) and not args.sequential_finetuning:
 
             optimizer_qa = AdamW(
-                          model.parameters(), 
-                          lr=hypers['lr_adam'], 
-                          correct_bias=True,
+                                  model.parameters(), 
+                                  lr=hypers['lr_adam'], 
+                                  correct_bias=True,
             )
 
             scheduler_qa = get_linear_schedule_with_warmup(
@@ -798,9 +798,9 @@ if __name__ == '__main__':
 
 
             optimizer_qa = AdamW(
-                          model.parameters(), 
-                          lr=hypers['lr_adam'], 
-                          correct_bias=True,
+                                  model.parameters(), 
+                                  lr=hypers['lr_adam'], 
+                                  correct_bias=True,
             )
 
             scheduler_qa = get_linear_schedule_with_warmup(
@@ -848,9 +848,9 @@ if __name__ == '__main__':
 
 
             optimizer_qa = AdamW(
-                          model.parameters(), 
-                          lr=hypers['lr_adam'], 
-                          correct_bias=True,
+                                  model.parameters(), 
+                                  lr=hypers['lr_adam'], 
+                                  correct_bias=True,
             )
 
             scheduler_qa = get_linear_schedule_with_warmup(
