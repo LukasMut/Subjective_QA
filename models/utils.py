@@ -588,13 +588,13 @@ def train(
           if epoch > 0 and early_stopping:
             if val_losses[-1] > val_losses[-2]:
               print("------------------------------------------")
-              print("----- Early stopping after {} steps -----".format(nb_tr_steps * (epoch + 1)))
+              print("----- Early stopping after {} steps -----".format(nb_tr_steps + len(train_dl) * epoch))
               print("------------------------------------------")
               break
         else:
           if stop_training:
             print("------------------------------------------")
-            print("----- Early stopping after {} steps -----".format(nb_tr_steps * (epoch + 1)))
+            print("----- Early stopping after {} steps -----".format(nb_tr_steps + len(train_dl) * epoch))
             print("------------------------------------------")
             break
 
@@ -1472,7 +1472,7 @@ def train_all(
           if epoch > 0 and early_stopping:
             if val_losses[-1] > val_losses[-2]:
               print("------------------------------------------")
-              print("----- Early stopping after {} steps -----".format(nb_tr_steps * (epoch + 1)))
+              print("----- Early stopping after {} steps -----".format(nb_tr_steps + len(train_dl) * epoch))
               print("------------------------------------------")
               print()
 
@@ -1495,7 +1495,7 @@ def train_all(
         else:
           if stop_training:
             print("------------------------------------------")
-            print("----- Early stopping after {} steps -----".format(nb_tr_steps * (epoch + 1)))
+            print("----- Early stopping after {} steps -----".format(nb_tr_steps + len(train_dl) * epoch))
             print("------------------------------------------")
             print()
 
