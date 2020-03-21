@@ -1221,7 +1221,6 @@ def train_all(
           print()
 
           if step > (steps_until_eval // 2):
-
             if task in running_tasks:
               batch_accs_qa.append(current_batch_acc)
               batch_f1s_qa.append(current_batch_f1)
@@ -1363,7 +1362,6 @@ def train_all(
 
           # backpropagate error
           batch_loss.backward()
-        
           # clip gradients if gradients become larger than predefined gradient norm
           torch.nn.utils.clip_grad_norm_(model.parameters(), args["max_grad_norm"])
 
