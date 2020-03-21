@@ -660,7 +660,7 @@ if __name__ == '__main__':
 
         hypers = {
                   "lr_adam": 5e-5,
-                  "warmup_steps": 0, # TODO: figure out, whether we should increase number of warmup steps 
+                  "warmup_steps": 0, 
                   "max_grad_norm": 1.0, # TODO: might it beneficial to modify max_grad_norm per task?
         }
 

@@ -82,7 +82,15 @@ def plot_results(
                 if re.search(r'' + metric, m):
                     r_plot[clf] = v                   
                     
-    if task =='sbj_class' and iv == 'datasets' and task_setting == 'single':
+    if task =='sbj_class' and iv == 'datasets' and task_setting == 'single' and model == 'linear':
+        params = [
+                  r'$D_{SQuAD} \cup D_{Subj}$ $(\mathbf{q, a})$',
+                  r'$D_{Subj}$ $(\mathbf{q, a})$',
+                  r'$D_{Subj}$ $(\mathbf{q, c})$',
+                  r'$D_{SQuAD} \cup D_{Subj}$ $(\mathbf{q, c})$',
+        ]
+        
+    if task =='sbj_class' and iv == 'datasets' and task_setting == 'single' and (model == 'highway' or model == 'recurrent'):
         params = [
                   r'$D_{SQuAD} \cup D_{Subj}$ $(\mathbf{q, a})$',
                   r'$D_{Subj}$ $(\mathbf{q, a})$',
