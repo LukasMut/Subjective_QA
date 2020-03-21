@@ -1169,7 +1169,6 @@ def train_all(
           b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _ = batch
 
           b_sbj_logits = sbj_logits_all[step]
-          b_domain_logits = domain_logits_all[step]
           b_aux_logits = torch.cat((b_sbj_logits, b_domain_logits), dim=1)
 
           # perform QA task
@@ -1474,7 +1473,7 @@ def train_all(
           model.train()
 
           if epoch > 0 and early_stopping:
-            if val_losses[-1] > val_losses[-2]:
+            if val_losses[-1] > val_losses[-2] or epoch == args['n_epochs'] - 1:
               print("------------------------------------------")
               print("----- Early stopping after {} steps -----".format(nb_tr_steps + len(train_dl) * epoch))
               print("------------------------------------------")
@@ -1497,7 +1496,7 @@ def train_all(
               else:
                 break
         else:
-          if stop_training:
+          if stop_training or epoch == args['n_epochs'] - 1:
             print("------------------------------------------")
             print("----- Early stopping after {} steps -----".format(nb_tr_steps + len(train_dl) * epoch))
             print("------------------------------------------")
