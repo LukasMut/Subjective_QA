@@ -528,7 +528,7 @@ if __name__ == '__main__':
                                                   )
                     
                     if args.sequential_finetuning:
-                        combined_tensor_dataset_dev_aux_sbj = create_tensor_dataset(combined_features_dev, aux_sbj_batch=True)
+                        combined_tensor_dataset_dev_aux_sbj = create_tensor_dataset(subjqa_features_dev, aux_sbj_batch=True)
 
                         val_dl_sbj = BatchGenerator(
                                                dataset=combined_tensor_dataset_dev_aux_sbj,
@@ -588,7 +588,7 @@ if __name__ == '__main__':
                                               sort_batch=sort_batch,
                                               )
                     
-                    combined_tensor_dataset_dev_aux_sbj = create_tensor_dataset(combined_features_dev, aux_sbj_batch=True)
+                    combined_tensor_dataset_dev_aux_sbj = create_tensor_dataset(subjqa_features_dev, aux_sbj_batch=True)
 
                     val_dl = BatchGenerator(
                                            dataset=combined_tensor_dataset_dev_aux_sbj,
