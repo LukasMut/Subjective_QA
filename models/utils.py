@@ -1156,7 +1156,7 @@ def train_all(
       with torch.no_grad():
         model.qa_head.fc_qa.in_features += add_features
         assert model.qa_head.fc_qa.out_features == args['n_qa_labels']
-        model.qa_head.fc_qa.weight = nn.Parameter(torch.cat((model.qa_head.fc_qa.weight, torch.randn(add_features, args['n_qa_labels']).T.to(device)), 1))
+        model.qa_head.fc_qa.weight = nn.Parameter(torch.cat((model.qa_head.fc_qa.weight, torch.randn(add_features, args['n_qa_labels'], requires_grad=False).T.to(device)), 1))
 
     # make sure, we fine-tune model on every task
     model.train()
