@@ -404,6 +404,9 @@ def train(
                 batch_acc_sbj /=  b_sbj.size(1)
                 batch_f1_sbj /= b_sbj.size(1)
 
+                batch_acc_aux = batch_acc_sbj
+                batch_f1_aux = batch_f1_sbj
+
                 """
                 sbj_logits = model(
                                    input_ids=b_input_ids,
@@ -654,6 +657,17 @@ def val(
 
     # set model to eval mode
     model.eval()
+
+    # n_features in DistilBERT transformer layers
+    distilbert_hidden_size = 768
+
+    try:
+      assert model.qa_head_fc_qa.weight.size(1) == distilbert_hidden_size
+      assert model.qa_head.fc_qa.in_features == distilbert_hidden_size
+    except AssertionError:
+      with torch.no_grad():
+        model.qa_head.fc_qa.weight = nn.Parameter(model.qa_head.fc_qa.weight[:, :distilbert_hidden_size])
+        model.qa_head.fc_qa.in_features = distilbert_hidden_size
 
     # path to save models
     model_path = args['model_dir'] 
@@ -1128,10 +1142,10 @@ def train_all(
   domain_loss_func = nn.CrossEntropyLoss(weight=domain_weights.to(device))
   batch_accs_domain, batch_f1s_domain = [], []
 
-  tasks = ['Sbj_Class','Domain_Class', 'QA']
+  tasks = ['Domain_Class', 'Sbj_Class', 'QA']
   running_tasks = tasks[:]
   
-  loss_funcs = [sbj_loss_func, domain_loss_func, qa_loss_func]
+  loss_funcs = [domain_loss_func, sbj_loss_func, qa_loss_func]
   
   if args['batch_presentation'] == 'alternating':
     # create copy of data loaders, when using (q, a) instead of (q, c) sequence pairs for sbj classification
@@ -1447,6 +1461,10 @@ def train_all(
                                                         val_f1s=val_f1s,
                                                         loss_func=loss_func,
                                                         )
+              if task == 'QA':
+                with torch.no_grad():
+                  model.qa_head.fc_qa.in_features += add_features
+                  model.qa_head.fc_qa.weight = nn.Parameter(torch.cat((model.qa_head.fc_qa.weight, torch.randn(add_features, args['n_qa_labels'], requires_grad=False).T.to(device)), 1))
 
               # we want to store train exact-match accuracies and F1 scores for each task as often as we evaluate model on validation set
               running_tasks = tasks[:]
