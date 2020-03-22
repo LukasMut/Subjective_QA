@@ -1046,11 +1046,17 @@ def train_all(
         early_stopping:bool=True,
         qa_type_weights=None,
         domain_weights=None,
-        max_epochs:int=3,
+        max_epochs:int=4,
         adversarial_simple:bool=False,
 ):
   n_iters = args['n_steps'] * args['n_epochs']
   n_examples = args['n_steps'] * batch_size
+
+  # make sure, we fine-tune for max. 3 epochs (last epoch is eval round to store model's output logits for aux tasks)
+  try:
+    assert args['n_epochs'] == max_epochs
+  except AssertionError:
+    args['n_epochs'] = max_epochs
   
   if args['n_evals'] == 'multiple_per_epoch':
     steps_until_eval =  args['n_steps'] // args['n_evals_per_epoch'] # number of steps between validations
@@ -1493,8 +1499,6 @@ def train_all(
               val_f1s_all_tasks.append(val_f1s)
 
               if task == 'Sbj_Class' or task == 'Domain_Class':
-                #if epoch >= args['n_epochs'] - 1:
-                #  args['n_epochs'] += 1
                 model.eval()
                 eval_round = True
                 seq_pair = '(q, a)' if args['batch_presentation'] == 'alternating' and task == 'Sbj_Class' else '(q, c)'
@@ -1516,8 +1520,6 @@ def train_all(
             val_f1s_all_tasks.append(val_f1s)
 
             if task == 'Sbj_Class' or task == 'Domain_Class':
-              #if epoch >= args['n_epochs'] - 1:
-              #  args['n_epochs'] += 1
               model.eval()
               eval_round = True
               seq_pair = '(q, a)' if args['batch_presentation'] == 'alternating' and task == 'Sbj_Class' else '(q, c)'
