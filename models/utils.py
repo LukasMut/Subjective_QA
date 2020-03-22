@@ -378,7 +378,6 @@ def train(
                 else:
                   b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, b_sbj, _ = main_batch
 
-
                 sbj_logits_a, sbj_logits_q = model(
                                                    input_ids=b_input_ids,
                                                    attention_masks=b_attn_masks,
@@ -397,19 +396,38 @@ def train(
                 else:
                   batch_loss += sbj_loss_func(sbj_logits, b_sbj)
 
-                current_sbj_acc = 0
-                current_sbj_f1 = 0
-
                 for k in range(b_sbj.size(1)):
 
-                  current_sbj_acc += accuracy(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')  
-                  current_sbj_f1 += f1(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')
+                  batch_acc_sbj += accuracy(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')  
+                  batch_f1_sbj += f1(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')
 
-                batch_acc_sbj += (current_sbj_acc / b_sbj.size(1))
-                batch_f1_sbj += (current_sbj_f1 / b_sbj.size(1))
+                batch_acc_sbj /=  b_sbj.size(1)
+                batch_f1_sbj /= b_sbj.size(1)
+
+                """
+                sbj_logits = model(
+                                   input_ids=b_input_ids,
+                                   attention_masks=b_attn_masks,
+                                   token_type_ids=b_token_type_ids,
+                                   input_lengths=b_input_lengths,
+                                   task=current_task,
+                                   )
+                      
+                b_sbj = b_sbj.type_as(sbj_logits)
+
+                if adversarial_simple:
+                  batch_loss -= sbj_loss_func(sbj_logits, b_sbj[:, 0])
+
+                else:
+                  batch_loss += sbj_loss_func(sbj_logits, b_sbj[:, 0])
+
+                batch_acc_sbj += accuracy(probas=torch.sigmoid(sbj_logits), y_true=b_sbj[:, 0], task='binary')  
+                batch_f1_sbj += f1(probas=torch.sigmoid(sbj_logits), y_true=b_sbj[:, 0], task='binary')
 
                 batch_acc_aux = batch_acc_sbj
                 batch_f1_aux = batch_f1_sbj
+
+                """
 
               elif current_task == 'Domain_Class':
 
@@ -743,16 +761,30 @@ def val(
 
             batch_loss_val += loss_func(sbj_logits, b_sbj)
 
-            current_sbj_acc = 0
-            current_sbj_f1 = 0
-
             for k in range(b_sbj.size(1)):
 
-              current_sbj_acc += accuracy(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')  
-              current_sbj_f1 += f1(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')
+              batch_acc_sbj += accuracy(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')  
+              batch_f1_val += f1(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')
 
-            batch_acc_sbj += (current_sbj_acc / b_sbj.size(1))
-            batch_f1_val += (current_sbj_f1 / b_sbj.size(1))
+            batch_acc_sbj /= b_sbj.size(1)
+            batch_f1_val /= b_sbj.size(1)
+
+            """
+            sbj_logits = model(
+                   input_ids=b_input_ids,
+                   attention_masks=b_attn_masks,
+                   token_type_ids=b_token_type_ids,
+                   input_lengths=b_input_lengths,
+                   task='Sbj_Class',
+                   )
+                    
+            b_sbj = b_sbj.type_as(sbj_logits)
+
+            batch_loss_val += loss_func(sbj_logits, b_sbj[:, 0])
+
+            batch_acc_sbj += accuracy(probas=torch.sigmoid(sbj_logits), y_true=b_sbj[:, 0], task='binary')  
+            batch_f1_val += f1(probas=torch.sigmoid(sbj_logits), y_true=b_sbj[:, 0], task='binary')
+            """
 
           elif args['task'] == 'Domain_Classification':
 
@@ -839,17 +871,21 @@ def test(
 ):
     n_steps = len(test_dl)
     n_examples = n_steps * batch_size
+    distilbert_hidden_size = 768
+
+    # set model to eval mode
+    model.eval()
        
     ### Inference ###
 
     try:
-      assert model.qa_head.fc_qa.in_features == 768
+      assert model.qa_head_fc_qa.weight.size(1) == distilbert_hidden_size
+      assert model.qa_head.fc_qa.in_features == distilbert_hidden_size
     except AssertionError:
-      model.qa_head.fc_qa.in_features = 768
-
-    # set model to eval mode
-    model.eval()
-    
+      with torch.no_grad():
+        model.qa_head.fc_qa.weight = nn.Parameter(model.qa_head.fc_qa.weight[:, :distilbert_hidden_size])
+        model.qa_head.fc_qa.in_features = distilbert_hidden_size
+ 
     if task == 'QA':
       correct_answers_test = 0
       loss_func = nn.CrossEntropyLoss()
@@ -953,16 +989,13 @@ def test(
 
               batch_loss_test += loss_func(sbj_logits, b_sbj)
 
-              current_sbj_acc = 0
-              current_sbj_f1 = 0
-
               for k in range(b_sbj.size(1)):
 
-                current_sbj_acc += accuracy(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')  
-                current_sbj_f1 += f1(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')
+                batch_acc_test += accuracy(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')  
+                batch_f1_test += f1(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')
 
-              batch_acc_test += (current_sbj_acc / b_sbj.size(1))
-              batch_f1_test += (current_sbj_f1 / b_sbj.size(1))
+              batch_acc_test /= b_sbj.size(1)
+              batch_f1_test /= b_sbj.size(1)
 
             elif task == 'Domain_Classification':
 
@@ -1113,12 +1146,17 @@ def train_all(
     ## fine-tune model on every task sequentially (i.e., soft-parameter sharing) ##
     ## store model's output logits for each mini-batch of input sequences after convergence on each of the two auxiliary tasks ##
 
-    if task == 'QA':
-      # TODO: figure out, whether this is the correct way to modify the in_size of a fc layer on the fly
-      model.qa_head.fc_qa.in_features += sbj_logits_all[0].size(1)
 
+    # TODO: figure out, whether this is the correct way to modify input_size and weights of a fc layer on the fly
+    if task == 'QA':
+      add_features = sbj_logits_all[0].size(1)
       if len(domain_logits_all) > 0:
-        model.qa_head.fc_qa.in_features += domain_logits_all[0].size(1)
+        add_features += domain_logits_all[0].size(1)
+      
+      with torch.no_grad():
+        model.qa_head.fc_qa.in_features += add_features
+        assert model.qa_head.fc_qa.out_features == args['n_qa_labels']
+        model.qa_head.fc_qa.weight = nn.Parameter(torch.cat((model.qa_head.fc_qa.weight, torch.randn(add_features, args['n_qa_labels']).T.to(device)), 1))
 
     # make sure, we fine-tune model on every task
     model.train()
@@ -1286,15 +1324,12 @@ def train_all(
               else:
                 batch_loss += sbj_loss_func(sbj_logits, b_sbj)
 
-              current_sbj_acc = 0
-              current_sbj_f1 = 0
-
               for k in range(b_sbj.size(1)):
-                current_sbj_acc += accuracy(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')  
-                current_sbj_f1 += f1(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')
+                batch_acc_sbj += accuracy(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')  
+                batch_f1_sbj += f1(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')
 
-              batch_acc_sbj += (current_sbj_acc / b_sbj.size(1))
-              batch_f1_sbj += (current_sbj_f1 / b_sbj.size(1))
+              batch_acc_sbj /= b_sbj.size(1)
+              batch_f1_sbj /= b_sbj.size(1)
 
               batch_acc_aux = batch_acc_sbj
               batch_f1_aux = batch_f1_sbj

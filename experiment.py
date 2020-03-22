@@ -669,12 +669,14 @@ if __name__ == '__main__':
         else:
             hypers["task"] = task
 
+        hypers["max_seq_length"] = max_seq_length
         hypers["n_epochs"] = args.n_epochs
         hypers["n_steps"] = n_steps
         hypers["n_evals"] = args.n_evals
         hypers["batch_presentation"] = args.batches
         hypers["task_sampling"] = args.task_sampling
         hypers["mtl_setting"] = args.mtl_setting
+        hypers["n_qa_labels"] = 2
 
         if args.n_evals == 'multiple_per_epoch':
             hypers["n_evals_per_epoch"] = 10 # number of times we evaluate model on dev set per epoch (not necessary, if we just evaluate once after an epoch)
