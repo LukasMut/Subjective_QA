@@ -1482,7 +1482,7 @@ def train_all(
           model.train()
 
           if epoch > 0 and early_stopping:
-            if val_losses[-1] > val_losses[-2] or epoch == max_epochs - 1:
+            if val_losses[-1] > val_losses[-2] or epoch >= args['n_epochs'] - 2:
               print("------------------------------------------")
               print("----- Stopping training after {} steps -----".format(nb_tr_steps + len(train_dl) * epoch))
               print("------------------------------------------")
@@ -1493,8 +1493,8 @@ def train_all(
               val_f1s_all_tasks.append(val_f1s)
 
               if task == 'Sbj_Class' or task == 'Domain_Class':
-                if epoch >= args['n_epochs'] - 1:
-                  args['n_epochs'] += 1
+                #if epoch >= args['n_epochs'] - 1:
+                #  args['n_epochs'] += 1
                 model.eval()
                 eval_round = True
                 seq_pair = '(q, a)' if args['batch_presentation'] == 'alternating' and task == 'Sbj_Class' else '(q, c)'
@@ -1505,7 +1505,7 @@ def train_all(
               else:
                 break
         else:
-          if stop_training or epoch == max_epochs - 1:
+          if stop_training or epoch >= args['n_epochs'] - 2:
             print("------------------------------------------")
             print("----- Stopping training after {} steps -----".format(nb_tr_steps + len(train_dl) * epoch))
             print("------------------------------------------")
@@ -1516,8 +1516,8 @@ def train_all(
             val_f1s_all_tasks.append(val_f1s)
 
             if task == 'Sbj_Class' or task == 'Domain_Class':
-              if epoch >= args['n_epochs'] - 1:
-                args['n_epochs'] += 1
+              #if epoch >= args['n_epochs'] - 1:
+              #  args['n_epochs'] += 1
               model.eval()
               eval_round = True
               seq_pair = '(q, a)' if args['batch_presentation'] == 'alternating' and task == 'Sbj_Class' else '(q, c)'

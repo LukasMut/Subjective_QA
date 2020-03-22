@@ -172,7 +172,6 @@ class LinearQAHead(nn.Module):
                 sbj_logits_a = self.fc_sbj_a(sbj_out)
                 sbj_logits_q = self.fc_sbj_q(sbj_out)
                 
-
                 # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
                 sbj_logits_a = sbj_logits_a.squeeze(-1)
                 sbj_logits_q = sbj_logits_q.squeeze(-1)
