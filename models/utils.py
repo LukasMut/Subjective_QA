@@ -5,6 +5,7 @@ __all__ = [
            'get_answers',
            'compute_exact_batch',
            'compute_f1_batch',
+           'create_optimizer',
            'to_cpu',
            'train',
            'train_all',
@@ -132,30 +133,30 @@ def create_optimizer(
                      task:str,
                      lr:float,
                      ):
-  task = task.lower()
-  if task == 'qa':
-    head = 'fc_qa'
-  elif task == 'sbj_class':
-    head = 'fc_sbj'
-  elif task == 'domain_class':
-    head = 'fc_domain'
-  else:
-    raise ValueError('Incorrect task name provided')
+    task = task.lower()
+    if task == 'qa':
+        head = 'fc_qa'
+    elif task == 'sbj_class':
+        head = 'fc_sbj'
+    elif task == 'domain_class':
+        head = 'fc_domain'
+    else:
+        raise ValueError('Incorrect task name provided')
   
-  no_decay = ["bias", "LayerNorm.weight"]
-  optim_grouped_parameters = [
+    no_decay = ["bias", "LayerNorm.weight"]
+    optim_grouped_parameters = [
     {"params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay) and re.search(r'(bert|' + head + ')', n)],
      "weight_decay": 0.0},
     {"params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay) and re.search(r'(bert|' + head + ')', n)],
      "weight_decay": 0.0},
-     ]
+    ]
   
-  optimizer = AdamW(optim_grouped_parameters,
-                    lr=lr, 
-                    correct_bias=True,
-                    )
-  return optimizer
-
+    optimizer = AdamW(
+                     optim_grouped_parameters,
+                     lr=lr, 
+                     correct_bias=True,
+    )
+    return optimizer
 
 def train(
           model,
@@ -1223,7 +1224,7 @@ def train_all(
         optimizer = create_optimizer(model=model, task=task, lr=args['lr_adam'])
 
         if i > 0:
-          scheduler = get_linear_schedule_with_warmup(
+            scheduler = get_linear_schedule_with_warmup(
                                                       optimizer, 
                                                       num_warmup_steps=args['warmup_steps'], 
                                                       num_training_steps=args['t_total'],

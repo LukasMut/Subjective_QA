@@ -696,11 +696,7 @@ if __name__ == '__main__':
 
         if isinstance(args.n_aux_tasks, type(None)) and args.sbj_classification:
 
-            optimizer_sbj = AdamW(
-                                  model.parameters(), 
-                                  lr=hypers['lr_adam'], 
-                                  correct_bias=True,
-            )
+            optimizer_sbj = create_optimizer(model=model, task='sbj_class', lr=args['lr_adam'])
 
             scheduler_sbj = get_linear_schedule_with_warmup(
                                                             optimizer_sbj, 
@@ -730,11 +726,7 @@ if __name__ == '__main__':
 
         elif isinstance(args.n_aux_tasks, type(None)) and args.domain_classification:
 
-            optimizer_dom = AdamW(
-                                  model.parameters(), 
-                                  lr=hypers['lr_adam'], 
-                                  correct_bias=True,
-            )
+            optimizer_dom = create_optimizer(model=model, task='domain_class', lr=args['lr_adam'])
 
             scheduler_dom = get_linear_schedule_with_warmup(
                                                             optimizer_dom, 
@@ -764,11 +756,7 @@ if __name__ == '__main__':
 
         elif isinstance(args.n_aux_tasks, type(None)) and not args.sequential_finetuning:
 
-            optimizer_qa = AdamW(
-                                  model.parameters(), 
-                                  lr=hypers['lr_adam'], 
-                                  correct_bias=True,
-            )
+            optimizer_qa = create_optimizer(model=model, task='QA', lr=args['lr_adam'])
 
             scheduler_qa = get_linear_schedule_with_warmup(
                                                            optimizer_qa, 
@@ -807,7 +795,7 @@ if __name__ == '__main__':
                                                            num_training_steps=t_total,
             )
 
-            optimizer_sbj = create_optimizer(model=model, task='Sbj_class', lr=args['lr_adam'])
+            optimizer_sbj = create_optimizer(model=model, task='sbj_class', lr=args['lr_adam'])
             
             scheduler_sbj = get_linear_schedule_with_warmup(
                                                             optimizer_sbj, 
@@ -840,7 +828,6 @@ if __name__ == '__main__':
         
         elif args.n_aux_tasks == 2 or args.sequential_finetuning:
 
-
             optimizer_qa = create_optimizer(model=model, task='QA', lr=args['lr_adam'])
 
             scheduler_qa = get_linear_schedule_with_warmup(
@@ -864,7 +851,6 @@ if __name__ == '__main__':
                                                             num_warmup_steps=hypers["warmup_steps"], 
                                                             num_training_steps=t_total,
             )
-
 
             if args.n_aux_tasks == 2:
 
