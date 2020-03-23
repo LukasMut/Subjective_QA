@@ -1556,14 +1556,14 @@ def train_all(
 
                     if epoch > 0 and early_stopping:
                         if val_losses[-1] > val_losses[-2] or epoch >= args['n_epochs'] - 2:
-                        print("------------------------------------------")
-                        print("----- Stopping training after {} steps -----".format(nb_tr_steps + len(train_dl) * epoch))
-                        print("------------------------------------------")
-                        print()
+                            print("------------------------------------------")
+                            print("----- Stopping training after {} steps -----".format(nb_tr_steps + len(train_dl) * epoch))
+                            print("------------------------------------------")
+                            print()
 
-                        val_losses_all_tasks.append(val_losses)
-                        val_accs_all_tasks.append(val_accs)
-                        val_f1s_all_tasks.append(val_f1s)
+                            val_losses_all_tasks.append(val_losses)
+                            val_accs_all_tasks.append(val_accs)
+                            val_f1s_all_tasks.append(val_f1s)
 
                         if task == 'Sbj_Class' or task == 'Domain_Class':
                             model.eval()
