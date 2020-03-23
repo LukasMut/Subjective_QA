@@ -194,7 +194,6 @@ class LinearQAHead(nn.Module):
                 domain_out = sequence_output + self.fc_domain_2(F.relu(self.aux_dropout(self.fc_domain_1(sequence_output))))
                 domain_out = self.aux_dropout(domain_out)
                 domain_logits = self.fc_domain_3(domain_out)
-                domain_logits = domain_logits.squeeze(-1)
 
                 # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
                 domain_logits = domain_logits.squeeze(-1)
@@ -380,7 +379,6 @@ class RecurrentQAHead(nn.Module):
                 domain_out = sequence_output + self.fc_domain_2(F.relu(self.aux_dropout(self.fc_domain_1(sequence_output))))
                 domain_out = self.aux_dropout(domain_out)
                 domain_logits = self.fc_domain_3(domain_out)
-                domain_logits = domain_logits.squeeze(-1)
 
                 # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
                 domain_logits = domain_logits.squeeze(-1)

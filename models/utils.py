@@ -290,15 +290,16 @@ def train(
             # set loss back to 0 after each training iteration
             batch_loss = 0            
 
-            # zero-out gradients w.r.t. task
-            if task_order[step - 1] == 'QA':
-              optimizer_qa.zero_grad()
+            if step > 0:
+              # zero-out gradients w.r.t. task
+              if task_order[step - 1] == 'QA':
+                optimizer_qa.zero_grad()
 
-            elif task_order[step - 1] == 'Sbj_Class':
-              optimizer_sbj.zero_grad()
+              elif task_order[step - 1] == 'Sbj_Class':
+                optimizer_sbj.zero_grad()
 
-            elif task_order[step - 1] == 'Domain_Class':
-              optimizer_dom.zero_grad()
+              elif task_order[step - 1] == 'Domain_Class':
+                optimizer_dom.zero_grad()
             
             if isinstance(n_aux_tasks, int):
               print('------------------------------------')
@@ -378,6 +379,8 @@ def train(
                 else:
                   b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, b_sbj, _ = main_batch
 
+                ## ANSWER & QUESTION CLASSIFICATOION ##
+
                 sbj_logits_a, sbj_logits_q = model(
                                                    input_ids=b_input_ids,
                                                    attention_masks=b_attn_masks,
@@ -411,6 +414,7 @@ def train(
                 batch_f1_aux = batch_f1_sbj
 
                 """
+                ## ANSWER CLASSIFICATION ##
                 sbj_logits = model(
                                    input_ids=b_input_ids,
                                    attention_masks=b_attn_masks,
