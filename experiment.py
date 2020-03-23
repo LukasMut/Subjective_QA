@@ -689,6 +689,7 @@ if __name__ == '__main__':
         hypers["dataset"] = args.finetuning
         
         t_total = n_steps * hypers['n_epochs'] # total number of training steps (i.e., step = iteration)
+        hypers["t_total"] = t_total
             
         # store train results in dict
         train_results  = dict()
@@ -798,12 +799,7 @@ if __name__ == '__main__':
 
         elif args.n_aux_tasks == 1:
 
-
-            optimizer_qa = AdamW(
-                                  model.parameters(), 
-                                  lr=hypers['lr_adam'], 
-                                  correct_bias=True,
-            )
+            optimizer_qa = create_optimizer(model=model, task='QA', lr=args['lr_adam'])
 
             scheduler_qa = get_linear_schedule_with_warmup(
                                                            optimizer_qa, 
@@ -811,11 +807,7 @@ if __name__ == '__main__':
                                                            num_training_steps=t_total,
             )
 
-            optimizer_sbj = AdamW(
-                                  model.parameters(), 
-                                  lr=hypers['lr_adam'], 
-                                  correct_bias=True,
-            )
+            optimizer_sbj = create_optimizer(model=model, task='Sbj_class', lr=args['lr_adam'])
             
             scheduler_sbj = get_linear_schedule_with_warmup(
                                                             optimizer_sbj, 
@@ -849,11 +841,7 @@ if __name__ == '__main__':
         elif args.n_aux_tasks == 2 or args.sequential_finetuning:
 
 
-            optimizer_qa = AdamW(
-                                  model.parameters(), 
-                                  lr=hypers['lr_adam'], 
-                                  correct_bias=True,
-            )
+            optimizer_qa = create_optimizer(model=model, task='QA', lr=args['lr_adam'])
 
             scheduler_qa = get_linear_schedule_with_warmup(
                                                            optimizer_qa, 
@@ -861,11 +849,7 @@ if __name__ == '__main__':
                                                            num_training_steps=t_total,
             )
 
-            optimizer_sbj = AdamW(
-                                  model.parameters(), 
-                                  lr=hypers['lr_adam'], 
-                                  correct_bias=True,
-            )
+            optimizer_sbj = create_optimizer(model=model, task='sbj_class', lr=args['lr_adam'])
             
             scheduler_sbj = get_linear_schedule_with_warmup(
                                                             optimizer_sbj, 
@@ -873,11 +857,7 @@ if __name__ == '__main__':
                                                             num_training_steps=t_total,
             )
             
-            optimizer_dom = AdamW(
-                                  model.parameters(), 
-                                  lr=hypers['lr_adam'], 
-                                  correct_bias=True,
-            )
+            optimizer_dom = create_optimizer(model=model, task='domain_class', lr=args['lr_adam'])
 
             scheduler_dom = get_linear_schedule_with_warmup(
                                                             optimizer_dom, 
@@ -917,12 +897,6 @@ if __name__ == '__main__':
                                                                                                                                                                             val_dl=val_dl,
                                                                                                                                                                             batch_size=batch_size,
                                                                                                                                                                             args=hypers,
-                                                                                                                                                                            optimizer_qa=optimizer_qa,
-                                                                                                                                                                            optimizer_sbj=optimizer_sbj,
-                                                                                                                                                                            optimizer_dom=optimizer_dom,
-                                                                                                                                                                            scheduler_qa=scheduler_qa,
-                                                                                                                                                                            scheduler_sbj=scheduler_sbj,
-                                                                                                                                                                            scheduler_dom=scheduler_dom,
                                                                                                                                                                             train_dl_sbj= train_dl_sbj if args.batches == 'alternating' else None,
                                                                                                                                                                             val_dl_sbj= val_dl_sbj if args.batches == 'alternating' else None,
                                                                                                                                                                             early_stopping=True,

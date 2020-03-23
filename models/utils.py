@@ -127,6 +127,36 @@ def to_cpu(
     if to_numpy: return tensor.numpy()
     else: return tensor
 
+def create_optimizer(
+                     model,
+                     task:str,
+                     lr:float,
+                     ):
+  task = task.lower()
+  if task == 'qa':
+    head = 'fc_qa'
+  elif task == 'sbj_class':
+    head = 'fc_sbj'
+  elif task == 'domain_class':
+    head = 'fc_domain'
+  else:
+    raise ValueError('Incorrect task name provided')
+  
+  no_decay = ["bias", "LayerNorm.weight"]
+  optim_grouped_parameters = [
+    {"params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay) and re.search(r'(bert|' + head + ')', n)],
+     "weight_decay": 0.0},
+    {"params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay) and re.search(r'(bert|' + head + ')', n)],
+     "weight_decay": 0.0},
+     ]
+  
+  optimizer = AdamW(optim_grouped_parameters,
+                    lr=lr, 
+                    correct_bias=True,
+                    )
+  return optimizer
+
+
 def train(
           model,
           tokenizer,
@@ -290,6 +320,7 @@ def train(
             # set loss back to 0 after each training iteration
             batch_loss = 0            
 
+            """
             if step > 0:
               # zero-out gradients w.r.t. task
               if task_order[step - 1] == 'QA':
@@ -300,6 +331,7 @@ def train(
 
               elif task_order[step - 1] == 'Domain_Class':
                 optimizer_dom.zero_grad()
+            """
             
             if isinstance(n_aux_tasks, int):
               print('------------------------------------')
@@ -308,6 +340,8 @@ def train(
               print()
 
             if current_task == 'QA':
+
+              optimizer_qa.zero_grad()
 
               # unpack inputs from dataloader for main task           
               b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _ = main_batch
@@ -369,6 +403,8 @@ def train(
             else:
 
               if current_task == 'Sbj_Class':
+
+                optimizer_sbj.zero_grad()
 
                 if args['task'] == 'QA' and args['batch_presentation'] == 'alternating':
                   b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj = aux_sbj_batch
@@ -440,6 +476,8 @@ def train(
                 """
 
               elif current_task == 'Domain_Class':
+
+                optimizer_dom.zero_grad()
 
                 b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, _, b_domains = main_batch
 
@@ -1095,12 +1133,6 @@ def train_all(
         val_dl,
         batch_size:int,
         args:dict,
-        optimizer_qa,
-        optimizer_sbj=None,
-        optimizer_dom=None,
-        scheduler_qa=None,
-        scheduler_sbj=None,
-        scheduler_dom=None,
         train_dl_sbj=None,
         val_dl_sbj=None,
         early_stopping:bool=True,
@@ -1186,6 +1218,16 @@ def train_all(
 
         # make sure, we fine-tune model on every task
         model.train()
+
+        # for each task initialize a separate optimizer
+        optimizer = create_optimizer(model=model, task=task, lr=args['lr_adam'])
+
+        if i > 0:
+          scheduler = get_linear_schedule_with_warmup(
+                                                      optimizer, 
+                                                      num_warmup_steps=args['warmup_steps'], 
+                                                      num_training_steps=args['t_total'],
+                                                      )
 
         eval_round = False
         stop_training = False
@@ -1446,19 +1488,9 @@ def train_all(
                     torch.nn.utils.clip_grad_norm_(model.parameters(), args["max_grad_norm"])
 
                     # take step down the valley w.r.t. current task
-                    if task == 'QA':
-                        optimizer_qa.step()
-                        scheduler_qa.step()
-                    
-                    elif task == 'Sbj_Class':
-                        optimizer_sbj.step()
-                        if not isinstance(scheduler_sbj, type(None)):
-                            scheduler_sbj.step()
-
-                    elif task == 'Domain_Class':
-                        optimizer_dom.step()
-                        if not isinstance(scheduler_dom, type(None)):
-                            scheduler_dom.step()
+                    optimizer.step()
+                    if i > 0:
+                      scheduler.step()
 
                     if args['n_evals'] == 'multiple_per_epoch':
                         if step > 0 and step % steps_until_eval == 0:
@@ -1511,20 +1543,6 @@ def train_all(
                     train_f1 = round(100 * (batch_f1 / nb_tr_examples), 3)
                     print("----- Train {} exact-match: {} % -----".format(args['task'], train_exact_match))
                     print("----- Train {} F1: {} % -----".format(args['task'], train_f1))
-
-                    if isinstance(n_aux_tasks, int) and (len(batch_accs_sbj) > 0 and len(batch_f1s_sbj) > 0):
-                        print("------------------------------------")
-                        print("----- Train Sbj acc: {} % -----".format(batch_accs_sbj[-1]))
-                        print("----- Train Sbj F1: {} % -----".format(batch_f1s_sbj[-1]))
-                        print("------------------------------------")
-                        print()
-
-                    if n_aux_tasks == 2:
-                        print("------------------------------------")
-                        print("----- Train Domain acc: {} % -----".format(batch_accs_domain[-1]))
-                        print("----- Train Domain F1: {} % -----".format(batch_f1s_domain[-1]))
-                        print("------------------------------------")
-                        print()
 
                 elif args['task'] == 'Sbj_Classification':
                     print("----- Train Sbj acc: {} % -----".format(batch_accs_sbj[-1]))
