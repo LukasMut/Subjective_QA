@@ -1231,6 +1231,7 @@ def train_all(
 
             # n_steps == n_updates per epoch (n_iters = n_epochs * n_steps per epoch)
             for step, batch in enumerate(tqdm(train_dl, desc="Step")):
+                
                 batch = tuple(t.to(device) for t in batch)
         
                 # set loss back to 0 after an iteration
