@@ -1507,10 +1507,10 @@ def train_all(
                 print("----- Train loss: {} -----".format(round(tr_loss, 3)))
 
                 if args['task'] == 'QA':
-                    train_exact_match = round(100 * (correct_answers / (task_distrib['QA'] * batch_size)), 3)
-                    train_f1 = round(100 * (batch_f1 / (task_distrib['QA'] * batch_size)), 3)
-                    print("----- Train {} exact-match: {} % -----".format(args['task'], round(train_exact_match, 3)))
-                    print("----- Train {} F1: {} % -----".format(args['task'], round(train_f1, 3)))
+                    train_exact_match = round(100 * (correct_answers / nb_tr_examples), 3)
+                    train_f1 = round(100 * (batch_f1 / nb_tr_examples), 3)
+                    print("----- Train {} exact-match: {} % -----".format(args['task'], train_exact_match))
+                    print("----- Train {} F1: {} % -----".format(args['task'], train_f1))
 
                     if isinstance(n_aux_tasks, int) and (len(batch_accs_sbj) > 0 and len(batch_f1s_sbj) > 0):
                         print("------------------------------------")
