@@ -1195,14 +1195,14 @@ def train_all(
 
         if task == 'Sbj_Class':
             if args['batch_presentation'] == 'alternating':
-            assert not isinstance(train_dl_sbj, type(None)), 'If class. (q, a) in T_sbj, provide separate train dl for sbj. class.'
-            assert not isinstance(val_dl_sbj, type(None)), 'If class. (q, a) in T_sbj, provide separate val dl for sbj. class.'
-            train_dl = train_dl_sbj
-            val_dl = val_dl_sbj
+                assert not isinstance(train_dl_sbj, type(None)), 'If class. (q, a) in T_sbj, provide separate train dl for sbj. class.'
+                assert not isinstance(val_dl_sbj, type(None)), 'If class. (q, a) in T_sbj, provide separate val dl for sbj. class.'
+                train_dl = train_dl_sbj
+                val_dl = val_dl_sbj
         else:
             if args['batch_presentation'] == 'alternating':
-            train_dl = train_dl_copy
-            val_dl = val_dl_copy
+                train_dl = train_dl_copy
+                val_dl = val_dl_copy
 
         val_losses = []
         val_accs = []
@@ -1605,5 +1605,4 @@ def train_all(
 
     # return model in eval mode
     model.eval()
-    return batch_losses, batch_accs_qa, batch_f1s_qa, batch_accs_sbj, batch_f1s_sbj, batch_accs_domain, batch_f1s_domain,
-val_losses_all_tasks, val_accs_all_tasks, val_f1s_all_tasks, model
+    return batch_losses, batch_accs_qa, batch_f1s_qa, batch_accs_sbj, batch_f1s_sbj, batch_accs_domain, batch_f1s_domain, val_losses_all_tasks, val_accs_all_tasks, val_f1s_all_tasks, model
