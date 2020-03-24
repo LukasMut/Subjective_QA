@@ -1539,7 +1539,7 @@ def train_all(
                                                                    task=task,
                                                                    )
                                 # pass model's raw output logits through sigmoid function
-                                # store probability scores for each mini-batch of input sequences
+                                # store probability scores for each input sequence in mini-batch
                                 sbj_logits_all.append(torch.stack((torch.sigmoid(sbj_logits_a), torch.sigmoid(sbj_logits_q)), dim=1))
                         else:
                             # perform subjectivity classification task
@@ -1587,7 +1587,7 @@ def train_all(
                                                       task=task,
                                   )
                                 # pass model's raw output logits through softmax function 
-                                # to yield probability distribution over classes and store those probability scores for each batch
+                                # to yield probability distribution over classes and store those probability scores for each input sequence in mini-batch
                                 domain_logits_all.append(F.softmax(domain_logits, dim=1))
                         else:
                             # perform context-domain classification task
@@ -1643,7 +1643,7 @@ def train_all(
                     print()
 
                     ## in any MTL setting, we exclusively want to store QA losses
-                    ## there's no need to store losses for auxiliary tasks since we want to observe effect of MTL on main task
+                    ## there's no need to store losses for auxiliary tasks since we want to observe effect of sequential transfer on main task
                     if task == 'QA':
                         tr_loss += batch_loss.item()
                         batch_losses.append(batch_loss.item())
