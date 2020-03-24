@@ -27,6 +27,8 @@ import transformers
 from collections import Counter, defaultdict
 from sklearn.metrics import f1_score
 from tqdm import trange, tqdm
+from transformers import AdamW
+from transformers import get_linear_schedule_with_warmup
 from transformers import BertTokenizer, BertModel, BertForQuestionAnswering
 
 from eval_squad import compute_exact, compute_f1
@@ -128,10 +130,20 @@ def to_cpu(
     if to_numpy: return tensor.numpy()
     else: return tensor
 
+def to_cat(
+           true_labels:torch.Tensor,
+           n_labels:int,
+           ):
+    batch_size = true_labels.size(0)
+    cat_mat = torch.zeros(batch_size, n_labels, dtype=torch.double)
+    for i, l in enumerate(true_labels):
+      cat_mat[i, l] += 1
+    return cat_mat.to(device)
+
 def create_optimizer(
                      model,
                      task:str,
-                     lr:float,
+                     eta:float,
                      ):
     task = task.lower()
     if task == 'qa':
@@ -152,9 +164,9 @@ def create_optimizer(
     ]
   
     optimizer = AdamW(
-                     optim_grouped_parameters,
-                     lr=lr, 
-                     correct_bias=True,
+                      optim_grouped_parameters,
+                      lr=eta, 
+                      correct_bias=True,
     )
     return optimizer
 
@@ -698,6 +710,8 @@ def val(
         val_accs:list,
         val_f1s:list,
         loss_func=None,
+        sequential_transfer:bool=False,
+        evaluation_strategy:str=None,
 ):
     ### Validation ###
 
@@ -706,14 +720,6 @@ def val(
 
     # n_features in DistilBERT transformer layers
     distilbert_hidden_size = 768
-
-    try:
-      assert model.qa_head.fc_qa.weight.size(1) == distilbert_hidden_size
-      assert model.qa_head.fc_qa.in_features == distilbert_hidden_size
-    except AssertionError:
-      with torch.no_grad():
-        model.qa_head.fc_qa.weight = nn.Parameter(model.qa_head.fc_qa.weight[:, :distilbert_hidden_size])
-        model.qa_head.fc_qa.in_features = distilbert_hidden_size
 
     # path to save models
     model_path = args['model_dir'] 
@@ -732,78 +738,158 @@ def val(
     nb_val_steps, nb_val_examples = 0, 0
 
     for batch in val_dl:
+        # move every tensor in batch to current device
+        batch = tuple(t.to(device) for t in batch)
         
         batch_loss_val = 0
         
-        # add batch to current device
-        batch = tuple(t.to(device) for t in batch)
+        ### UNPACK INPUTS FROM MINI-BATCH FOR CURRENT TASK ###
 
-        if args['task'] == 'Sbj_Classification':
+        if args['task'] == 'QA' and sequential_transfer:
+          b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_sbj, b_domains = batch
 
+        elif args['task'] == 'QA' and not sequential_transfer:
+          b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _ = batch
+
+        elif args['task'] == 'Sbj_Classification':
           if args['batch_presentation'] == 'alternating':
             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj = batch
           else:
             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, b_sbj, _ = batch
-
-        elif args['task'] == 'QA':
-            b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos,  _, _ = batch
-
+            
         elif args['task'] == 'Domain_Classification':
           b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _,  _, b_domains = batch
 
-         # if current batch_size is smaller than specified batch_size, skip batch
+        else:
+          raise ValueError('Incorrect task name provided')
+
+        ##########################################################
+
+        # if number of examples in current batch is smaller than specified batch_size, skip batch
         if b_input_ids.size(0) != batch_size:
             continue
         
-        # we evaluate the model on the main task only (i.e., QA)
+        # no gradient computation in evaluation mode
         with torch.no_grad():
-
           if args['task'] == 'QA':
+              if sequential_transfer:
+                  if evaluation_strategy == 'oracle':
+                      # inform model about true labels corresponding to auxiliary tasks
+                      one_hot_domains = to_cat(true_labels=b_domains, n_labels=args['n_domains'])
+                      b_sbj = b_sbj.type_as(one_hot_domains)
+                      b_aux_hard_targets = torch.cat((b_sbj, one_hot_domains), dim=1)
 
-            ans_logits_val = model(
-                                   input_ids=b_input_ids,
-                                   attention_masks=b_attn_masks,
-                                   token_type_ids=b_token_type_ids,
-                                   input_lengths=b_input_lengths,
-                                   task='QA'
-                                   )
+                      # perform QA task with hard targets from both auxiliary tasks as additional information about (q, c) sequence pair
+                      ans_logits_val = model(
+                                             input_ids=b_input_ids,
+                                             attention_masks=b_attn_masks,
+                                             token_type_ids=b_token_type_ids,
+                                             input_lengths=b_input_lengths,
+                                             task='QA',
+                                             aux_targets=b_aux_hard_targets,
+                      )
+                  elif evaluation_strategy == 'soft_targets':
+                      # perform subjectivity classification task
+                      sbj_logits_a, sbj_logits_q = model( 
+                                                         input_ids=b_input_ids,
+                                                         attention_masks=b_attn_masks,
+                                                         token_type_ids=b_token_type_ids,
+                                                         input_lengths=b_input_lengths,
+                                                         task='Sbj_Class',
+                                                        )
+                              
+                      # pass model's raw (sbj) output logits through sigmoid function to yield probability scores
+                      sbj_probas = torch.stack((torch.sigmoid(sbj_logits_a), torch.sigmoid(sbj_logits_q)), dim=1)
 
-            start_logits_val, end_logits_val = ans_logits_val
+                      # perform context-domain classification task
+                      domain_logits = model(
+                                            input_ids=b_input_ids,
+                                            attention_masks=b_attn_masks,
+                                            token_type_ids=b_token_type_ids,
+                                            input_lengths=b_input_lengths,
+                                            task='Domain_Class',
+                                            )
+                      # pass model's raw (context-domain) output logits through softmax function to yield probability distribution over domain classes 
+                      soft_domains = F.softmax(domain_logits, dim=1)
 
-            start_true_val = to_cpu(b_start_pos)
-            end_true_val = to_cpu(b_end_pos)
-            
-            # start and end loss must be computed separately
-            start_loss = loss_func(start_logits_val, b_start_pos)
-            end_loss = loss_func(end_logits_val, b_end_pos)
-            batch_loss_val = (start_loss + end_loss) / 2
-            
-            print("----------------------------------------")
-            print("----- Current val batch loss: {} -----".format(round(batch_loss_val.item(), 3)))
-            print("----------------------------------------")
-            print()
-            
-            start_log_probs_val = to_cpu(F.log_softmax(start_logits_val, dim=1), detach=True, to_numpy=False)
-            end_log_probs_val = to_cpu(F.log_softmax(end_logits_val, dim=1), detach=True, to_numpy=False)
-        
-            pred_answers = get_answers(
-                                       tokenizer=tokenizer,
-                                       b_input_ids=b_input_ids,
-                                       start_logs=start_log_probs_val,
-                                       end_logs=end_log_probs_val,
-                                       predictions=True,
-            )
+                      # create mini-batch of soft targets for both auxiliary tasks
+                      b_aux_soft_targets = torch.cat((sbj_probas, soft_domains), dim=1)
 
-            true_answers = get_answers(
-                                       tokenizer=tokenizer,
-                                       b_input_ids=b_input_ids,
-                                       start_logs=b_start_pos,
-                                       end_logs=b_end_pos,
-                                       predictions=False,
-            )
-            
-            correct_answers_val += compute_exact_batch(true_answers, pred_answers)
-            batch_f1_val += compute_f1_batch(true_answers, pred_answers)
+                      # perform QA task with soft targets from both auxiliary tasks as additional information about (q, c) sequence pair
+                      ans_logits_val = model(
+                                            input_ids=b_input_ids,
+                                            attention_masks=b_attn_masks,
+                                            token_type_ids=b_token_type_ids,
+                                            input_lengths=b_input_lengths,
+                                            task='QA',
+                                            aux_targets=b_aux_soft_targets,
+                                            )
+                  elif evaluation_strategy == 'no_aux_targets':
+
+                      ### make sure model does not constain weights for auxiliary task probability scores ###
+
+                      try:
+                        assert model.qa_head.fc_qa.weight.size(1) == distilbert_hidden_size
+                      except AssertionError:
+                        with torch.no_grad():
+                          model.qa_head.fc_qa.weight = nn.Parameter(model.qa_head.fc_qa.weight[:, :distilbert_hidden_size])
+                          model.qa_head.fc_qa.in_features = distilbert_hidden_size
+
+                      ########################################################################################
+
+                      # perform QA task without any additional information about auxiliary tasks at evaluation time
+                      ans_logits_val = model(
+                                             input_ids=b_input_ids,
+                                             attention_masks=b_attn_masks,
+                                             token_type_ids=b_token_type_ids,
+                                             input_lengths=b_input_lengths,
+                                             task='QA',
+                                             )
+              else:
+                  ans_logits_val = model(
+                                         input_ids=b_input_ids,
+                                         attention_masks=b_attn_masks,
+                                         token_type_ids=b_token_type_ids,
+                                         input_lengths=b_input_lengths,
+                                         task='QA'
+                                         )
+
+              start_logits_val, end_logits_val = ans_logits_val
+
+              start_true_val = to_cpu(b_start_pos)
+              end_true_val = to_cpu(b_end_pos)
+              
+              # start and end loss must be computed separately
+              start_loss = loss_func(start_logits_val, b_start_pos)
+              end_loss = loss_func(end_logits_val, b_end_pos)
+              batch_loss_val = (start_loss + end_loss) / 2
+              
+              print("----------------------------------------")
+              print("----- Current val batch loss: {} -----".format(round(batch_loss_val.item(), 3)))
+              print("----------------------------------------")
+              print()
+              
+              start_log_probs_val = to_cpu(F.log_softmax(start_logits_val, dim=1), detach=True, to_numpy=False)
+              end_log_probs_val = to_cpu(F.log_softmax(end_logits_val, dim=1), detach=True, to_numpy=False)
+          
+              pred_answers = get_answers(
+                                         tokenizer=tokenizer,
+                                         b_input_ids=b_input_ids,
+                                         start_logs=start_log_probs_val,
+                                         end_logs=end_log_probs_val,
+                                         predictions=True,
+              )
+
+              true_answers = get_answers(
+                                         tokenizer=tokenizer,
+                                         b_input_ids=b_input_ids,
+                                         start_logs=b_start_pos,
+                                         end_logs=b_end_pos,
+                                         predictions=False,
+              )
+              
+              correct_answers_val += compute_exact_batch(true_answers, pred_answers)
+              batch_f1_val += compute_f1_batch(true_answers, pred_answers)
 
           elif args['task'] == 'Sbj_Classification':
 
@@ -930,25 +1016,23 @@ def test(
         batch_size:int,
         not_finetuned:bool=False,
         task:str='QA',
+        n_domains:int=6,
         input_sequence:str='question_context',
+        sequential_transfer:bool=False,
+        inference_strategy:str=None,
 ):
     n_steps = len(test_dl)
     n_examples = n_steps * batch_size
     distilbert_hidden_size = 768
-
-    # set model to eval mode
-    model.eval()
-       
+    
+    #################
     ### Inference ###
+    #################
 
-    try:
-      assert model.qa_head.fc_qa.weight.size(1) == distilbert_hidden_size
-      assert model.qa_head.fc_qa.in_features == distilbert_hidden_size
-    except AssertionError:
-      with torch.no_grad():
-        model.qa_head.fc_qa.weight = nn.Parameter(model.qa_head.fc_qa.weight[:, :distilbert_hidden_size])
-        model.qa_head.fc_qa.in_features = distilbert_hidden_size
- 
+    model.eval()
+
+    ### INITIALISE LOSS FUNCTION FOR RESPECTIVE TASK ###
+
     if task == 'QA':
       correct_answers_test = 0
       loss_func = nn.CrossEntropyLoss()
@@ -960,19 +1044,25 @@ def test(
     elif task == 'Domain_Classification':
       batch_acc_test = 0
       loss_func = nn.CrossEntropyLoss()
+
+    ###################################################
     
     batch_f1_test = 0
     test_f1, test_loss = 0, 0
     nb_test_steps, nb_test_examples = 0, 0
 
-    for batch in test_dl:
-       
-        batch_loss_test = 0
-
-        # move tensors in batch to current device (e.g., GPU)
+    for n, batch in enumerate(test_dl):
+        # move all tensors in batch to current device (e.g., GPU)
         batch = tuple(t.to(device) for t in batch)
+
+        batch_loss_test = 0
         
-        if task == 'QA':
+        ### UNPACK INPUTS FROM MINI-BATCH FOR RESPECTIVE TASK ###
+
+        if task == 'QA' and sequential_transfer:
+          b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_sbj, b_domains = batch
+
+        elif task == 'QA' and not sequential_transfer:
           b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _ = batch
 
         elif task == 'Sbj_Classification':
@@ -985,7 +1075,13 @@ def test(
         elif task == 'Domain_Classification':
           b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _,  _, b_domains = batch
 
-        # if current batch_size is smaller than specified batch_size, skip batch (number of examples in last batch might not be equal to batch_size)
+        else:
+          raise ValueError('Incorrect task name provided')
+
+        ##########################################################
+
+        ## NOTE: number of examples in last mini-batch might not be equal to batch_size ##
+        ## if the latter is the case and number of examples in current batch is smaller than specified batch_size, skip batch ##
         if b_input_ids.size(0) != batch_size:
             continue
 
@@ -995,16 +1091,93 @@ def test(
                   start_logits_test, end_logits_test = model(
                                                              input_ids=b_input_ids,
                                                              attention_mask=b_attn_masks,
-                                                             )
-              else:  
-                  start_logits_test, end_logits_test = model(
-                                                           input_ids=b_input_ids,
-                                                           attention_masks=b_attn_masks,
-                                                           token_type_ids=b_token_type_ids,
-                                                           input_lengths=b_input_lengths,
-                                                           task='QA',
-                                                           )
+                  )
+              else:
+                if sequential_transfer:
+                  if inference_strategy == 'oracle':
+                    # inform model about true labels for auxiliary tasks
+                    one_hot_domains = to_cat(true_labels=b_domains, n_labels=n_domains)
+                    b_sbj = b_sbj.type_as(one_hot_domains)
+                    b_aux_hard_targets = torch.cat((b_sbj, one_hot_domains), dim=1)
 
+                    # perform QA task with hard targets from both auxiliary tasks as additional information about question-context sequence pair
+                    start_logits_test, end_logits_test = model(
+                                                               input_ids=b_input_ids,
+                                                               attention_masks=b_attn_masks,
+                                                               token_type_ids=b_token_type_ids,
+                                                               input_lengths=b_input_lengths,
+                                                               task='QA',
+                                                               aux_targets=b_aux_hard_targets,
+                    )
+                  elif inference_strategy == 'soft_targets':
+                      # perform subjectivity classification task
+                      sbj_logits_a, sbj_logits_q = model( 
+                                                         input_ids=b_input_ids,
+                                                         attention_masks=b_attn_masks,
+                                                         token_type_ids=b_token_type_ids,
+                                                         input_lengths=b_input_lengths,
+                                                         task='Sbj_Class',
+                                                        )
+                        
+                      # pass model's raw (sbj) output logits through sigmoid function to yield probability scores
+                      sbj_probas = torch.stack((torch.sigmoid(sbj_logits_a), torch.sigmoid(sbj_logits_q)), dim=1)
+
+                      # perform context-domain classification task
+                      domain_logits = model(
+                                            input_ids=b_input_ids,
+                                            attention_masks=b_attn_masks,
+                                            token_type_ids=b_token_type_ids,
+                                            input_lengths=b_input_lengths,
+                                            task='Domain_Class',
+                                            )
+                      # pass model's raw (context-domain) output logits through softmax function to yield probability distribution over domain classes 
+                      soft_domains = F.softmax(domain_logits, dim=1)
+
+                      # create mini-batch of soft targets for both auxiliary tasks
+                      b_aux_soft_targets = torch.cat((sbj_probas, soft_domains), dim=1)
+
+                      # perform QA task with soft targets from both auxiliary tasks as additional information about question-context sequence pair
+                      start_logits_test, end_logits_test = model(
+                                                                input_ids=b_input_ids,
+                                                                attention_masks=b_attn_masks,
+                                                                token_type_ids=b_token_type_ids,
+                                                                input_lengths=b_input_lengths,
+                                                                task='QA',
+                                                                aux_targets=b_aux_soft_targets,
+                                                                )
+                  elif inference_strategy == 'no_aux_targets':
+
+                      ### make sure model does not constain weights for soft targets from auxiliary tasks ###
+
+                      if n == 0:
+                          try:
+                              assert model.qa_head.fc_qa.weight.size(1) == distilbert_hidden_size
+                          except AssertionError:
+                              model.qa_head.fc_qa.weight = nn.Parameter(model.qa_head.fc_qa.weight[:, :distilbert_hidden_size])
+                              model.qa_head.fc_qa.in_features = distilbert_hidden_size
+
+                      ########################################################################################
+
+                      # perform QA task without any additional information about auxiliary tasks at test time
+                      start_logits_test, end_logits_test = model(
+                                                                 input_ids=b_input_ids,
+                                                                 attention_masks=b_attn_masks,
+                                                                 token_type_ids=b_token_type_ids,
+                                                                 input_lengths=b_input_lengths,
+                                                                 task='QA',
+                                                                 )
+                  else:
+                    raise ValueError('Incorrect name for inference strategy in sequential transfer setting provided.')
+                else:
+                    start_logits_test, end_logits_test = model(
+                                                               input_ids=b_input_ids,
+                                                               attention_masks=b_attn_masks,
+                                                               token_type_ids=b_token_type_ids,
+                                                               input_lengths=b_input_lengths,
+                                                               task='QA',
+                                                               )
+
+              # move true start and end positions of answer span to CPU
               start_true_test = to_cpu(b_start_pos)
               end_true_test = to_cpu(b_end_pos)
 
@@ -1126,21 +1299,20 @@ def test(
    
     return test_loss, test_acc, test_f1
 
-
 def train_all(
-        model,
-        tokenizer,
-        train_dl,
-        val_dl,
-        batch_size:int,
-        args:dict,
-        train_dl_sbj=None,
-        val_dl_sbj=None,
-        early_stopping:bool=True,
-        qa_type_weights=None,
-        domain_weights=None,
-        max_epochs:int=4,
-        adversarial_simple:bool=False,
+              model,
+              tokenizer,
+              train_dl,
+              val_dl,
+              batch_size:int,
+              args:dict,
+              train_dl_sbj=None,
+              val_dl_sbj=None,
+              early_stopping:bool=True,
+              qa_type_weights=None,
+              domain_weights=None,
+              max_epochs:int=4,
+              adversarial_simple:bool=False,
 ):
     n_iters = args['n_steps'] * args['n_epochs']
     n_examples = args['n_steps'] * batch_size
@@ -1221,7 +1393,7 @@ def train_all(
         model.train()
 
         # for each task initialize a separate optimizer
-        optimizer = create_optimizer(model=model, task=task, lr=args['lr_adam'])
+        optimizer = create_optimizer(model=model, task=task, eta=args['lr_adam'])
 
         if i > 0:
             scheduler = get_linear_schedule_with_warmup(
@@ -1277,32 +1449,49 @@ def train_all(
                 
                 batch = tuple(t.to(device) for t in batch)
         
-                # set loss back to 0 after an iteration
-                batch_loss = 0                        
+                # set loss back to 0 after every iteration
+                batch_loss = 0                       
 
                 if task == 'QA':
                     # make sure, we are not in eval mode when fine-tuning on QA
                     assert eval_round == False
 
-                    # after each training iteration, zero-out gradients
-                    optimizer_qa.zero_grad()
+                    # after each training step, zero-out gradients
+                    optimizer.zero_grad()
 
                     # unpack inputs from dataloader for main task           
                     b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _ = batch
 
-                    b_sbj_logits = sbj_logits_all[step]
-                    b_domain_logits = domain_logits_all[step]
-                    b_aux_logits = torch.cat((b_sbj_logits, b_domain_logits), dim=1)
+                    if args['training_regime'] == 'oracle':
+                        # inform model about true labels corresponding to auxiliary tasks
+                        one_hot_domains = to_cat(true_labels=b_domains, n_labels=args['n_domains'])
+                        b_sbj = b_sbj.type_as(one_hot_domains)
+                        b_aux_hard_targets = torch.cat((b_sbj, one_hot_domains), dim=1)
 
-                    # perform QA task
-                    start_logits, end_logits = model(
-                                                     input_ids=b_input_ids,
-                                                     attention_masks=b_attn_masks,
-                                                     token_type_ids=b_token_type_ids,
-                                                     input_lengths=b_input_lengths,
-                                                     task=task,
-                                                     aux_logits=b_aux_logits,
-                    )
+                        # perform QA task with hard targets from both auxiliary tasks as additional information about any (q, c) sequence pair
+                        start_logits, end_logits = model(
+                                               input_ids=b_input_ids,
+                                               attention_masks=b_attn_masks,
+                                               token_type_ids=b_token_type_ids,
+                                               input_lengths=b_input_lengths,
+                                               task='QA',
+                                               aux_targets=b_aux_hard_targets,
+                        )
+
+                    elif args['training_regime'] == 'soft_targets':
+                        b_sbj_scores = sbj_logits_all[step]
+                        b_soft_domains = domain_logits_all[step]
+                        b_aux_soft_targets = torch.cat((b_sbj_scores, b_soft_domains), dim=1)
+
+                        # perform QA task with soft targets from both auxiliary tasks as additional information about any (q, c) sequence pair
+                        start_logits, end_logits = model(
+                                                         input_ids=b_input_ids,
+                                                         attention_masks=b_attn_masks,
+                                                         token_type_ids=b_token_type_ids,
+                                                         input_lengths=b_input_lengths,
+                                                         task=task,
+                                                         aux_targets=b_aux_soft_targets,
+                        )
 
                     # start and end loss must be computed separately and then averaged
                     start_loss = qa_loss_func(start_logits, b_start_pos)
@@ -1373,8 +1562,9 @@ def train_all(
                                 # store probability scores for each mini-batch of input sequences
                                 sbj_logits_all.append(torch.stack((torch.sigmoid(sbj_logits_a), torch.sigmoid(sbj_logits_q)), dim=1))
                         else:
-                            # after each training iteration, zero-out gradients
-                            optimizer_sbj.zero_grad()
+                            # after each training step, zero-out gradients
+                            optimizer.zero_grad()
+
                             # perform subjectivity classification task
                             sbj_logits_a, sbj_logits_q = model( 
                                                                input_ids=b_input_ids,
@@ -1423,8 +1613,9 @@ def train_all(
                                 # to yield probability distribution over classes and store those probability scores for each batch
                                 domain_logits_all.append(F.softmax(domain_logits, dim=1))
                         else:
-                            # after each training iteration, zero-out gradients
-                            optimizer_dom.zero_grad()
+                            # after each training step, zero-out gradients
+                            optimizer.zero_grad()
+
                             # perform context-domain classification task
                             domain_logits = model(
                                                   input_ids=b_input_ids,
@@ -1490,14 +1681,15 @@ def train_all(
 
                     # take step down the valley w.r.t. current task
                     optimizer.step()
+
+                    # decrease learning rate linearly for all tasks but the first
                     if i > 0:
                       scheduler.step()
 
                     if args['n_evals'] == 'multiple_per_epoch':
                         if step > 0 and step % steps_until_eval == 0:
-                            
-                            if task == 'QA':
-                                # save model's current weights for auxiliary logits (we evaluate model without aux logits)
+                            if task == 'QA' and args['evaluation_strategy'] == 'no_aux_targets':
+                                # save model's current weights for aux targets (we evaluate model without information about aux targets)
                                 current_aux_weights = model.qa_head.fc_qa.weight[:, 768:]
                             
                             val_losses, val_accs, val_f1s, model = val(
@@ -1512,12 +1704,14 @@ def train_all(
                                                                        val_accs=val_accs,
                                                                        val_f1s=val_f1s,
                                                                        loss_func=loss_func,
+                                                                       sequential_transfer=True,
+                                                                       evaluation_strategy=args['evaluation_strategy'],
+
                             )
-                            if task == 'QA':
+                            if task == 'QA' and args['evaluation_strategy'] == 'no_aux_targets':
                                 with torch.no_grad():
                                     model.qa_head.fc_qa.in_features += add_features
-                                    model.qa_head.fc_qa.weight = nn.Parameter(torch.cat((model.qa_head.fc_qa.weight,
-                                                                                         current_aux_weights.to(device)), 1))
+                                    model.qa_head.fc_qa.weight = nn.Parameter(torch.cat((model.qa_head.fc_qa.weight, current_aux_weights.to(device)), 1))
 
                             ## we want to store train exact-match accuracies and F1 scores for each task
                             ## as often as we evaluate model on validation set
@@ -1557,19 +1751,30 @@ def train_all(
                 print()
         
                 if args['n_evals'] == 'one_per_epoch':
+                    if task == 'QA' and args['evaluation_strategy'] == 'no_aux_targets':
+                        # save model's current weights for aux targets (we evaluate model without information about aux targets)
+                        current_aux_weights = model.qa_head.fc_qa.weight[:, 768:]
+                            
                     val_losses, val_accs, val_f1s, model = val(
-                                                                model=model,
-                                                                tokenizer=tokenizer,
-                                                                val_dl=val_dl,
-                                                                args=args,
-                                                                current_step=step,
-                                                                epoch=epoch,
-                                                                batch_size=batch_size,
-                                                                val_losses=val_losses,
-                                                                val_accs=val_accs,
-                                                                val_f1s=val_f1s,
-                                                                loss_func=loss_func,
-                                                    )
+                                                               model=model,
+                                                               tokenizer=tokenizer,
+                                                               val_dl=val_dl,
+                                                               args=args,
+                                                               current_step=step,
+                                                               epoch=epoch,
+                                                               batch_size=batch_size,
+                                                               val_losses=val_losses,
+                                                               val_accs=val_accs,
+                                                               val_f1s=val_f1s,
+                                                               loss_func=loss_func,
+                                                               sequential_transfer=True,
+                                                               evaluation_strategy=args['evaluation_strategy'],
+                                                               )
+
+                    if task == 'QA' and args['evaluation_strategy'] == 'no_aux_targets':
+                        with torch.no_grad():
+                            model.qa_head.fc_qa.in_features += add_features
+                            model.qa_head.fc_qa.weight = nn.Parameter(torch.cat((model.qa_head.fc_qa.weight, current_aux_weights.to(device)), 1))
 
                     ## we want to store train exact-match accuracies and F1 scores for each task
                     ## as often as we evaluate model on validation set
@@ -1589,7 +1794,7 @@ def train_all(
                             val_accs_all_tasks.append(val_accs)
                             val_f1s_all_tasks.append(val_f1s)
 
-                        if task == 'Sbj_Class' or task == 'Domain_Class':
+                        if args['training_regime'] == 'soft_targets' and (task == 'Sbj_Class' or task == 'Domain_Class'):
                             model.eval()
                             eval_round = True
                             seq_pair = '(q, a)' if args['batch_presentation'] == 'alternating' and task == 'Sbj_Class' else '(q, c)'
@@ -1610,7 +1815,7 @@ def train_all(
                         val_accs_all_tasks.append(val_accs)
                         val_f1s_all_tasks.append(val_f1s)
 
-                        if task == 'Sbj_Class' or task == 'Domain_Class':
+                        if args['training_regime'] == 'soft_targets' and (task == 'Sbj_Class' or task == 'Domain_Class'):
                             model.eval()
                             eval_round = True
                             seq_pair = '(q, a)' if args['batch_presentation'] == 'alternating' and task == 'Sbj_Class' else '(q, c)'

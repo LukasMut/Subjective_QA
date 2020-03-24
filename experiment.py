@@ -41,8 +41,12 @@ if __name__ == '__main__':
             help='If provided, perform domain classification (multi-class) instead of QA.')
     parser.add_argument('--multitask', action='store_true',
             help='If provided, MTL instead of STL setting.')
-    parser.add_argument('--sequential_finetuning', action='store_true',
+    parser.add_argument('--sequential_transfer', action='store_true',
             help='If provided, model will be fine-tuned sequentially on all tasks until convergence.')
+    parser.add_argument('--sequential_transfer_training', type=str, default=None,
+            help='Required in sequential transfer setting. Must be one of {"oracle", "soft_targets"}.')
+    parser.add_argument('--sequential_transfer_evaluation', type=str, default=None,
+            help='Required in sequential transfer setting. Must be one of {"oracle", "soft_targets", "no_aux_targets"}.')
     parser.add_argument('--mtl_setting', type=str, default=None,
         help='If "domain_only", only domain classification will be performed in any MTL setting.')
     parser.add_argument('--batches', type=str, default='normal',
@@ -134,7 +138,7 @@ if __name__ == '__main__':
     highway = 'Highway' if args.highway_connection else ''
     train_method = 'multitask' + '_' + str(args.n_aux_tasks) if args.multitask else 'singletask'
     eval_setup = args.n_evals
-    sequential_finetuning = 'finetune_all' if args.sequential_finetuning else ''
+    sequential_transfer = 'sequential_transfer' if args.sequential_transfer else ''
 
     if args.sbj_classification:
         task = 'Sbj_Class'
@@ -152,7 +156,7 @@ if __name__ == '__main__':
     else:
         training = args.adversarial if args.adversarial == 'GRL' else 'adv' + args.adversarial
 
-    model_name = 'DistilBERT' + '_' + encoding + '_' + highway + '_' + train_method + '_' + batch_presentation + '_' + training + '_' + dataset + '_' + eval_setup + '_' + task + '_' + mtl_setting + '_' + sampling_strategy + '_' + sequential_finetuning
+    model_name = 'DistilBERT' + '_' + encoding + '_' + highway + '_' + train_method + '_' + batch_presentation + '_' + training + '_' + dataset + '_' + eval_setup + '_' + task + '_' + mtl_setting + '_' + sampling_strategy + '_' + sequential_transfer
     model_name = model_name.lower()
     
     if args.version == 'train':
@@ -238,7 +242,7 @@ if __name__ == '__main__':
 
             n_steps = len(train_dl)
 
-            if args.multitask or args.sequential_finetuning:
+            if args.multitask or args.sequential_transfer:
 
                 if args.batches == 'alternating':
                     
@@ -251,7 +255,7 @@ if __name__ == '__main__':
                                                   sort_batch=sort_batch,
                                                   )
                     
-                    if args.sequential_finetuning:
+                    if args.sequential_transfer:
                         subjqa_tensor_dataset_dev_aux_sbj = create_tensor_dataset(subjqa_features_dev, aux_sbj_batch=True)
 
                         val_dl_sbj = BatchGenerator(
@@ -265,7 +269,7 @@ if __name__ == '__main__':
                 if args.multitask:
                     assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
                 
-                if args.n_aux_tasks == 2 or args.sequential_finetuning:
+                if args.n_aux_tasks == 2 or args.sequential_transfer:
                     subjqa_domains = [f.domain for f in subjqa_features_train]
                     domain_weights = get_class_weights(
                                                        subjqa_classes=subjqa_domains,
@@ -514,7 +518,7 @@ if __name__ == '__main__':
 
             n_steps = len(train_dl)
 
-            if args.multitask or args.sequential_finetuning:
+            if args.multitask or args.sequential_transfer:
 
                 if args.batches == 'alternating':
 
@@ -527,7 +531,7 @@ if __name__ == '__main__':
                                                   sort_batch=sort_batch,
                                                   )
                     
-                    if args.sequential_finetuning:
+                    if args.sequential_transfer:
                         combined_tensor_dataset_dev_aux_sbj = create_tensor_dataset(subjqa_features_dev, aux_sbj_batch=True)
 
                         val_dl_sbj = BatchGenerator(
@@ -541,7 +545,7 @@ if __name__ == '__main__':
                 if args.multitask:  
                     assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
                 
-                if args.n_aux_tasks == 2 or args.sequential_finetuning:
+                if args.n_aux_tasks == 2 or args.sequential_transfer:
                     
                     squad_domains = [f.domain for f in squad_features_train]
                     subjqa_domains = [f.domain for f in subjqa_features_train]
@@ -638,7 +642,7 @@ if __name__ == '__main__':
             task = 'Sbj_Classification'
         elif args.domain_classification:
             task = 'Domain_Classification'
-        elif args.sequential_finetuning:
+        elif args.sequential_transfer:
             task = 'all'
         else:
             task = 'QA'
@@ -664,11 +668,6 @@ if __name__ == '__main__':
                   "max_grad_norm": 1.0, # TODO: might it beneficial to modify max_grad_norm per task?
         }
 
-        if args.sequential_finetuning:
-            hypers["task"] = ''
-        else:
-            hypers["task"] = task
-
         hypers["max_seq_length"] = max_seq_length
         hypers["n_epochs"] = args.n_epochs
         hypers["n_steps"] = n_steps
@@ -688,6 +687,17 @@ if __name__ == '__main__':
         hypers["model_name"] = model_name
         hypers["dataset"] = args.finetuning
         
+        if args.sequential_transfer:
+            hypers["task"] = ''
+            hypers["sequential_transfer"] = True
+            assert isinstance(args.sequential_transfer_training, str)
+            hypers["training_regime"] = args.sequential_transfer_training
+            assert isinstance(args.sequential_transfer_evaluation, str)
+            hypers["evaluation_strategy"] = args.sequential_transfer_evaluation
+        else:
+            hypers["task"] = task
+            hypers["sequential_transfer"] = False
+        
         t_total = n_steps * hypers['n_epochs'] # total number of training steps (i.e., step = iteration)
         hypers["t_total"] = t_total
             
@@ -696,7 +706,7 @@ if __name__ == '__main__':
 
         if isinstance(args.n_aux_tasks, type(None)) and args.sbj_classification:
 
-            optimizer_sbj = create_optimizer(model=model, task='sbj_class', lr=args['lr_adam'])
+            optimizer_sbj = create_optimizer(model=model, task='sbj_class', eta=hypers['lr_adam'])
 
             scheduler_sbj = get_linear_schedule_with_warmup(
                                                             optimizer_sbj, 
@@ -726,7 +736,7 @@ if __name__ == '__main__':
 
         elif isinstance(args.n_aux_tasks, type(None)) and args.domain_classification:
 
-            optimizer_dom = create_optimizer(model=model, task='domain_class', lr=args['lr_adam'])
+            optimizer_dom = create_optimizer(model=model, task='domain_class', eta=hypers['lr_adam'])
 
             scheduler_dom = get_linear_schedule_with_warmup(
                                                             optimizer_dom, 
@@ -754,9 +764,9 @@ if __name__ == '__main__':
                                                                                             adversarial_simple=False,
             )
 
-        elif isinstance(args.n_aux_tasks, type(None)) and not args.sequential_finetuning:
+        elif isinstance(args.n_aux_tasks, type(None)) and not args.sequential_transfer:
 
-            optimizer_qa = create_optimizer(model=model, task='QA', lr=args['lr_adam'])
+            optimizer_qa = create_optimizer(model=model, task='QA', eta=hypers['lr_adam'])
 
             scheduler_qa = get_linear_schedule_with_warmup(
                                                            optimizer_qa, 
@@ -787,7 +797,7 @@ if __name__ == '__main__':
 
         elif args.n_aux_tasks == 1:
 
-            optimizer_qa = create_optimizer(model=model, task='QA', lr=args['lr_adam'])
+            optimizer_qa = create_optimizer(model=model, task='QA', eta=hypers['lr_adam'])
 
             scheduler_qa = get_linear_schedule_with_warmup(
                                                            optimizer_qa, 
@@ -795,7 +805,7 @@ if __name__ == '__main__':
                                                            num_training_steps=t_total,
             )
 
-            optimizer_sbj = create_optimizer(model=model, task='sbj_class', lr=args['lr_adam'])
+            optimizer_sbj = create_optimizer(model=model, task='sbj_class', eta=hypers['lr_adam'])
             
             scheduler_sbj = get_linear_schedule_with_warmup(
                                                             optimizer_sbj, 
@@ -826,9 +836,9 @@ if __name__ == '__main__':
             train_results['batch_accs_sbj'] = batch_accs_sbj
             train_results['batch_f1s_sbj'] = batch_f1s_sbj
         
-        elif args.n_aux_tasks == 2 or args.sequential_finetuning:
+        elif args.n_aux_tasks == 2 or args.sequential_transfer:
 
-            optimizer_qa = create_optimizer(model=model, task='QA', lr=args['lr_adam'])
+            optimizer_qa = create_optimizer(model=model, task='QA', eta=hypers['lr_adam'])
 
             scheduler_qa = get_linear_schedule_with_warmup(
                                                            optimizer_qa, 
@@ -836,7 +846,7 @@ if __name__ == '__main__':
                                                            num_training_steps=t_total,
             )
 
-            optimizer_sbj = create_optimizer(model=model, task='sbj_class', lr=args['lr_adam'])
+            optimizer_sbj = create_optimizer(model=model, task='sbj_class', eta=hypers['lr_adam'])
             
             scheduler_sbj = get_linear_schedule_with_warmup(
                                                             optimizer_sbj, 
@@ -844,7 +854,7 @@ if __name__ == '__main__':
                                                             num_training_steps=t_total,
             )
             
-            optimizer_dom = create_optimizer(model=model, task='domain_class', lr=args['lr_adam'])
+            optimizer_dom = create_optimizer(model=model, task='domain_class', eta=hypers['lr_adam'])
 
             scheduler_dom = get_linear_schedule_with_warmup(
                                                             optimizer_dom, 
@@ -866,15 +876,15 @@ if __name__ == '__main__':
                                                                                                                                                                         optimizer_sbj=optimizer_sbj,
                                                                                                                                                                         optimizer_dom=optimizer_dom,
                                                                                                                                                                         scheduler_qa=scheduler_qa,
-                                                                                                                                                                        scheduler_sbj=scheduler_sbj,
-                                                                                                                                                                        scheduler_dom=scheduler_dom,
+                                                                                                                                                                        scheduler_sbj=None, #scheduler_sbj,
+                                                                                                                                                                        scheduler_dom=None, ##scheduler_dom,
                                                                                                                                                                         early_stopping=True,
                                                                                                                                                                         qa_type_weights=qa_type_weights,
                                                                                                                                                                         domain_weights=domain_weights,
                                                                                                                                                                         adversarial_simple=True if args.adversarial == 'simple' else False,
                 )
 
-            elif args.sequential_finetuning:
+            elif args.sequential_transfer:
 
                 batch_losses, batch_accs, batch_f1s, batch_accs_sbj, batch_f1s_sbj, batch_accs_domain, batch_f1s_domain, val_losses, val_accs, val_f1s, model =  train_all(
                                                                                                                                                                             model=model,
@@ -965,10 +975,10 @@ if __name__ == '__main__':
                                     )
 
             if args.sbj_classification:
-                task =  'Sbj_Classification'
+                task = 'Sbj_Classification'
             elif args.domain_classification:
                 task = 'Domain_Classification'
-            elif args.sequential_finetuning:
+            elif args.sequential_transfer:
                 task = 'all'
             else:
                 task = 'QA'
@@ -1003,16 +1013,18 @@ if __name__ == '__main__':
                 model.load_state_dict(torch.load(args.sd + '/%s' % (model_name)))
                 # set model to device
                 model.to(device)
-                                                                 
-            
+
             test_loss, test_acc, test_f1 = test(
                                                 model=model,
                                                 tokenizer=bert_tokenizer,
                                                 test_dl=test_dl,
                                                 batch_size=batch_size,
                                                 not_finetuned=args.not_finetuned,
-                                                task= task,
-                                                input_sequence= 'question_answer' if args.batches == 'alternating' else 'question_context', 
+                                                task=task,
+                                                n_domains=n_domain_labels,
+                                                input_sequence= 'question_answer' if args.batches == 'alternating' else 'question_context',
+                                                sequential_transfer = args.sequential_transfer,
+                                                inference_strategy = args.sequential_transfer_evaluation,
             )
             
             test_results = dict()

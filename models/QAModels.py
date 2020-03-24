@@ -77,7 +77,7 @@ class DistilBertForQA(DistilBertPreTrainedModel):
                 attention_masks:torch.Tensor,
                 token_type_ids:torch.Tensor,
                 task:str,
-                aux_logits=None,
+                aux_targets=None,
                 position_ids=None,
                 head_mask=None,
                 inputs_embeds=None,
@@ -98,7 +98,7 @@ class DistilBertForQA(DistilBertPreTrainedModel):
                                 distilbert_output=distilbert_output,
                                 seq_lengths=input_lengths,
                                 task=task,
-                                aux_logits=aux_logits,
+                                aux_targets=aux_targets,
                                 start_positions=start_positions,
                                 end_positions=end_positions,
             )
@@ -106,7 +106,7 @@ class DistilBertForQA(DistilBertPreTrainedModel):
             return self.qa_head(
                                 distilbert_output=distilbert_output,
                                 task=task,
-                                aux_logits=aux_logits,
+                                aux_targets=aux_targets,
                                 start_positions=start_positions,
                                 end_positions=end_positions,
             )

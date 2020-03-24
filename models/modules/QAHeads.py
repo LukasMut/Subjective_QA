@@ -93,7 +93,7 @@ class LinearQAHead(nn.Module):
                 self,
                 distilbert_output:torch.Tensor,
                 task:str,
-                aux_logits=None,
+                aux_targets=None,
                 start_positions=None,
                 end_positions=None,
     ):
@@ -105,17 +105,17 @@ class LinearQAHead(nn.Module):
        
         if task == 'QA':
 
-            if isinstance(aux_logits, torch.Tensor):
+            if isinstance(aux_targets, torch.Tensor):
                 
-                def concat_embeds_logits(seq_out:torch.Tensor, aux_logits:torch.Tensor):
+                def concat_embeds_logits(seq_out:torch.Tensor, aux_targets:torch.Tensor):
                     seqs_cat_logits = []
-                    assert seq_out.size(0) == aux_logits.size(0)
-                    for b, seq in enumerate(seq_out):
-                        seq_cat_logits = [torch.cat((seq[t], aux_logits[b])).detach().cpu().numpy().tolist() for t, _ in enumerate(seq)]
+                    assert seq_out.size(0) == aux_targets.size(0)
+                    for n, seq in enumerate(seq_out):
+                        seq_cat_logits = [torch.cat((seq[t], aux_targets[n])).detach().cpu().numpy().tolist() for t, _ in enumerate(seq)]
                         seqs_cat_logits.append(seq_cat_logits)
                     return torch.tensor(seqs_cat_logits, requires_grad=True).to(device)
 
-                sequence_output = concat_embeds_logits(sequence_output, aux_logits) 
+                sequence_output = concat_embeds_logits(sequence_output, aux_targets) 
 
             logits = self.fc_qa(sequence_output)
             start_logits, end_logits = logits.split(1, dim=-1)
@@ -285,7 +285,7 @@ class RecurrentQAHead(nn.Module):
                 distilbert_output:torch.Tensor,
                 seq_lengths:torch.Tensor,
                 task:str,
-                aux_logits=None,
+                aux_targets=None,
                 start_positions=None,
                 end_positions=None,
     ):
