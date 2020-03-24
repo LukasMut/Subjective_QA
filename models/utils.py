@@ -270,7 +270,6 @@ def train(
       batch_accs_domain, batch_f1s_domain = [], []
       loss_func = domain_loss_func
 
-    # generate random sample over all tasks (TODO: for MTL setting with 2 auxiliary tasks, we might want to sample QA task with a higher probability than auxiliary tasks)
     if isinstance(n_aux_tasks, type(None)) or args['task_sampling'] == 'uniform' or args['task'] in ['Sbj_Classification', 'Domain_Classification']:
       distrib = [1/len(tasks) for _ in tasks]
       

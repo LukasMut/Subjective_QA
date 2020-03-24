@@ -643,7 +643,6 @@ if __name__ == '__main__':
                                                    )
 
         # initialise QA model
-
         if args.sbj_classification:
             task = 'Sbj_Classification'
         elif args.domain_classification:
@@ -682,6 +681,7 @@ if __name__ == '__main__':
         hypers["task_sampling"] = args.task_sampling
         hypers["mtl_setting"] = args.mtl_setting
         hypers["n_qa_labels"] = 2
+        hypers["n_domains"] = n_domain_labels
 
         if args.n_evals == 'multiple_per_epoch':
             hypers["n_evals_per_epoch"] = 10 # number of times we evaluate model on dev set per epoch (not necessary, if we just evaluate once after an epoch)
