@@ -1659,7 +1659,7 @@ def train_all(
 
                     # decrease learning rate linearly for all tasks but the first
                     if i > 0:
-                      scheduler.step()
+                        scheduler.step()
 
                     # after each training step, zero-out gradients
                     optimizer.zero_grad()
@@ -1667,7 +1667,7 @@ def train_all(
                     if args['n_evals'] == 'multiple_per_epoch':
                         if step > 0 and step % steps_until_eval == 0:
                             if task == 'QA' and args['evaluation_strategy'] == 'no_aux_targets':
-                                # save model's current weights for aux targets (we evaluate model without information about aux targets)
+                                # save model's current weights for aux targets (in current setting, we evaluate model without information about aux targets)
                                 current_aux_weights = model.qa_head.fc_qa.weight[:, 768:]
                             
                             val_losses, val_accs, val_f1s, model = val(
@@ -1691,8 +1691,8 @@ def train_all(
                                     model.qa_head.fc_qa.in_features += add_features
                                     model.qa_head.fc_qa.weight = nn.Parameter(torch.cat((model.qa_head.fc_qa.weight, current_aux_weights.to(device)), 1))
 
-                            ## we want to store train exact-match accuracies and F1 scores for each task
-                            ## as often as we evaluate model on validation set
+                            # we want to store train exact-match accuracies and F1 scores for each task
+                            # as often as we evaluate model on validation set
                             running_tasks = tasks[:]
                 
                             # after evaluation on dev set, set model back to train mode
@@ -1754,8 +1754,8 @@ def train_all(
                             model.qa_head.fc_qa.in_features += add_features
                             model.qa_head.fc_qa.weight = nn.Parameter(torch.cat((model.qa_head.fc_qa.weight, current_aux_weights.to(device)), 1))
 
-                    ## we want to store train exact-match accuracies and F1 scores for each task
-                    ## as often as we evaluate model on validation set
+                    # we want to store train exact-match accuracies and F1 scores for each task
+                    # as often as we evaluate model on validation set
                     running_tasks = tasks[:]
                     
                     # after evaluation on dev set, move model back to train mode
