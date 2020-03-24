@@ -1318,15 +1318,16 @@ def train_all(
     n_examples = args['n_steps'] * batch_size
 
     # make sure, we fine-tune for max. 3 epochs (last epoch is eval round to store model's output logits for aux tasks)
-    try:
-        assert args['n_epochs'] == max_epochs
-    except AssertionError:
-        args['n_epochs'] = max_epochs
+    if args['training_regime'] == 'soft_targets':
+      try:
+          assert args['n_epochs'] == max_epochs
+      except AssertionError:
+          args['n_epochs'] = max_epochs
   
     if args['n_evals'] == 'multiple_per_epoch':
         steps_until_eval =  args['n_steps'] // args['n_evals_per_epoch'] # number of steps between validations
 
-    # freeze transformer layers for debugging
+    # freeze transformer layers for debugging on local machine
     if args['freeze_bert']:
         model_name = args['pretrained_model']
         model = freeze_transformer_layers(model, model_name=model_name, unfreeze=False)
@@ -1381,7 +1382,7 @@ def train_all(
         ###### ORACLE: concatenate true labels for auxiliary tasks with each contextual word embedding in any (q, c) sequence #######
         #############################################################################################################################
 
-        # TODO: figure out, whether this is the correct way to modify input_size and weights of a fc layer on the fly
+        #TODO: figure out, whether this is the correct way to modify input_size and weights of a fc layer on the fly
         if task == 'QA':
             if args['training_regime'] == 'soft_targets':
                 add_features = sbj_logits_all[0].size(1)
@@ -1404,10 +1405,10 @@ def train_all(
 
         if i > 0:
             scheduler = get_linear_schedule_with_warmup(
-                                                      optimizer, 
-                                                      num_warmup_steps=args['warmup_steps'], 
-                                                      num_training_steps=args['t_total'],
-                                                      )
+                                                        optimizer, 
+                                                        num_warmup_steps=args['warmup_steps'], 
+                                                        num_training_steps=args['t_total'],
+                                                        )
 
         eval_round = False
         stop_training = False

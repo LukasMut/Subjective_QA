@@ -138,7 +138,13 @@ if __name__ == '__main__':
     highway = 'Highway' if args.highway_connection else ''
     train_method = 'multitask' + '_' + str(args.n_aux_tasks) if args.multitask else 'singletask'
     eval_setup = args.n_evals
-    sequential_transfer = 'sequential_transfer' if args.sequential_transfer else ''
+    
+    if args.sequential_transfer:
+        sequential_transfer = 'sequential_transfer'
+        sequential_transfer += '_' + args.sequential_transfer_training
+        sequential_transfer += '_' + args.sequential_transfer_evaluation
+    else:
+        sequential_transfer= ''
 
     if args.sbj_classification:
         task = 'Sbj_Class'
