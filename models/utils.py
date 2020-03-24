@@ -1389,10 +1389,10 @@ def train_all(
                 model.qa_head.fc_qa.weight = nn.Parameter(torch.cat((model.qa_head.fc_qa.weight,
                                                                      torch.randn(add_features, args['n_qa_labels']).T.to(device)), 1))
 
-        # make sure, we fine-tune model on every task
+        # make sure we fine-tune model on every task
         model.train()
 
-        # for each task initialize a separate optimizer
+        # initialize task-specific optimizers on the fly
         optimizer = create_optimizer(model=model, task=task, eta=args['lr_adam'])
 
         if i > 0:
