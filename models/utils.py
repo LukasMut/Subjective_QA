@@ -322,7 +322,6 @@ def train(
               assert len(batch) == 2, 'In MTL, we must provide batches with different input sequences for the main and auxiliary task when alternating'
               main_batch = tuple(t.to(device) for t in batch[0])
               aux_sbj_batch = tuple(t.to(device) for t in batch[1])
-
             else:
               main_batch = tuple(t.to(device) for t in batch)
             
@@ -330,20 +329,7 @@ def train(
             current_task = task_order[step]
 
             # set loss back to 0 after each training iteration
-            batch_loss = 0            
-
-            """
-            if step > 0:
-              # zero-out gradients w.r.t. task
-              if task_order[step - 1] == 'QA':
-                optimizer_qa.zero_grad()
-
-              elif task_order[step - 1] == 'Sbj_Class':
-                optimizer_sbj.zero_grad()
-
-              elif task_order[step - 1] == 'Domain_Class':
-                optimizer_dom.zero_grad()
-            """
+            batch_loss = 0 
             
             if isinstance(n_aux_tasks, int):
               print('------------------------------------')
@@ -352,9 +338,6 @@ def train(
               print()
 
             if current_task == 'QA':
-
-              optimizer_qa.zero_grad()
-
               # unpack inputs from dataloader for main task           
               b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _ = main_batch
 
@@ -406,18 +389,13 @@ def train(
               print()
 
               if step > (steps_until_eval // 2):
-
                 if current_task in running_tasks:
                   batch_accs_qa.append(current_batch_acc)
                   batch_f1s_qa.append(current_batch_f1)
                   running_tasks.pop(running_tasks.index(current_task))
 
             else:
-
               if current_task == 'Sbj_Class':
-
-                optimizer_sbj.zero_grad()
-
                 if args['task'] == 'QA' and args['batch_presentation'] == 'alternating':
                   b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj = aux_sbj_batch
 
@@ -489,8 +467,6 @@ def train(
 
               elif current_task == 'Domain_Class':
 
-                optimizer_dom.zero_grad()
-
                 b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, _, b_domains = main_batch
 
                 domain_logits = model(
@@ -526,9 +502,7 @@ def train(
 
               # we don't want to save F1 scores and exact-match accuracies at the very beginning of training
               if step > (steps_until_eval // 2):
-
                 if current_task in running_tasks:
-
                   if current_task == 'Sbj_Class':
                     batch_accs_sbj.append(current_batch_acc_aux)
                     batch_f1s_sbj.append(current_batch_f1_aux)
@@ -565,19 +539,21 @@ def train(
             if current_task == 'QA':
               optimizer_qa.step()
               scheduler_qa.step()
+              optimizer_qa.zero_grad()
             
             elif current_task == 'Sbj_Class':
               optimizer_sbj.step()
               if not isinstance(scheduler_sbj, type(None)):
                 scheduler_sbj.step()
+              optimizer_sbj.zero_grad()
 
             elif current_task == 'Domain_Class':
               optimizer_dom.step()
               if not isinstance(scheduler_dom, type(None)):
                 scheduler_dom.step()
+              optimizer_dom.zero_grad()
 
             if args['n_evals'] == 'multiple_per_epoch':
-              
               if step > 0 and step % steps_until_eval == 0:
                 val_losses, val_accs, val_f1s, model = val(
                                                           model=model,
@@ -1376,12 +1352,12 @@ def train_all(
     for i, task in enumerate(tqdm(tasks, desc="Task")):
         
         ################################################ SEQUENTIAL TRANSFER ########################################################
-        ############## fine-tune model on every task sequentially (i.e., sequential transfer / soft-parameter sharing) ##############
+        ############## Fine-tune model on every task sequentially (i.e., sequential transfer / soft-parameter sharing) ##############
         ####### SOFT TARGETS: store model's auxiliary output logits for each mini-batch of input sequences after convergence ########
         ###### ORACLE: concatenate true labels for auxiliary tasks with each contextual word embedding in any (q, c) sequence #######
         #############################################################################################################################
 
-        #TODO: figure out, whether this is the correct way to modify input_size and weights of a fc layer on the fly
+        #TODO: figure out, whether this is the correct way to modify input_size and weights of a fc (output) layer on the fly
         if task == 'QA':
             if args['training_regime'] == 'soft_targets':
                 add_features = sbj_logits_all[0].size(1)
@@ -1463,9 +1439,6 @@ def train_all(
                     # make sure, we are not in eval mode when fine-tuning on QA
                     assert eval_round == False
 
-                    # after each training step, zero-out gradients
-                    optimizer.zero_grad()
-
                     # unpack inputs from dataloader for main task           
                     b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _ = batch
 
@@ -1501,8 +1474,8 @@ def train_all(
                         )
 
                     # start and end loss must be computed separately and then averaged
-                    start_loss = qa_loss_func(start_logits, b_start_pos)
-                    end_loss = qa_loss_func(end_logits, b_end_pos)
+                    start_loss = loss_func(start_logits, b_start_pos)
+                    end_loss = loss_func(end_logits, b_end_pos)
                     batch_loss += (start_loss + end_loss) / 2
 
                     start_log_probas = to_cpu(F.log_softmax(start_logits, dim=1), detach=False, to_numpy=False)
@@ -1569,9 +1542,6 @@ def train_all(
                                 # store probability scores for each mini-batch of input sequences
                                 sbj_logits_all.append(torch.stack((torch.sigmoid(sbj_logits_a), torch.sigmoid(sbj_logits_q)), dim=1))
                         else:
-                            # after each training step, zero-out gradients
-                            optimizer.zero_grad()
-
                             # perform subjectivity classification task
                             sbj_logits_a, sbj_logits_q = model( 
                                                                input_ids=b_input_ids,
@@ -1584,9 +1554,9 @@ def train_all(
                             b_sbj = b_sbj.type_as(sbj_logits)
 
                             if adversarial_simple:
-                                batch_loss -= sbj_loss_func(sbj_logits, b_sbj)
+                                batch_loss -= loss_func(sbj_logits, b_sbj)
                             else:
-                                batch_loss += sbj_loss_func(sbj_logits, b_sbj)
+                                batch_loss += loss_func(sbj_logits, b_sbj)
                                 
                             current_sbj_acc = 0
                             current_sbj_f1 = 0
@@ -1620,9 +1590,6 @@ def train_all(
                                 # to yield probability distribution over classes and store those probability scores for each batch
                                 domain_logits_all.append(F.softmax(domain_logits, dim=1))
                         else:
-                            # after each training step, zero-out gradients
-                            optimizer.zero_grad()
-
                             # perform context-domain classification task
                             domain_logits = model(
                                                   input_ids=b_input_ids,
@@ -1633,9 +1600,9 @@ def train_all(
                             )
 
                             if adversarial_simple:
-                                batch_loss -= domain_loss_func(domain_logits, b_domains)
+                                batch_loss -= loss_func(domain_logits, b_domains)
                             else:
-                                batch_loss += domain_loss_func(domain_logits, b_domains)
+                                batch_loss += loss_func(domain_logits, b_domains)
                                 
                             batch_acc_domain += accuracy(probas=F.log_softmax(domain_logits, dim=1), y_true=b_domains, task='multi-way')
                             batch_f1_domain += f1(probas=F.log_softmax(domain_logits, dim=1), y_true=b_domains, task='multi-way')
@@ -1683,6 +1650,7 @@ def train_all(
                         
                     # backpropagate error
                     batch_loss.backward()
+                    
                     # clip gradients if gradients become larger than predefined gradient norm
                     torch.nn.utils.clip_grad_norm_(model.parameters(), args["max_grad_norm"])
 
@@ -1692,6 +1660,9 @@ def train_all(
                     # decrease learning rate linearly for all tasks but the first
                     if i > 0:
                       scheduler.step()
+
+                    # after each training step, zero-out gradients
+                    optimizer.zero_grad()
 
                     if args['n_evals'] == 'multiple_per_epoch':
                         if step > 0 and step % steps_until_eval == 0:
