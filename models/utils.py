@@ -157,9 +157,9 @@ def create_optimizer(
   
     no_decay = ["bias", "LayerNorm.weight"]
     optim_grouped_parameters = [
-    {"params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay) and re.search(r'(bert|' + head + ')', n)],
+    {"params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay) and re.search(r'(' + 'bert' + '|' + head + ')', n)],
      "weight_decay": 0.0},
-    {"params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay) and re.search(r'(bert|' + head + ')', n)],
+    {"params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay) and re.search(r'(' + 'bert' + '|' + head + ')', n)],
      "weight_decay": 0.0},
     ]
   
@@ -1372,9 +1372,6 @@ def train_all(
                 model.qa_head.fc_qa.weight = nn.Parameter(torch.cat((model.qa_head.fc_qa.weight,
                                                                      torch.randn(add_features, args['n_qa_labels']).T.to(device)), 1))
 
-        # make sure we fine-tune model on every task
-        model.train()
-
         # initialize task-specific optimizers on the fly
         optimizer = create_optimizer(model=model, task=task, eta=args['lr_adam'])
 
@@ -1394,6 +1391,9 @@ def train_all(
         print()
 
         loss_func = loss_funcs[i]
+
+        # make sure we fine-tune model on every task
+        model.train()
 
         if task == 'Sbj_Class':
             if args['batch_presentation'] == 'alternating':
@@ -1454,7 +1454,7 @@ def train_all(
                                                          attention_masks=b_attn_masks,
                                                          token_type_ids=b_token_type_ids,
                                                          input_lengths=b_input_lengths,
-                                                         task='QA',
+                                                         task=task,
                                                          aux_targets=b_aux_hard_targets,
                                                          )
 
