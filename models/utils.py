@@ -1375,12 +1375,12 @@ def train_all(
         # initialize task-specific optimizers on the fly
         optimizer = create_optimizer(model=model, task=task, eta=args['lr_adam'])
 
-        if i > 0:
-            scheduler = get_linear_schedule_with_warmup(
-                                                        optimizer, 
-                                                        num_warmup_steps=args['warmup_steps'], 
-                                                        num_training_steps=args['t_total'],
-                                                        )
+        # if i > 0:
+        scheduler = get_linear_schedule_with_warmup(
+                                                    optimizer, 
+                                                    num_warmup_steps=args['warmup_steps'], 
+                                                    num_training_steps=args['t_total'],
+                                                    )
 
         eval_round = False
         stop_training = False
@@ -1658,8 +1658,8 @@ def train_all(
                     optimizer.step()
 
                     # decrease learning rate linearly for all tasks but the first
-                    if i > 0:
-                        scheduler.step()
+                    # if i > 0:
+                    scheduler.step()
 
                     # after each training step, zero-out gradients
                     optimizer.zero_grad()
