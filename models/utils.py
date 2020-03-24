@@ -1375,14 +1375,21 @@ def train_all(
 
     for i, task in enumerate(tqdm(tasks, desc="Task")):
         
-        ## fine-tune model on every task sequentially (i.e., sequential transfer / soft-parameter sharing) ##
-        ## store model's output logits for each mini-batch of input sequences after convergence on each of the two auxiliary tasks ##
+        ################################################ SEQUENTIAL TRANSFER ########################################################
+        ############## fine-tune model on every task sequentially (i.e., sequential transfer / soft-parameter sharing) ##############
+        ####### SOFT TARGETS: store model's auxiliary output logits for each mini-batch of input sequences after convergence ########
+        ###### ORACLE: concatenate true labels for auxiliary tasks with each contextual word embedding in any (q, c) sequence #######
+        #############################################################################################################################
 
         # TODO: figure out, whether this is the correct way to modify input_size and weights of a fc layer on the fly
         if task == 'QA':
-            add_features = sbj_logits_all[0].size(1)
-            if len(domain_logits_all) > 0:
-                add_features += domain_logits_all[0].size(1)
+            if args['training_regime'] == 'soft_targets':
+                add_features = sbj_logits_all[0].size(1)
+                if len(domain_logits_all) > 0:
+                    add_features += domain_logits_all[0].size(1)
+            elif args['training_regime'] == 'oracle':
+                add_features = args['n_qa_labels'] + args['n_domains']
+
             with torch.no_grad():
                 model.qa_head.fc_qa.in_features += add_features
                 assert model.qa_head.fc_qa.out_features == args['n_qa_labels']
@@ -1470,13 +1477,13 @@ def train_all(
 
                         # perform QA task with hard targets from both auxiliary tasks as additional information about any (q, c) sequence pair
                         start_logits, end_logits = model(
-                                               input_ids=b_input_ids,
-                                               attention_masks=b_attn_masks,
-                                               token_type_ids=b_token_type_ids,
-                                               input_lengths=b_input_lengths,
-                                               task='QA',
-                                               aux_targets=b_aux_hard_targets,
-                        )
+                                                         input_ids=b_input_ids,
+                                                         attention_masks=b_attn_masks,
+                                                         token_type_ids=b_token_type_ids,
+                                                         input_lengths=b_input_lengths,
+                                                         task='QA',
+                                                         aux_targets=b_aux_hard_targets,
+                                                         )
 
                     elif args['training_regime'] == 'soft_targets':
                         b_sbj_scores = sbj_logits_all[step]
