@@ -135,7 +135,7 @@ def to_cat(
            n_labels:int,
            ):
     batch_size = true_labels.size(0)
-    cat_mat = torch.zeros(batch_size, n_labels, dtype=torch.double)
+    cat_mat = torch.zeros(batch_size, n_labels)
     for i, l in enumerate(true_labels):
       cat_mat[i, l] += 1
     return cat_mat.to(device)
