@@ -834,6 +834,7 @@ def create_question_answer_sequences(
 def create_tensor_dataset(
                           features:list,
                           aux_sbj_batch:bool=False,
+                          detailed_analysis_sbj_class:bool=False,
                           ):
     if aux_sbj_batch:
         all_input_ids,  all_input_mask, all_segment_ids, all_input_lengths, all_sbj = create_question_answer_sequences(features=features)
@@ -858,18 +859,32 @@ def create_tensor_dataset(
         all_sbj = torch.stack((all_a_sbj, all_q_sbj), dim=1)
 
         all_domains = torch.tensor([f.domain for f in features], dtype=torch.long)
-        #all_datasets = torch.tensor([f.dataset for f in features], dtype=torch.long)
+        
+        if detailed_analysis_sbj_class:
+            all_datasets = torch.tensor([f.dataset for f in features], dtype=torch.long)
+            dataset = TensorDataset(
+                                    all_input_ids,
+                                    all_input_mask,
+                                    all_segment_ids,
+                                    all_input_lengths,
+                                    all_start_positions,
+                                    all_end_positions,
+                                    all_sbj,
+                                    all_domains,
+                                    all_datasets,
+                                    )
 
-        dataset = TensorDataset(
-                                all_input_ids,
-                                all_input_mask,
-                                all_segment_ids,
-                                all_input_lengths,
-                                all_start_positions,
-                                all_end_positions,
-                                all_sbj,
-                                all_domains,
-                                )
+        else:
+            dataset = TensorDataset(
+                                    all_input_ids,
+                                    all_input_mask,
+                                    all_segment_ids,
+                                    all_input_lengths,
+                                    all_start_positions,
+                                    all_end_positions,
+                                    all_sbj,
+                                    all_domains,
+                                    )
     return dataset
     
 def get_class_weights(

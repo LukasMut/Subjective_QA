@@ -57,6 +57,34 @@ def accuracy(probas:torch.Tensor, y_true:torch.Tensor, task:str):
     y_true = y_true.type_as(y_pred)
     return (y_pred == to_cpu(y_true, to_numpy=False)).float().mean().item()
 
+def compute_rel_freq(results_per_ds:dict):
+  return {ds: {qa: 100 * (score['correct'] / score['freq']) for qa, score in qa.items()} for ds, qa in results_per_ds.items()}
+
+def get_detailed_scores(
+                        probas:torch.Tensor,
+                        y_true:torch.Tensor,
+                        y_ds:torch.Tensor,
+                        results_per_ds:dict,
+                    )
+    y_pred = soft_to_hard(probas) 
+    y_true = to_cpu(y_true.type_as(y_pred), to_numpy=False)
+    y_ds = to_cpu(y_true.type_as(y_pred), to_numpy=False)
+
+    for p, l, ds in zip(y_pred, y_true, y_ds):
+
+      if 'freq' in results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj']:
+        results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj']['freq'] += 1
+      else:
+        results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj']['freq'] = 1
+
+      if (p == l):
+        if 'correct' in results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj']:
+          results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj']['correct'] += 1
+        else:
+          results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj']['correct'] = 1
+
+    return results_per_ds
+
 def f1(probas:torch.Tensor, y_true:torch.Tensor, task:str, avg:str='macro'):
     y_pred = soft_to_hard(probas) if task == 'binary' else torch.argmax(to_cpu(probas, detach=True, to_numpy=False), dim=1)
     return f1_score(to_cpu(y_true), y_pred.numpy(), average=avg)
@@ -995,6 +1023,7 @@ def test(
         input_sequence:str='question_context',
         sequential_transfer:bool=False,
         inference_strategy:str=None,
+        detailed_analysis_sbj_class:bool=False,
 ):
     n_steps = len(test_dl)
     n_examples = n_steps * batch_size
@@ -1021,6 +1050,13 @@ def test(
       loss_func = nn.CrossEntropyLoss()
 
     ###################################################
+
+    ######### DETAILED ANALYSIS ###########
+
+    if detailed_analysis_sbj_class:
+      results_per_ds = defaultdict(dict)
+
+    ########################################
     
     batch_f1_test = 0
     test_f1, test_loss = 0, 0
@@ -1041,7 +1077,11 @@ def test(
           b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _ = batch
 
         elif task == 'Sbj_Classification':
-          if input_sequence == 'question_context':
+
+          if detailed_analysis_sbj_class:
+            b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, b_sbj, _, b_ds = batch
+
+          elif input_sequence == 'question_context':
             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, b_sbj, _ = batch
 
           elif input_sequence == 'question_answer':
@@ -1208,6 +1248,9 @@ def test(
                 current_sbj_acc += accuracy(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')  
                 current_sbj_f1 += f1(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')
 
+                if detailed_analysis_sbj_class:
+                  results_per_ds = get_detailed_scores(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], y_ds=b_ds, results_per_ds=results_per_ds)
+
               batch_acc_test += (current_sbj_acc / b_sbj.size(1))
               batch_f1_test += (current_sbj_f1 / b_sbj.size(1))
 
@@ -1271,8 +1314,12 @@ def test(
 
     print("----------------------------------")
     print()
-   
-    return test_loss, test_acc, test_f1
+
+    if detailed_analysis_sbj_class:
+      results_per_ds = compute_rel_freq(results_per_ds)
+      return test_loss, test_acc, test_f1, results_per_ds
+    else:
+      return test_loss, test_acc, test_f1
 
 def train_all(
               model,
@@ -1353,7 +1400,7 @@ def train_all(
         
         ################################################ SEQUENTIAL TRANSFER ########################################################
         ############## Fine-tune model on every task sequentially (i.e., sequential transfer / soft-parameter sharing) ##############
-        ####### SOFT TARGETS: store model's auxiliary output logits for each mini-batch of input sequences after convergence ########
+        #### SOFT TARGETS: store model's auxiliary output logits for each mini-batch of input sequences after model convergence #####
         ###### ORACLE: concatenate true labels for auxiliary tasks with each contextual word embedding in any (q, c) sequence #######
         #############################################################################################################################
 
@@ -1363,6 +1410,7 @@ def train_all(
                 add_features = sbj_logits_all[0].size(1)
                 if len(domain_logits_all) > 0:
                     add_features += domain_logits_all[0].size(1)
+
             elif args['training_regime'] == 'oracle':
                 add_features = args['n_qa_labels'] + args['n_domains']
 
@@ -1375,12 +1423,12 @@ def train_all(
         # initialize task-specific optimizers on the fly
         optimizer = create_optimizer(model=model, task=task, eta=args['lr_adam'])
 
-        # if i > 0:
-        scheduler = get_linear_schedule_with_warmup(
-                                                    optimizer, 
-                                                    num_warmup_steps=args['warmup_steps'], 
-                                                    num_training_steps=args['t_total'],
-                                                    )
+        if i > 0:
+            scheduler = get_linear_schedule_with_warmup(
+                                                        optimizer, 
+                                                        num_warmup_steps=args['warmup_steps'], 
+                                                        num_training_steps=args['t_total'],
+                                                        )
 
         eval_round = False
         stop_training = False
@@ -1658,8 +1706,8 @@ def train_all(
                     optimizer.step()
 
                     # decrease learning rate linearly for all tasks but the first
-                    # if i > 0:
-                    scheduler.step()
+                    if i > 0:
+                        scheduler.step()
 
                     # after each training step, zero-out gradients
                     optimizer.zero_grad()

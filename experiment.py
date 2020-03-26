@@ -71,6 +71,8 @@ if __name__ == '__main__':
             help='Set model save directory for QA model.')
     parser.add_argument('--not_finetuned', action='store_true',
             help='If provided, test DistilBERT model previously pre-trained on SQuAD on SubjQA (no prior task-specific fine-tuning); only possible in test version.')
+    parser.add_argument('--detailed_analysis_sbj_class', action='store_true',
+            help='If provided, compute detailed analysis of subjectivity classification test results w.r.t datasets')
     args = parser.parse_args()
     
     # check whether arg.parser works correctly
@@ -115,6 +117,7 @@ if __name__ == '__main__':
     dataset_weights = None
 
     n_domain_labels = None if args.finetuning == 'SQuAD' else len(domains)
+    n_qa_labels = 2
     
     # NOTE: we use pre-trained cased model since both BERT and DistilBERT cased models perform significantly better on SQuAD than uncased versions     
     bert_tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-cased')
@@ -965,6 +968,39 @@ if __name__ == '__main__':
                                                                 domain_to_idx=domain_to_idx,
                                                                 dataset_to_idx=dataset_to_idx,
             )
+
+            if args.detailed_analysis_sbj_class:
+
+                squad_data_train = get_data(
+                                            source='/SQuAD/',
+                                            split='train',
+                )
+                
+                squad_examples_train = create_examples(
+                                           squad_data_train,
+                                           source='SQuAD',
+                                           is_training=True,
+                )
+                
+                _, squad_examples_dev = split_into_train_and_dev(squad_examples_train)
+
+                squad_features_dev = convert_examples_to_features(
+                                                                 squad_examples_dev, 
+                                                                 bert_tokenizer,
+                                                                 max_seq_length=max_seq_length,
+                                                                 doc_stride=doc_stride,
+                                                                 max_query_length=max_query_length,
+                                                                 is_training=True,
+                                                                 domain_to_idx=domain_to_idx,
+                                                                 dataset_to_idx=dataset_to_idx,
+            )
+
+                np.random.shuffle(squad_features_dev)
+
+                subjqa_features_test.extend(subjqa_features_dev)
+
+                subjqa_tensor_dataset_test = create_tensor_dataset(subjqa_features_test, detailed_analysis_sbj_class=True)
+
             
             if not args.sbj_classification or (args.sbj_classification and args.batches == 'normal'):
                 
@@ -1015,28 +1051,52 @@ if __name__ == '__main__':
                                                         n_domain_labels = n_domain_labels,
                                                         task = task,
                 )
+
+                if args.sequential_transfer:
+                    add_features = n_qa_labels + n_domain_labels
+                    model.qa_head.fc_qa.in_features += add_features
+                    model.qa_head.fc_qa.weight = nn.Parameter(torch.cat((model.qa_head.fc_qa.weight, torch.randn(add_features, n_qa_labels).T), 1))
+                
                 # load fine-tuned model
                 model.load_state_dict(torch.load(args.sd + '/%s' % (model_name)))
                 # set model to device
                 model.to(device)
 
-            test_loss, test_acc, test_f1 = test(
-                                                model=model,
-                                                tokenizer=bert_tokenizer,
-                                                test_dl=test_dl,
-                                                batch_size=batch_size,
-                                                not_finetuned=args.not_finetuned,
-                                                task=task,
-                                                n_domains=n_domain_labels,
-                                                input_sequence= 'question_answer' if args.batches == 'alternating' else 'question_context',
-                                                sequential_transfer = args.sequential_transfer,
-                                                inference_strategy = args.sequential_transfer_evaluation,
-            )
+            if args.detailed_analysis_sbj_class:
+                test_loss, test_acc, test_f1, results_per_ds = test(
+                                                                    model=model,
+                                                                    tokenizer=bert_tokenizer,
+                                                                    test_dl=test_dl,
+                                                                    batch_size=batch_size,
+                                                                    not_finetuned=args.not_finetuned,
+                                                                    task= 'QA' if task == 'all' else task,
+                                                                    n_domains=n_domain_labels,
+                                                                    input_sequence= 'question_answer' if args.batches == 'alternating' else 'question_context',
+                                                                    sequential_transfer = args.sequential_transfer,
+                                                                    inference_strategy = args.sequential_transfer_evaluation,
+                                                                    detailed_analysis_sbj_class = True,
+                                                                    )
+            else:
+                test_loss, test_acc, test_f1 = test(
+                                                    model=model,
+                                                    tokenizer=bert_tokenizer,
+                                                    test_dl=test_dl,
+                                                    batch_size=batch_size,
+                                                    not_finetuned=args.not_finetuned,
+                                                    task= 'QA' if task == 'all' else task,
+                                                    n_domains=n_domain_labels,
+                                                    input_sequence= 'question_answer' if args.batches == 'alternating' else 'question_context',
+                                                    sequential_transfer = args.sequential_transfer,
+                                                    inference_strategy = args.sequential_transfer_evaluation,
+                )
             
             test_results = dict()
             test_results['test_loss'] = test_loss
             test_results['test_acc'] = test_acc
             test_results['test_f1'] = test_f1
+
+            if args.detailed_analysis_sbj_class:
+                test_results['test_results_per_ds'] = results_per_ds
             
             with open('./results_test/' + model_name + '.json', 'w') as json_file:
                 json.dump(test_results, json_file)

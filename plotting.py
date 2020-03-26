@@ -108,6 +108,14 @@ def plot_results(
                   r'Linear',
                   r'BiLSTM',
         ]
+        
+    elif task =='sbj_class' and iv == 'models' and task_setting == 'single':
+        params = [
+                  r'Linear $(\mathbf{q, a})$',
+                  r'Linear $(\mathbf{q, c})$',
+                  r'Highway $(\mathbf{q, a})$',
+                  r'Highway $(\mathbf{q, c})$',
+        ]
 
     elif iv == 'models' and task_setting == 'single':
         params = [
