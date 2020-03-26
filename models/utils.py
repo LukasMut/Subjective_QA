@@ -65,7 +65,7 @@ def get_detailed_scores(
                         y_true:torch.Tensor,
                         y_ds:torch.Tensor,
                         results_per_ds:dict,
-                    )
+                        ):
     y_pred = soft_to_hard(probas) 
     y_true = to_cpu(y_true.type_as(y_pred), to_numpy=False)
     y_ds = to_cpu(y_true.type_as(y_pred), to_numpy=False)
