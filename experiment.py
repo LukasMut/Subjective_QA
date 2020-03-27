@@ -997,7 +997,7 @@ if __name__ == '__main__':
 
                 np.random.shuffle(squad_features_dev)
 
-                subjqa_features_test.extend(subjqa_features_dev)
+                subjqa_features_test.extend(squad_features_dev)
 
                 subjqa_tensor_dataset_test = create_tensor_dataset(subjqa_features_test, detailed_analysis_sbj_class=True)
 
