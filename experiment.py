@@ -834,7 +834,7 @@ if __name__ == '__main__':
                                                                                                                             optimizer_sbj=optimizer_sbj,
                                                                                                                             optimizer_dom=None,
                                                                                                                             scheduler_qa=scheduler_qa,
-                                                                                                                            scheduler_sbj=scheduler_sbj,
+                                                                                                                            scheduler_sbj=None, #scheduler_sbj,
                                                                                                                             scheduler_dom=None,
                                                                                                                             early_stopping=True,
                                                                                                                             qa_type_weights=qa_type_weights,

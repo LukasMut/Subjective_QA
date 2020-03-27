@@ -46,6 +46,7 @@ class LinearQAHead(nn.Module):
 
         # fully-connected QA output layer with dropout
         self.fc_qa = nn.Linear(self.in_size, self.n_labels)
+        nn.init.xavier_uniform_(self.fc_qa.weight)
         self.qa_dropout = nn.Dropout(p = self.qa_dropout_p)
 
         if (self.task == 'QA' and self.multitask) or self.task == 'Sbj_Classification' or self.task == 'all':
@@ -57,6 +58,9 @@ class LinearQAHead(nn.Module):
             self.fc_sbj_2 = nn.Linear(self.in_size, self.in_size)
             self.fc_sbj_a = nn.Linear(self.in_size, 1) # fc subj. layer for answers
             self.fc_sbj_q = nn.Linear(self.in_size, 1) # fc subj. layer for questions
+
+            for fc_sbj in [self.fc_sbj_1, self.fc_sbj_2, self.fc_sbj_a, self.fc_sbj_q]:
+                nn.init.xavier_uniform_(self.fc_sbj.weight)
 
         
         elif self.task == 'Domain_Classification':
@@ -71,6 +75,9 @@ class LinearQAHead(nn.Module):
             self.fc_domain_1 = nn.Linear(self.in_size, self.in_size)
             self.fc_domain_2 = nn.Linear(self.in_size, self.in_size)
             self.fc_domain_3 = nn.Linear(self.in_size, self.n_domain_labels)
+
+            for fc_domain in [self.fc_domain_1, self.fc_domain_2, self.fc_domain_3]:
+                nn.init.xavier_uniform_(self.fc_domain.weight)
         
         if (self.task == 'QA' and self.multitask) or self.task == 'all':
 
@@ -85,6 +92,9 @@ class LinearQAHead(nn.Module):
                 self.fc_domain_1 = nn.Linear(self.in_size, self.in_size)
                 self.fc_domain_2 = nn.Linear(self.in_size, self.in_size)
                 self.fc_domain_3 = nn.Linear(self.in_size, self.n_domain_labels)
+
+                for fc_domain in [self.fc_domain_1, self.fc_domain_2, self.fc_domain_3]:
+                    nn.init.xavier_uniform_(self.fc_domain.weight)
 
             elif self.n_aux_tasks > 2:
                 raise ValueError("Model cannot perform more than 2 auxiliary tasks.")
