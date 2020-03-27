@@ -247,6 +247,7 @@ class RecurrentQAHead(nn.Module):
             
         # fully-connected QA output layer with dropout
         self.fc_qa = nn.Linear(self.in_size, self.n_labels)
+        nn.init.xavier_uniform_(self.fc_qa.weight)
         self.qa_dropout = nn.Dropout(p = self.qa_dropout_p)
 
         if (self.task == 'QA' and self.multitask) or self.task == 'Sbj_Classification' or self.task == 'all':
