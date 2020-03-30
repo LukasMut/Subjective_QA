@@ -514,6 +514,7 @@ if __name__ == '__main__':
             
             combined_tensor_dataset_train = create_tensor_dataset(combined_features_train, multi_qa_type_class=args.multi_qa_type_class)
 
+            #TODO: implement this for test loop
             if args.multi_qa_type_class:
                 # split development set into dev and test sets
                 squad_examples_dev = squad_examples_dev[:len(squad_examples_dev)//2]
