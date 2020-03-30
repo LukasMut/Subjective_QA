@@ -974,13 +974,13 @@ if __name__ == '__main__':
                 squad_data_train = get_data(
                                             source='/SQuAD/',
                                             split='train',
-                )
+                                            )
                 
                 squad_examples_train = create_examples(
                                            squad_data_train,
                                            source='SQuAD',
                                            is_training=True,
-                )
+                                           )
                 
                 _, squad_examples_dev = split_into_train_and_dev(squad_examples_train)
 
@@ -993,16 +993,17 @@ if __name__ == '__main__':
                                                                  is_training=True,
                                                                  domain_to_idx=domain_to_idx,
                                                                  dataset_to_idx=dataset_to_idx,
-            )
+                                                                 )
 
                 np.random.shuffle(squad_features_dev)
 
                 subjqa_features_test.extend(squad_features_dev)
 
+            
+            if args.detailed_analysis_sbj_class:
                 subjqa_tensor_dataset_test = create_tensor_dataset(subjqa_features_test, detailed_analysis_sbj_class=True)
 
-            
-            if not args.sbj_classification or (args.sbj_classification and args.batches == 'normal'):
+            elif not args.sbj_classification or (args.sbj_classification and args.batches == 'normal'):
                 
                 subjqa_tensor_dataset_test = create_tensor_dataset(subjqa_features_test)
 
