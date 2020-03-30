@@ -161,13 +161,14 @@ if __name__ == '__main__':
     batch_presentation = args.batches
     sampling_strategy = 'over' if args.task_sampling == 'oversampling' else 'unif'
     mtl_setting = 'domain' if args.mtl_setting == 'domain_only' else ''
+    qa_type_multi = 'multi' if args.multi_qa_type_class else ''
 
     if isinstance(args.adversarial, type(None)):
         training = 'classic'
     else:
         training = args.adversarial if args.adversarial == 'GRL' else 'adv' + args.adversarial
 
-    model_name = 'DistilBERT' + '_' + encoding + '_' + highway + '_' + train_method + '_' + batch_presentation + '_' + training + '_' + dataset + '_' + eval_setup + '_' + task + '_' + mtl_setting + '_' + sampling_strategy + '_' + sequential_transfer
+    model_name = 'DistilBERT' + '_' + encoding + '_' + highway + '_' + train_method + '_' + batch_presentation + '_' + training + '_' + dataset + '_' + eval_setup + '_' + task + '_' + qa_type_multi + '_' + mtl_setting + '_' + sampling_strategy + '_' + sequential_transfer
     model_name = model_name.lower()
     
     if args.version == 'train':
@@ -1011,7 +1012,7 @@ if __name__ == '__main__':
                                                                 dataset_to_idx=dataset_to_idx,
             )
 
-            if args.detailed_analysis_sbj_class:
+            if args.detailed_analysis_sbj_class or args.multi_qa_type_class:
 
                 squad_data_train = get_data(
                                             source='/SQuAD/',
@@ -1022,9 +1023,13 @@ if __name__ == '__main__':
                                            squad_data_train,
                                            source='SQuAD',
                                            is_training=True,
+                                           multi_qa_type_class=True if args.multi_qa_type_class else False,
                                            )
                 
                 _, squad_examples_dev = split_into_train_and_dev(squad_examples_train)
+
+                if args.multi_qa_type_class:
+                    squad_examples_dev = squad_examples_dev[len(squad_examples_dev)//2:]
 
                 squad_features_dev = convert_examples_to_features(
                                                                  squad_examples_dev, 
@@ -1037,21 +1042,22 @@ if __name__ == '__main__':
                                                                  dataset_to_idx=dataset_to_idx,
                                                                  )
 
-                np.random.shuffle(squad_features_dev)
-
                 subjqa_features_test.extend(squad_features_dev)
 
+                # make sure that examples from SQuAD are not just at the end of the dataset (i.e., last mini-batches)
+                np.random.shuffle(subjqa_features_test)
             
-            if args.detailed_analysis_sbj_class:
+            if args.multi_qa_type_class:
+                subjqa_tensor_dataset_test = create_tensor_dataset(subjqa_features_test, multi_qa_type_class=True)
+
+            elif args.detailed_analysis_sbj_class:
                 subjqa_tensor_dataset_test = create_tensor_dataset(subjqa_features_test, detailed_analysis_sbj_class=True)
 
-            elif not args.sbj_classification or (args.sbj_classification and args.batches == 'normal'):
-                
-                subjqa_tensor_dataset_test = create_tensor_dataset(subjqa_features_test)
-
             elif args.sbj_classification and args.batches == 'alternating':
-
                 subjqa_tensor_dataset_test = create_tensor_dataset(subjqa_features_test, aux_sbj_batch=True)
+
+            elif not args.sbj_classification or (args.sbj_classification and args.batches == 'normal'):
+                subjqa_tensor_dataset_test = create_tensor_dataset(subjqa_features_test)
 
             test_dl = BatchGenerator(
                                     dataset=subjqa_tensor_dataset_test,
@@ -1120,6 +1126,20 @@ if __name__ == '__main__':
                                                                     inference_strategy = args.sequential_transfer_evaluation,
                                                                     detailed_analysis_sbj_class = True,
                                                                     )
+            elif args.multi_qa_type_class:
+                test_loss, test_acc, test_f1, predictions, true_labels, feat_reps = test(
+                                                                                            model=model,
+                                                                                            tokenizer=bert_tokenizer,
+                                                                                            test_dl=test_dl,
+                                                                                            batch_size=batch_size,
+                                                                                            not_finetuned=args.not_finetuned,
+                                                                                            task= 'QA' if task == 'all' else task,
+                                                                                            n_domains=n_domain_labels,
+                                                                                            input_sequence= 'question_answer' if args.batches == 'alternating' else 'question_context',
+                                                                                            sequential_transfer = args.sequential_transfer,
+                                                                                            inference_strategy = args.sequential_transfer_evaluation,
+                                                                                            multi_qa_type_class=True,
+                                                                                            )
             else:
                 test_loss, test_acc, test_f1 = test(
                                                     model=model,
@@ -1141,6 +1161,11 @@ if __name__ == '__main__':
 
             if args.detailed_analysis_sbj_class:
                 test_results['test_results_per_ds'] = results_per_ds
+
+            elif args.multi_qa_type_class:
+                test_results['predictions'] = predictions
+                test_results['true_labels'] = true_labels
+                test_results['feat_reps'] = feat_reps
             
             with open('./results_test/' + model_name + '.json', 'w') as json_file:
                 json.dump(test_results, json_file)

@@ -116,6 +116,7 @@ class LinearQAHead(nn.Module):
                 aux_targets=None,
                 start_positions=None,
                 end_positions=None,
+                output_feat_reps:bool=False,
     ):
         sequence_output = distilbert_output[0]
         sequence_output = self.qa_dropout(sequence_output)
@@ -193,7 +194,11 @@ class LinearQAHead(nn.Module):
                 if isinstance(self.n_qa_type_labels, int):
                     sbj_logits_q = self.fc_sbj_q(sbj_out)
                     sbj_logits_q = sbj_logits_q.squeeze(-1)
-                    return sbj_logits_q
+                    if output_feat_reps:
+                        sequence_output = sequence_output.squeeze(1)
+                        return sbj_logits_q, sequence_output
+                    else:
+                        return sbj_logits_q
                 else:
                     sbj_logits_a = self.fc_sbj_a(sbj_out)
                     sbj_logits_q = self.fc_sbj_q(sbj_out)
@@ -332,6 +337,7 @@ class RecurrentQAHead(nn.Module):
                 aux_targets=None,
                 start_positions=None,
                 end_positions=None,
+                output_feat_reps:bool=False,
     ):
         sequence_output = distilbert_output[0]
         sequence_output = self.qa_dropout(sequence_output)

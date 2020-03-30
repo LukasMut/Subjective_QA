@@ -57,6 +57,10 @@ def accuracy(probas:torch.Tensor, y_true:torch.Tensor, task:str):
     y_true = y_true.type_as(y_pred)
     return (y_pred == to_cpu(y_true, to_numpy=False)).float().mean().item()
 
+def f1(probas:torch.Tensor, y_true:torch.Tensor, task:str, avg:str='macro'):
+    y_pred = soft_to_hard(probas) if task == 'binary' else torch.argmax(to_cpu(probas, detach=True, to_numpy=False), dim=1)
+    return f1_score(to_cpu(y_true), y_pred.numpy(), average=avg)
+
 def compute_rel_freq(results_per_ds:dict):
   return {ds: {qa: 100 * (score['correct'] / score['freq']) for qa, score in qa.items()} for ds, qa in results_per_ds.items()}
 
@@ -84,10 +88,6 @@ def get_detailed_scores(
           results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj'] = {'correct': 1}
 
     return results_per_ds
-
-def f1(probas:torch.Tensor, y_true:torch.Tensor, task:str, avg:str='macro'):
-    y_pred = soft_to_hard(probas) if task == 'binary' else torch.argmax(to_cpu(probas, detach=True, to_numpy=False), dim=1)
-    return f1_score(to_cpu(y_true), y_pred.numpy(), average=avg)
 
 def freeze_transformer_layers(
                               model,
@@ -629,6 +629,7 @@ def train(
                                                           val_accs=val_accs,
                                                           val_f1s=val_f1s,
                                                           loss_func=loss_func,
+                                                          multi_qa_type_class=multi_qa_type_class,
                                                           )
 
                 # we want to store train exact-match accuracies and F1 scores for each task as often as we evaluate model on validation set
@@ -938,7 +939,7 @@ def val(
                                      attention_masks=b_attn_masks,
                                      token_type_ids=b_token_type_ids,
                                      input_lengths=b_input_lengths,
-                                     task=current_task,
+                                     task='Sbj_Class',
                                      )
 
                   batch_loss_val += loss_func(sbj_logits, b_sbj)
@@ -1058,6 +1059,8 @@ def test(
         sequential_transfer:bool=False,
         inference_strategy:str=None,
         detailed_analysis_sbj_class:bool=False,
+        multi_qa_type_class:bool=False,
+
 ):
     n_steps = len(test_dl)
     n_examples = n_steps * batch_size
@@ -1077,7 +1080,11 @@ def test(
 
     elif task == 'Sbj_Classification':
       batch_acc_test = 0
-      loss_func = nn.BCEWithLogitsLoss()
+      if multi_qa_type_class:
+        loss_func = nn.CrossEntropyLoss()
+        predictions, true_labels, feat_reps = [], [], []
+      else:
+        loss_func = nn.BCEWithLogitsLoss()
 
     elif task == 'Domain_Classification':
       batch_acc_test = 0
@@ -1260,33 +1267,63 @@ def test(
 
             elif task == 'Sbj_Classification':
 
-              sbj_logits_a, sbj_logits_q = model(
-                                                 input_ids=b_input_ids,
-                                                 attention_masks=b_attn_masks,
-                                                 token_type_ids=b_token_type_ids,
-                                                 input_lengths=b_input_lengths,
-                                                 task='Sbj_Class',
-                                                 )
+              if multi_qa_type_class:
+                  sbj_logits, feat_reps_cls = model(
+                                                input_ids=b_input_ids,
+                                                attention_masks=b_attn_masks,
+                                                token_type_ids=b_token_type_ids,
+                                                input_lengths=b_input_lengths,
+                                                task='Sbj_Class',
+                                                output_feat_reps=True,
+                                                )
 
-              sbj_logits = torch.stack((sbj_logits_a, sbj_logits_q), dim=1)
-              
-              b_sbj = b_sbj.type_as(sbj_logits)
+                  batch_loss_test += loss_func(sbj_logits, b_sbj)
 
-              batch_loss_test += loss_func(sbj_logits, b_sbj)
+                  sbj_log_probas = F.log_softmax(sbj_logits, dim=1)
 
-              current_sbj_acc = 0
-              current_sbj_f1 = 0
+                  batch_acc_test += accuracy(probas=sbj_log_probas, y_true=b_sbj, task='multi-way')  
+                  batch_f1_test += f1(probas=sbj_log_probas, y_true=b_sbj, task='multi-way')
 
-              for k in range(b_sbj.size(1)):
+                  #### STORE FEATURE REPRESENTATIONS PER LABEL & MODEL'S PREDICTIONS ####
 
-                current_sbj_acc += accuracy(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')  
-                current_sbj_f1 += f1(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')
+                  y_hat_q_type = torch.argmax(to_cpu(sbj_log_probas, detach=True, to_numpy=False), dim=1).numpy().tolist()
+                  y_true = to_cpu(b_sbj, detach=False, to_numpy=True).tolist()
+                  feat_reps_cls = to_cpu(feat_reps_cls, detach=True, to_numpy=True).tolist()
 
-                if detailed_analysis_sbj_class:
-                  results_per_ds = get_detailed_scores(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], y_ds=b_ds, results_per_ds=results_per_ds)
+                  predictions.append(y_hat_q_type)
+                  true_labels.append(y_true)
+                  
+                  for feat_rep in feat_reps_cls:
+                    feat_reps.append(feat_rep)
 
-              batch_acc_test += (current_sbj_acc / b_sbj.size(1))
-              batch_f1_test += (current_sbj_f1 / b_sbj.size(1))
+              else:
+                  sbj_logits_a, sbj_logits_q = model(
+                                                     input_ids=b_input_ids,
+                                                     attention_masks=b_attn_masks,
+                                                     token_type_ids=b_token_type_ids,
+                                                     input_lengths=b_input_lengths,
+                                                     task='Sbj_Class',
+                                                     )
+
+                  sbj_logits = torch.stack((sbj_logits_a, sbj_logits_q), dim=1)
+                  
+                  b_sbj = b_sbj.type_as(sbj_logits)
+
+                  batch_loss_test += loss_func(sbj_logits, b_sbj)
+
+                  current_sbj_acc = 0
+                  current_sbj_f1 = 0
+
+                  for k in range(b_sbj.size(1)):
+
+                    current_sbj_acc += accuracy(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')  
+                    current_sbj_f1 += f1(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')
+
+                    if detailed_analysis_sbj_class:
+                      results_per_ds = get_detailed_scores(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], y_ds=b_ds, results_per_ds=results_per_ds)
+
+                  batch_acc_test += (current_sbj_acc / b_sbj.size(1))
+                  batch_f1_test += (current_sbj_f1 / b_sbj.size(1))
 
             elif task == 'Domain_Classification':
 
@@ -1352,6 +1389,10 @@ def test(
     if detailed_analysis_sbj_class:
       results_per_ds = compute_rel_freq(results_per_ds)
       return test_loss, test_acc, test_f1, results_per_ds
+    if multi_qa_type_class:
+      predictions = np.array(predictions).flatten().tolist()
+      true_labels = np.array(true_labels).flatten().tolist()
+      return test_loss, test_acc, test_f1, predictions, true_labels, feat_reps
     else:
       return test_loss, test_acc, test_f1
 
