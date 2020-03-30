@@ -62,12 +62,14 @@ class LinearQAHead(nn.Module):
             if isinstance(self.n_qa_type_labels, int):
                 # multi-way qa_type classification task
                 self.fc_sbj_q = nn.Linear(self.in_size, n_qa_type_labels) # fc subj. layer for questions
+                sbj_layers = [self.fc_sbj_1, self.fc_sbj_2, self.fc_sbj_q]
             else:
                 # binary qa_type classification task
                 self.fc_sbj_a = nn.Linear(self.in_size, 1) # fc subj. layer for answers
                 self.fc_sbj_q = nn.Linear(self.in_size, 1) # fc subj. layer for questions
+                sbj_layers = [self.fc_sbj_1, self.fc_sbj_2, self.fc_sbj_a, self.fc_sbj_q]
 
-            for fc_sbj in [self.fc_sbj_1, self.fc_sbj_2, self.fc_sbj_a, self.fc_sbj_q]:
+            for fc_sbj in sbj_layers:
                 nn.init.xavier_uniform_(fc_sbj.weight)
 
         
@@ -277,11 +279,13 @@ class RecurrentQAHead(nn.Module):
 
             if isinstance(self.n_qa_type_labels, int):
                 self.fc_sbj_q = nn.Linear(self.in_size, n_qa_type_labels) # fc subj. layer for questions
+                sbj_layers = [self.fc_sbj_1, self.fc_sbj_2, self.fc_sbj_q]
             else:
                 self.fc_sbj_a = nn.Linear(self.in_size, 1) # fc subj. layer for answers
                 self.fc_sbj_q = nn.Linear(self.in_size, 1) # fc subj. layer for questions
+                sbj_layers = [self.fc_sbj_1, self.fc_sbj_2, self.fc_sbj_a, self.fc_sbj_q]
 
-            for fc_sbj in [self.fc_sbj_1, self.fc_sbj_2, self.fc_sbj_a, self.fc_sbj_q]:
+            for fc_sbj in sbj_layers:
                 nn.init.xavier_uniform_(fc_sbj.weight)
 
         elif self.task == 'Domain_Classification':

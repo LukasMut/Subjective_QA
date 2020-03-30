@@ -72,7 +72,7 @@ def get_detailed_scores(
 
     for p, l, ds in zip(y_pred, y_true, y_ds):
 
-      if 'freq' in results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj']:['']
+      if 'freq' in results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj']:
         results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj']['freq'] += 1
       else:
         results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj'] = {'freq': 1}
