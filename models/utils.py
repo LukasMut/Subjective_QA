@@ -72,16 +72,16 @@ def get_detailed_scores(
 
     for p, l, ds in zip(y_pred, y_true, y_ds):
 
-      if 'freq' in results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj']:
+      if 'freq' in results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj']:['']
         results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj']['freq'] += 1
       else:
-        results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj']['freq'] = 1
+        results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj'] = {'freq': 1}
 
-      if (p == l):
+      if p == l:
         if 'correct' in results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj']:
           results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj']['correct'] += 1
         else:
-          results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj']['correct'] = 1
+          results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj'] = {'correct': 1}
 
     return results_per_ds
 
@@ -217,6 +217,7 @@ def train(
           domain_weights=None,
           max_epochs:int=3,
           adversarial_simple:bool=False,
+          multi_qa_type_class:bool=False,
           plot_task_distrib:bool=False,
 ):
     n_iters = args['n_steps'] * args['n_epochs']
@@ -277,7 +278,10 @@ def train(
 
     elif args['task'] == 'Sbj_Classification':
       tasks = ['Sbj_Class']
-      if args['dataset'] == 'combined':
+      if args['dataset'] == 'combined' and multi_qa_type_class:
+        assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
+        sbj_loss_func = nn.CrossEntropyLoss(weight=qa_type_weights.to(device))
+      elif args['dataset'] == 'combined':
         assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
         print("Weights for subjective Anwers: {}".format(qa_type_weights[0]))
         print()
@@ -433,39 +437,67 @@ def train(
                 else:
                   b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, b_sbj, _ = main_batch
 
-                ## ANSWER & QUESTION CLASSIFICATOION ##
 
-                sbj_logits_a, sbj_logits_q = model(
-                                                   input_ids=b_input_ids,
-                                                   attention_masks=b_attn_masks,
-                                                   token_type_ids=b_token_type_ids,
-                                                   input_lengths=b_input_lengths,
-                                                   task=current_task,
-                                                   )
+                if multi_qa_type_class:
+                  #########################################################
+                  ##### MULTI-WAY SEQUENCE CLASSIFICATION OF QA TYPE ######
+                  #########################################################
+                  sbj_logits = model(
+                                     input_ids=b_input_ids,
+                                     attention_masks=b_attn_masks,
+                                     token_type_ids=b_token_type_ids,
+                                     input_lengths=b_input_lengths,
+                                     task=current_task,
+                                     )
 
-                sbj_logits = torch.stack((sbj_logits_a, sbj_logits_q), dim=1)
-                      
-                b_sbj = b_sbj.type_as(sbj_logits)
+                  b_sbj = b_sbj.type_as(sbj_logits)
 
-                if adversarial_simple:
-                  batch_loss -= sbj_loss_func(sbj_logits, b_sbj)
+                  if adversarial_simple:
+                    batch_loss -= sbj_loss_func(sbj_logits, b_sbj)
+                  else:
+                    batch_loss += sbj_loss_func(sbj_logits, b_sbj)
+  
+                  batch_acc_sbj += accuracy(probas=F.log_softmax(sbj_logits, dim=1), y_true=b_sbj, task='multi-way')  
+                  batch_f1_sbj += f1(probas=F.log_softmax(sbj_logits, dim=1), y_true=b_sbj, task='multi-way')
+
+                  batch_acc_aux = batch_acc_sbj
+                  batch_f1_aux = batch_f1_sbj
 
                 else:
-                  batch_loss += sbj_loss_func(sbj_logits, b_sbj)
-    
-                current_sbj_acc = 0
-                current_sbj_f1 = 0
+                  ###############################################################
+                  ##### BINARY SEQUENCE CLASSIFICATION OF ANSWER & QUESTION #####
+                  ###############################################################
+                  sbj_logits_a, sbj_logits_q = model(
+                                                     input_ids=b_input_ids,
+                                                     attention_masks=b_attn_masks,
+                                                     token_type_ids=b_token_type_ids,
+                                                     input_lengths=b_input_lengths,
+                                                     task=current_task,
+                                                     )
 
-                for k in range(b_sbj.size(1)):
+                  sbj_logits = torch.stack((sbj_logits_a, sbj_logits_q), dim=1)
+                        
+                  b_sbj = b_sbj.type_as(sbj_logits)
 
-                  current_sbj_acc += accuracy(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')  
-                  current_sbj_f1 += f1(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')
+                  if adversarial_simple:
+                    batch_loss -= sbj_loss_func(sbj_logits, b_sbj)
 
-                batch_acc_sbj += (current_sbj_acc / b_sbj.size(1))
-                batch_f1_sbj += (current_sbj_f1 / b_sbj.size(1))
+                  else:
+                    batch_loss += sbj_loss_func(sbj_logits, b_sbj)
+      
+                  current_sbj_acc = 0
+                  current_sbj_f1 = 0
 
-                batch_acc_aux = batch_acc_sbj
-                batch_f1_aux = batch_f1_sbj
+                  for k in range(b_sbj.size(1)):
+
+                    current_sbj_acc += accuracy(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')  
+                    current_sbj_f1 += f1(probas=torch.sigmoid(sbj_logits[:, k]), y_true=b_sbj[:, k], task='binary')
+
+                  batch_acc_sbj += (current_sbj_acc / b_sbj.size(1))
+                  batch_f1_sbj += (current_sbj_f1 / b_sbj.size(1))
+
+                  batch_acc_aux = batch_acc_sbj
+                  batch_f1_aux = batch_f1_sbj
 
                 """
                 ## ANSWER CLASSIFICATION ##
@@ -494,6 +526,10 @@ def train(
                 """
 
               elif current_task == 'Domain_Class':
+
+                  ###############################################################
+                  ##### MULTI-WAY SEQUENCE CLASSIFICATION OF REVIEW DOMAIN ######
+                  ###############################################################
 
                 b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, _, b_domains = main_batch
 

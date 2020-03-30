@@ -227,6 +227,7 @@ def create_examples(
                     examples:list,
                     source:str,
                     is_training:bool=True,
+                    multi_qa_type_class:bool=False,
 ):
     """
     Args:
@@ -285,8 +286,8 @@ def create_examples(
                 end_position = None
                 orig_answer_text = qa['answers'][0]['text'] if len(qa['answers']) == 1 else ''
                 is_impossible = qa['is_impossible']
-                q_sbj = 0
-                a_sbj = 0
+                q_sbj = 2 if multi_qa_type_class else 0
+                a_sbj = 2 if multi_qa_type_class else 0
                 domain = 'wikipedia'
 
                 # we don't need start and end positions in eval mode
@@ -313,7 +314,6 @@ def create_examples(
                         cleaned_answer_text = " ".join(whitespace_tokenize(orig_answer_text))
 
                         if actual_text.find(cleaned_answer_text) == -1:
-                            # logger.warning("Could not find answer: '%s' vs. '%s'", actual_text, cleaned_answer_text)
                             # skip example, if answer cannot be recovered from document
                             continue
 
@@ -835,6 +835,7 @@ def create_tensor_dataset(
                           features:list,
                           aux_sbj_batch:bool=False,
                           detailed_analysis_sbj_class:bool=False,
+                          multi_qa_type_class:bool=False,
                           ):
     if aux_sbj_batch:
         all_input_ids,  all_input_mask, all_segment_ids, all_input_lengths, all_sbj = create_question_answer_sequences(features=features)
@@ -856,7 +857,8 @@ def create_tensor_dataset(
 
         all_q_sbj = torch.tensor([f.q_sbj for f in features], dtype=torch.long)
         all_a_sbj = torch.tensor([f.a_sbj for f in features], dtype=torch.long)
-        all_sbj = torch.stack((all_a_sbj, all_q_sbj), dim=1)
+        
+        all_sbj =  all_q_sbj if multi_qa_type_class else torch.stack((all_a_sbj, all_q_sbj), dim=1)
 
         all_domains = torch.tensor([f.domain for f in features], dtype=torch.long)
         
@@ -892,7 +894,8 @@ def get_class_weights(
                       idx_to_class:dict,
                       squad_classes=None,
                       binary:bool=False,
-                      qa_type:str='questions',
+                      qa_type:str=None,
+                      multi_qa_type_class:bool=False,
 
 ):
     n_total_subjqa = len(subjqa_classes)
@@ -904,6 +907,10 @@ def get_class_weights(
 
         if len(class_distrib_subjqa) > 2:
             class_distrib_subjqa['wikipedia'] = n_total_squad
+            class_distrib = class_distrib_subjqa
+
+        elif len(class_distrib_subjqa) == 2 and multi_qa_type_class:
+            class_distrib_subjqa['squad_obj'] = n_total_squad
             class_distrib = class_distrib_subjqa
 
         elif len(class_distrib_subjqa) == 2:
@@ -921,8 +928,12 @@ def get_class_weights(
         return torch.tensor(class_weight, dtype=torch.float)
     else:
         class_weights = {c: 1 - (v / n_total) for c, v in class_distrib.items()}
-        print("Domain weights: {}".format(class_weights))
-        print()
+        if multi_qa_type_class:
+            print("QA type weights: {}".format(class_weights))
+            print()
+        else:
+            print("Domain weights: {}".format(class_weights))
+            print()
         # sort weights in the correct order (as will be presented to the model)
         if isinstance(squad_classes, type(None)):
             class_weights = [class_weights[c] for _, c in idx_to_class.items() if c != 'wikipedia']

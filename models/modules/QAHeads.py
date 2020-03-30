@@ -27,6 +27,7 @@ class LinearQAHead(nn.Module):
                  n_aux_tasks=None,
                  aux_dropout_p:float=0.1,
                  n_domain_labels=None,
+                 n_qa_type_labels=None,
                  adversarial:bool=False,
                  task:str='QA',
     ):
@@ -39,7 +40,8 @@ class LinearQAHead(nn.Module):
         self.n_aux_tasks = n_aux_tasks
         self.aux_dropout_p = aux_dropout_p
         self.qa_dropout_p = qa_dropout_p
-        self.task = task 
+        self.task = task
+        self.n_qa_type_labels = n_qa_type_labels
 
         if highway_block:
             self.highway = Highway(self.in_size)
@@ -56,8 +58,14 @@ class LinearQAHead(nn.Module):
             # fully-connected subjectivity output layers (must be present in every MTL setting)
             self.fc_sbj_1 = nn.Linear(self.in_size, self.in_size)
             self.fc_sbj_2 = nn.Linear(self.in_size, self.in_size)
-            self.fc_sbj_a = nn.Linear(self.in_size, 1) # fc subj. layer for answers
-            self.fc_sbj_q = nn.Linear(self.in_size, 1) # fc subj. layer for questions
+
+            if isinstance(self.n_qa_type_labels, int):
+                # multi-way qa_type classification task
+                self.fc_sbj_q = nn.Linear(self.in_size, n_qa_type_labels) # fc subj. layer for questions
+            else:
+                # binary qa_type classification task
+                self.fc_sbj_a = nn.Linear(self.in_size, 1) # fc subj. layer for answers
+                self.fc_sbj_q = nn.Linear(self.in_size, 1) # fc subj. layer for questions
 
             for fc_sbj in [self.fc_sbj_1, self.fc_sbj_2, self.fc_sbj_a, self.fc_sbj_q]:
                 nn.init.xavier_uniform_(fc_sbj.weight)
@@ -179,14 +187,20 @@ class LinearQAHead(nn.Module):
                 # introduce skip connection (add output of previous layer to linear transformation) to encode more information
                 sbj_out = sequence_output + self.fc_sbj_2(F.relu(self.aux_dropout(self.fc_sbj_1(sequence_output))))
                 sbj_out = self.aux_dropout(sbj_out)
-                sbj_logits_a = self.fc_sbj_a(sbj_out)
-                sbj_logits_q = self.fc_sbj_q(sbj_out)
-                
-                # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
-                sbj_logits_a = sbj_logits_a.squeeze(-1)
-                sbj_logits_q = sbj_logits_q.squeeze(-1)
-                
-                return sbj_logits_a, sbj_logits_q
+
+                if isinstance(self.n_qa_type_labels, int):
+                    sbj_logits_q = self.fc_sbj_q(sbj_out)
+                    sbj_logits_q = sbj_logits_q.squeeze(-1)
+                    return sbj_logits_q
+                else:
+                    sbj_logits_a = self.fc_sbj_a(sbj_out)
+                    sbj_logits_q = self.fc_sbj_q(sbj_out)
+                    
+                    # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
+                    sbj_logits_a = sbj_logits_a.squeeze(-1)
+                    sbj_logits_q = sbj_logits_q.squeeze(-1)
+                    
+                    return sbj_logits_a, sbj_logits_q
 
             elif task == 'Domain_Class':
 
@@ -224,6 +238,7 @@ class RecurrentQAHead(nn.Module):
                  n_aux_tasks=None,
                  aux_dropout_p:float=0.1,
                  n_domain_labels=None,
+                 n_qa_type_labels=None,
                  adversarial:bool=False,
                  task:str='QA',
     ):
@@ -239,6 +254,7 @@ class RecurrentQAHead(nn.Module):
         self.n_recurrent_layers = 2 # set number of recurrent layers to 1 or 2 (more are not necessary and computationally inefficient / costly)
         self.rnn_version = 'LSTM'
         self.task = task
+        self.n_qa_type_labels = n_qa_type_labels
 
         self.rnn_encoder = BiLSTM(max_seq_length, in_size=self.in_size, n_layers=self.n_recurrent_layers) if self.rnn_version == 'LSTM' else BiGRU(max_seq_length, in_size=self.in_size, n_layers=self.n_recurrent_layers)
         
@@ -258,8 +274,12 @@ class RecurrentQAHead(nn.Module):
             # fully-connected subjectivity output layers (must be present in every MTL setting and sbj classification)
             self.fc_sbj_1 = nn.Linear(self.in_size, self.in_size)
             self.fc_sbj_2 = nn.Linear(self.in_size, self.in_size)
-            self.fc_sbj_a = nn.Linear(self.in_size, 1) # fc subj. layer for answers
-            self.fc_sbj_q = nn.Linear(self.in_size, 1) # fc subj. layer for questions
+
+            if isinstance(self.n_qa_type_labels, int):
+                self.fc_sbj_q = nn.Linear(self.in_size, n_qa_type_labels) # fc subj. layer for questions
+            else:
+                self.fc_sbj_a = nn.Linear(self.in_size, 1) # fc subj. layer for answers
+                self.fc_sbj_q = nn.Linear(self.in_size, 1) # fc subj. layer for questions
 
             for fc_sbj in [self.fc_sbj_1, self.fc_sbj_2, self.fc_sbj_a, self.fc_sbj_q]:
                 nn.init.xavier_uniform_(fc_sbj.weight)
@@ -374,14 +394,20 @@ class RecurrentQAHead(nn.Module):
                 # introduce skip connection (add output of previous layer to linear transformation) to encode more information
                 sbj_out = sequence_output + self.fc_sbj_2(F.relu(self.aux_dropout(self.fc_sbj_1(sequence_output))))
                 sbj_out = self.aux_dropout(sbj_out)
-                sbj_logits_a = self.fc_sbj_a(sbj_out)
-                sbj_logits_q = self.fc_sbj_q(sbj_out)
 
-                # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
-                sbj_logits_a = sbj_logits_a.squeeze(-1)
-                sbj_logits_q = sbj_logits_q.squeeze(-1)
+                if isinstance(self.n_qa_type_labels, int):
+                    sbj_logits_q = self.fc_sbj_q(sbj_out)
+                    sbj_logits_q = sbj_logits_q.squeeze(-1)
+                    return sbj_logits_q
+                else:
+                    sbj_logits_a = self.fc_sbj_a(sbj_out)
+                    sbj_logits_q = self.fc_sbj_q(sbj_out)
 
-                return sbj_logits_a, sbj_logits_q #, hidden_rnn
+                    # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
+                    sbj_logits_a = sbj_logits_a.squeeze(-1)
+                    sbj_logits_q = sbj_logits_q.squeeze(-1)
+
+                    return sbj_logits_a, sbj_logits_q #, hidden_rnn
 
             elif task == 'Domain_Class':
 

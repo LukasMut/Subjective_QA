@@ -29,6 +29,7 @@ class DistilBertForQA(DistilBertPreTrainedModel):
                  adversarial:bool=False,
                  n_aux_tasks=None,
                  n_domain_labels=None,
+                 n_qa_type_labels=None,
                  task:str='QA',
     ):        
         super(DistilBertForQA, self).__init__(config)
@@ -40,6 +41,7 @@ class DistilBertForQA(DistilBertPreTrainedModel):
         self.adversarial = adversarial
         self.n_aux_tasks = n_aux_tasks
         self.n_domain_labels = n_domain_labels
+        self.n_qa_type_labels = n_qa_type_labels
         self.task = task
 
         if self.multitask: assert isinstance(self.n_aux_tasks, int), "If MTL setting, number of auxiliary tasks must be defined"
@@ -54,6 +56,7 @@ class DistilBertForQA(DistilBertPreTrainedModel):
                                            multitask=self.multitask,
                                            n_aux_tasks=self.n_aux_tasks,
                                            n_domain_labels=self.n_domain_labels,
+                                           n_qa_type_labels=self.n_qa_type_labels,
                                            adversarial=self.adversarial,
                                            task=self.task
                                            )
@@ -66,6 +69,7 @@ class DistilBertForQA(DistilBertPreTrainedModel):
                                         multitask=self.multitask,
                                         n_aux_tasks=self.n_aux_tasks,
                                         n_domain_labels=self.n_domain_labels,
+                                        n_qa_type_labels=self.n_qa_type_labels,
                                         adversarial=self.adversarial,
                                         task=self.task
                                         )

@@ -37,6 +37,8 @@ if __name__ == '__main__':
             help='Define number of evaluations during training. If "multiple_per_epoch", ten evals per epoch. If "one_per_epoch", once after a training epoch.')
     parser.add_argument('--sbj_classification', action='store_true',
             help='If provided, perform subjectivity classification (binary) instead of QA.')
+    parser.add_argument('--multi_qa_type_class', action='store_true',
+            help='If provided, subjectivity classification will be casted as a multi-class instead of a binary learning problem. Only possible in finetuning setting "combined".')
     parser.add_argument('--domain_classification', action='store_true',
             help='If provided, perform domain classification (multi-class) instead of QA.')
     parser.add_argument('--multitask', action='store_true',
@@ -100,7 +102,7 @@ if __name__ == '__main__':
     
     domains = domains[:-1] if args.finetuning == 'SubjQA' else domains
    
-    qa_types = ['obj', 'sbj']
+    qa_types = ['subjqa_obj', 'subjqa_sbj', 'squad_obj'] if args.finetuning == 'combined' and args.multi_qa_type_class else ['obj', 'sbj']
     datasets = ['SQuAD', 'SubjQA'] # not sure, whether this auxiliary task is actually useful
     
     # create domain_to_idx, qa_type_to_idx and dataset_to_idx mappings (necessary for auxiliary tasks)
@@ -117,7 +119,7 @@ if __name__ == '__main__':
     dataset_weights = None
 
     n_domain_labels = None if args.finetuning == 'SQuAD' else len(domains)
-    n_qa_labels = 2
+    n_qa_type_labels = len(qa_types)
     
     # NOTE: we use pre-trained cased model since both BERT and DistilBERT cased models perform significantly better on SQuAD than uncased versions     
     bert_tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-cased')
@@ -484,11 +486,11 @@ if __name__ == '__main__':
                                        squad_data_train,
                                        source='SQuAD',
                                        is_training=True,
+                                       multi_qa_type_class=True if args.multi_qa_type_class else False,
             )
 
             # create train and dev examples from SQuAD train set only
-            squad_examples_train, _ = split_into_train_and_dev(squad_examples_train)
-            
+            squad_examples_train, squad_examples_dev = split_into_train_and_dev(squad_examples_train)            
             
             squad_features_train = convert_examples_to_features(
                                                                 squad_examples_train, 
@@ -499,6 +501,7 @@ if __name__ == '__main__':
                                                                 is_training=True,
                                                                 domain_to_idx=domain_to_idx,
                                                                 dataset_to_idx=dataset_to_idx,
+
             )
 
             np.random.shuffle(squad_features_train)
@@ -509,9 +512,32 @@ if __name__ == '__main__':
 
             np.random.shuffle(combined_features_train)
             
-            combined_tensor_dataset_train = create_tensor_dataset(combined_features_train)
-            
-            subjqa_tensor_dataset_dev = create_tensor_dataset(subjqa_features_dev)
+            combined_tensor_dataset_train = create_tensor_dataset(combined_features_train, multi_qa_type_class=args.multi_qa_type_class)
+
+            if args.multi_qa_type_class:
+                # split development set into dev and test sets
+                squad_examples_dev = squad_examples_dev[:len(squad_examples_dev)//2]
+
+                squad_features_dev = convert_examples_to_features(
+                                                                  squad_examples_dev, 
+                                                                  bert_tokenizer,
+                                                                  max_seq_length=max_seq_length,
+                                                                  doc_stride=doc_stride,
+                                                                  max_query_length=max_query_length,
+                                                                  is_training=True,
+                                                                  domain_to_idx=domain_to_idx,
+                                                                  dataset_to_idx=dataset_to_idx,
+                                                                  )
+                squad_features_dev.extend(subjqa_features_dev)
+
+                combined_features_dev = squad_features_dev
+
+                combined_tensor_dataset_dev = create_tensor_dataset(combined_features_dev, multi_qa_type_class=args.multi_qa_type_class)
+
+            else:
+                combined_features_dev = subjqa_features_dev
+
+                combined_tensor_dataset_dev = create_tensor_dataset(combined_features_dev)
 
             train_dl = BatchGenerator(
                                       dataset=combined_tensor_dataset_train,
@@ -520,7 +546,7 @@ if __name__ == '__main__':
             )
 
             val_dl = BatchGenerator(
-                                    dataset=subjqa_tensor_dataset_dev,
+                                    dataset=combined_tensor_dataset_dev,
                                     batch_size=batch_size,
                                     sort_batch=sort_batch,
             )
@@ -541,7 +567,7 @@ if __name__ == '__main__':
                                                   )
                     
                     if args.sequential_transfer:
-                        combined_tensor_dataset_dev_aux_sbj = create_tensor_dataset(subjqa_features_dev, aux_sbj_batch=True)
+                        combined_tensor_dataset_dev_aux_sbj = create_tensor_dataset(combined_features_dev, aux_sbj_batch=True)
 
                         val_dl_sbj = BatchGenerator(
                                                dataset=combined_tensor_dataset_dev_aux_sbj,
@@ -601,7 +627,7 @@ if __name__ == '__main__':
                                               sort_batch=sort_batch,
                                               )
                     
-                    combined_tensor_dataset_dev_aux_sbj = create_tensor_dataset(subjqa_features_dev, aux_sbj_batch=True)
+                    combined_tensor_dataset_dev_aux_sbj = create_tensor_dataset(combined_features_dev, aux_sbj_batch=True)
 
                     val_dl = BatchGenerator(
                                            dataset=combined_tensor_dataset_dev_aux_sbj,
@@ -617,23 +643,36 @@ if __name__ == '__main__':
                 subjqa_a_types = [f.a_sbj for f in subjqa_features_train]
                 squad_a_types = [f.a_sbj for f in squad_features_train]
                 
-                q_type_weights = get_class_weights(
-                                                   subjqa_classes=subjqa_q_types,
-                                                   idx_to_class=idx_to_qa_types,
-                                                   squad_classes=squad_q_types,
-                                                   binary=True,
-                                                   qa_type='questions',
-                )
 
-                a_type_weights = get_class_weights(
-                                                  subjqa_classes=subjqa_a_types,
-                                                  idx_to_class=idx_to_qa_types,
-                                                  squad_classes=squad_a_types,
-                                                  binary=True,
-                                                  qa_type='answers',
-                )
+                if args.multi_qa_type_class:
+                    q_type_weights = get_class_weights(
+                                                       subjqa_classes=subjqa_q_types,
+                                                       idx_to_class=idx_to_qa_types,
+                                                       squad_classes=squad_q_types,
+                                                       binary=False,
+                                                       qa_type='questions',
+                                                       multi_qa_type_class=True,
+                    )
 
-                qa_type_weights = torch.stack((a_type_weights, q_type_weights))
+                    qa_type_weights = q_type_weights
+
+                else:
+                    q_type_weights = get_class_weights(
+                                                       subjqa_classes=subjqa_q_types,
+                                                       idx_to_class=idx_to_qa_types,
+                                                       squad_classes=squad_q_types,
+                                                       binary=True,
+                                                       qa_type='questions',
+                    )
+                    a_type_weights = get_class_weights(
+                                                      subjqa_classes=subjqa_a_types,
+                                                      idx_to_class=idx_to_qa_types,
+                                                      squad_classes=squad_a_types,
+                                                      binary=True,
+                                                      qa_type='answers',
+                    )
+
+                    qa_type_weights = torch.stack((a_type_weights, q_type_weights))
 
             elif args.domain_classification:
 
@@ -664,6 +703,7 @@ if __name__ == '__main__':
                                               adversarial = True if args.adversarial == 'GRL' else False,
                                               n_aux_tasks = args.n_aux_tasks,
                                               n_domain_labels = n_domain_labels,
+                                              n_qa_type_labels = n_qa_type_labels if args.multi_qa_type_class else None,
                                               task = task,
         )
 
@@ -683,7 +723,7 @@ if __name__ == '__main__':
         hypers["batch_presentation"] = args.batches
         hypers["task_sampling"] = args.task_sampling
         hypers["mtl_setting"] = args.mtl_setting
-        hypers["n_qa_labels"] = 2
+        hypers["n_qa_type_labels"] = n_qa_type_labels
         hypers["n_domains"] = n_domain_labels
 
         if args.n_evals == 'multiple_per_epoch':
@@ -741,6 +781,7 @@ if __name__ == '__main__':
                                                                                             qa_type_weights=qa_type_weights,
                                                                                             domain_weights=domain_weights,
                                                                                             adversarial_simple=False,
+                                                                                            multi_qa_type_class=args.multi_qa_type_class,
             )
 
         elif isinstance(args.n_aux_tasks, type(None)) and args.domain_classification:
@@ -1050,13 +1091,14 @@ if __name__ == '__main__':
                                                         adversarial = True if args.adversarial == 'GRL' else False,
                                                         n_aux_tasks = args.n_aux_tasks,
                                                         n_domain_labels = n_domain_labels,
+                                                        n_qa_type_labels = n_qa_type_labels if args.multi_qa_type_class else None,
                                                         task = task,
                 )
 
                 if args.sequential_transfer:
-                    add_features = n_qa_labels + n_domain_labels
+                    add_features = n_qa_type_labels + n_domain_labels
                     model.qa_head.fc_qa.in_features += add_features
-                    model.qa_head.fc_qa.weight = nn.Parameter(torch.cat((model.qa_head.fc_qa.weight, torch.randn(add_features, n_qa_labels).T), 1))
+                    model.qa_head.fc_qa.weight = nn.Parameter(torch.cat((model.qa_head.fc_qa.weight, torch.randn(add_features, n_qa_type_labels).T), 1))
                 
                 # load fine-tuned model
                 model.load_state_dict(torch.load(args.sd + '/%s' % (model_name)))
