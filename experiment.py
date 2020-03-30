@@ -513,8 +513,10 @@ if __name__ == '__main__':
 
             np.random.shuffle(combined_features_train)
             
-            combined_tensor_dataset_train = create_tensor_dataset(combined_features_train, multi_qa_type_class=args.multi_qa_type_class)
-
+            combined_tensor_dataset_train = create_tensor_dataset(
+                                                                  combined_features_train,
+                                                                  multi_qa_type_class=args.multi_qa_type_class,
+                                                                  )
             #TODO: implement this for test loop
             if args.multi_qa_type_class:
                 # split development set into dev and test sets
@@ -534,7 +536,10 @@ if __name__ == '__main__':
 
                 combined_features_dev = squad_features_dev
 
-                combined_tensor_dataset_dev = create_tensor_dataset(combined_features_dev, multi_qa_type_class=args.multi_qa_type_class)
+                combined_tensor_dataset_dev = create_tensor_dataset(
+                                                                    combined_features_dev,
+                                                                    multi_qa_type_class=args.multi_qa_type_class,
+                                                                    )
 
             else:
                 combined_features_dev = subjqa_features_dev
@@ -560,7 +565,11 @@ if __name__ == '__main__':
                 if args.batches == 'alternating':
 
                     # create different dataset for subjectivity auxiliary task (condition on question-answer sequence only instead of question-review sequence)
-                    combined_tensor_dataset_train_aux_sbj = create_tensor_dataset(combined_features_train, aux_sbj_batch=True)
+                    combined_tensor_dataset_train_aux_sbj = create_tensor_dataset(
+                                                                                  combined_features_train, 
+                                                                                  aux_sbj_batch=True,
+                                                                                  multi_qa_type_class=args.multi_qa_type_class,
+                                                                                  )
 
                     train_dl_sbj = BatchGenerator(
                                                   dataset=combined_tensor_dataset_train_aux_sbj,
@@ -569,13 +578,17 @@ if __name__ == '__main__':
                                                   )
                     
                     if args.sequential_transfer:
-                        combined_tensor_dataset_dev_aux_sbj = create_tensor_dataset(combined_features_dev, aux_sbj_batch=True)
+                        combined_tensor_dataset_dev_aux_sbj = create_tensor_dataset(
+                                                                                    combined_features_dev,
+                                                                                    aux_sbj_batch=True,
+                                                                                    multi_qa_type_class=args.multi_qa_type_class,
+                                                                                    )
 
                         val_dl_sbj = BatchGenerator(
-                                               dataset=combined_tensor_dataset_dev_aux_sbj,
-                                               batch_size=batch_size,
-                                               sort_batch=sort_batch,
-                                              )
+                                                   dataset=combined_tensor_dataset_dev_aux_sbj,
+                                                   batch_size=batch_size,
+                                                   sort_batch=sort_batch,
+                                                   )
                     else:
                         train_dl = list(zip(train_dl, train_dl_sbj))
 
@@ -621,7 +634,11 @@ if __name__ == '__main__':
                 if args.batches == 'alternating':
 
                     # create different dataset for subjectivity auxiliary task (condition on question-answer sequence only instead of question-review sequence)
-                    combined_tensor_dataset_train_aux_sbj = create_tensor_dataset(combined_features_train, aux_sbj_batch=True)
+                    combined_tensor_dataset_train_aux_sbj = create_tensor_dataset(
+                                                                                  combined_features_train, 
+                                                                                  aux_sbj_batch=True,
+                                                                                  multi_qa_type_class=args.multi_qa_type_class,
+                                                                                  )
 
                     train_dl = BatchGenerator(
                                               dataset=combined_tensor_dataset_train_aux_sbj,
@@ -629,7 +646,11 @@ if __name__ == '__main__':
                                               sort_batch=sort_batch,
                                               )
                     
-                    combined_tensor_dataset_dev_aux_sbj = create_tensor_dataset(combined_features_dev, aux_sbj_batch=True)
+                    combined_tensor_dataset_dev_aux_sbj = create_tensor_dataset(
+                                                                                combined_features_dev,
+                                                                                aux_sbj_batch=True,
+                                                                                multi_qa_type_class=args.multi_qa_type_class,
+                                                                                )
 
                     val_dl = BatchGenerator(
                                            dataset=combined_tensor_dataset_dev_aux_sbj,
@@ -1048,13 +1069,24 @@ if __name__ == '__main__':
                 np.random.shuffle(subjqa_features_test)
             
             if args.multi_qa_type_class:
-                subjqa_tensor_dataset_test = create_tensor_dataset(subjqa_features_test, multi_qa_type_class=True)
+                subjqa_tensor_dataset_test = create_tensor_dataset(
+                                                                   subjqa_features_test, 
+                                                                   multi_qa_type_class=args.multi_qa_type_class,
+                                                                   )
 
             elif args.detailed_analysis_sbj_class:
-                subjqa_tensor_dataset_test = create_tensor_dataset(subjqa_features_test, detailed_analysis_sbj_class=True)
+                subjqa_tensor_dataset_test = create_tensor_dataset(
+                                                                   subjqa_features_test,
+                                                                   detailed_analysis_sbj_class=args.detailed_analysis_sbj_class,
+                                                                   multi_qa_type_class=args.multi_qa_type_class,
+                                                                   )
 
             elif args.sbj_classification and args.batches == 'alternating':
-                subjqa_tensor_dataset_test = create_tensor_dataset(subjqa_features_test, aux_sbj_batch=True)
+                subjqa_tensor_dataset_test = create_tensor_dataset(
+                                                                   subjqa_features_test,
+                                                                   aux_sbj_batch=True,
+                                                                   multi_qa_type_class=args.multi_qa_type_class,
+                                                                   )
 
             elif not args.sbj_classification or (args.sbj_classification and args.batches == 'normal'):
                 subjqa_tensor_dataset_test = create_tensor_dataset(subjqa_features_test)
