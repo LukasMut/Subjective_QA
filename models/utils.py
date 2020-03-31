@@ -72,7 +72,7 @@ def get_detailed_scores(
                         ):
     y_pred = soft_to_hard(probas) 
     y_true = to_cpu(y_true.type_as(y_pred), to_numpy=False)
-    y_ds = to_cpu(y_true.type_as(y_pred), to_numpy=False)
+    y_ds = to_cpu(y_ds.type_as(y_pred), to_numpy=False)
 
     for p, l, ds in zip(y_pred, y_true, y_ds):
 
