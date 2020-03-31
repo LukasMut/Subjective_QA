@@ -773,6 +773,7 @@ def create_question_answer_sequences(
                                     cls_token:int=101,
                                     sep_token:int=102,
                                     pad_token:int=0,
+                                    multi_qa_type_class:bool=False,
                                     ):
     # NOTE: we want to create (q_i, a_i) sequence pairs (opposed to (q_i, r_i) pairs) to better inform model about subjectivity
     all_input_ids, all_input_masks, all_segment_ids, all_input_lengths, all_q_sbj, all_a_sbj = [], [], [], [], [], []
@@ -827,7 +828,7 @@ def create_question_answer_sequences(
 
     all_q_sbj = torch.tensor(all_q_sbj, dtype=torch.long)
     all_a_sbj = torch.tensor(all_a_sbj, dtype=torch.long)
-    all_sbj = torch.stack((all_a_sbj, all_q_sbj), dim=1)
+    all_sbj = all_q_sbj if multi_qa_type_class else torch.stack((all_a_sbj, all_q_sbj), dim=1)
 
     return all_input_ids, all_input_masks, all_segment_ids, all_input_lengths, all_sbj
 
@@ -838,8 +839,10 @@ def create_tensor_dataset(
                           multi_qa_type_class:bool=False,
                           ):
     if aux_sbj_batch:
-        all_input_ids,  all_input_mask, all_segment_ids, all_input_lengths, all_sbj = create_question_answer_sequences(features=features)
-        
+        all_input_ids,  all_input_mask, all_segment_ids, all_input_lengths, all_sbj = create_question_answer_sequences(
+                                                                                                                        features=features,
+                                                                                                                        multi_qa_type_class=multi_qa_type_class,
+                                                                                                                        )
         dataset = TensorDataset(
                                 all_input_ids,
                                 all_input_mask,

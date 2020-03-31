@@ -380,6 +380,7 @@ def plot_seqs_projected_via_tsne(
                                  tsne_embed_y:np.ndarray,
                                  y_true:np.ndarray,
                                  class_to_idx:dict,
+                                 model_name:str,
 ):
     plt.figure(figsize=(16,10), dpi=300) #NOTE: the higher the dpi the better the resolution
     ax = plt.subplot(111)
@@ -408,6 +409,6 @@ def plot_seqs_projected_via_tsne(
     ax.legend(fancybox=True, shadow=True, loc='upper right', fontsize=legend_fontsize)
 
     plt.tight_layout()
-    plt.savefig('./plots/feat_reps/' + 'tsne_question_context_frozen_bert' + '.png')
+    plt.savefig('./plots/feat_reps/' + model_name + '.png')
     plt.show()
     plt.clf()
