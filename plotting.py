@@ -3,6 +3,7 @@ __all__ = [
            'plot_results',
            'plotting',
            'plot_confusion_matrix',
+           'plot_seqs_projected_via_tsne',
 ]
 
 import numpy as np
@@ -372,3 +373,41 @@ def plot_confusion_matrix(y_true, y_pred, classes,
                     color="white" if cm[i, j] > thresh else "black")
     fig.tight_layout()
     return ax
+
+
+def plot_seqs_projected_via_tsne(
+                                 tsne_embed_x:np.ndarray,
+                                 tsne_embed_y:np.ndarray,
+                                 y_true:np.ndarray,
+                                 class_to_idx:dict,
+):
+    plt.figure(figsize=(16,10), dpi=300) #NOTE: the higher the dpi the better the resolution
+    ax = plt.subplot(111)
+    
+    # set hyperparameters
+    legend_fontsize = 13
+    
+    # hide the right and top spines
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+
+    # only show ticks on the left (y-axis) and bottom (x-axis) spines
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    
+    # specify both labels for legend and colors for data points
+    if len(np.unique(y_true)) > 3:
+        classes = list(class_to_idx.keys())
+    else:
+        classes = ['$\mathbf{D}_{SubjQA}^{obj}$', '$\mathbf{D}_{SubjQA}^{sbj}$', '$\mathbf{D}_{SQuAD}$']
+        colors = ['royalblue', 'palevioletred', 'green']
+
+    for cat, lab in class_to_idx.items():
+        ax.scatter(tsne_embed_x[y_true == lab], tsne_embed_y[y_true == lab], alpha=.6, color=colors[lab], label=classes[lab])
+
+    ax.legend(fancybox=True, shadow=True, loc='upper right', fontsize=legend_fontsize)
+
+    plt.tight_layout()
+    plt.savefig('./plots/feat_reps/' + 'tsne_question_context_frozen_bert' + '.png')
+    plt.show()
+    plt.clf()
