@@ -1,4 +1,5 @@
 __all__ = [
+           'conf_mat',
            'get_results',
            'plot_results',
            'plotting',
@@ -16,9 +17,12 @@ import os
 import re
 
 from collections import defaultdict
-from itertools import islice
+from itertools import islice, product
+
 from sklearn.metrics import confusion_matrix
+from sklearn.utils import check_matplotlib_support
 from sklearn.utils.multiclass import unique_labels
+
 
 def get_results(
                 task:str,
@@ -323,57 +327,9 @@ def plotting(
                          task_sampling=task_sampling,
             )
             
-            
-def plot_confusion_matrix(y_true, y_pred, classes,
-                          normalize=False,
-                          title=None,
-                          cmap=plt.cm.Blues):
-    """
-    This function prints and plots the confusion matrix.
-    Normalization can be applied by setting `normalize=True`.
-    """
-    if not title:
-        if normalize:
-            title = 'Normalized confusion matrix'
-        else:
-            title = 'Confusion matrix, without normalization'
-
-    # Compute confusion matrix
-    cm = confusion_matrix(y_true, y_pred)
-    # Only use the labels that appear in the data
-    classes = classes[unique_labels(y_true, y_pred)]
-    if normalize:
-        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
-        print("Normalized confusion matrix")
-    else:
-        print('Confusion matrix, without normalization')
-        
-    fig, ax = plt.subplots()
-    im = ax.imshow(cm, interpolation='nearest', cmap=cmap)
-    ax.figure.colorbar(im, ax=ax)
-
-    ax.set(xticks=np.arange(cm.shape[1]),
-           yticks=np.arange(cm.shape[0]),
-           xticklabels=classes, yticklabels=classes,
-           title=title,
-           ylabel='True label',
-           xlabel='Predicted label')
-
-    # rotate the tick labels and set their alignment.
-    plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
-             rotation_mode="anchor")
-
-    # loop over data dimensions and create text annotations
-    fmt = '.2f' if normalize else 'd'
-    thresh = cm.max() / 2.
-    for i in range(cm.shape[0]):
-        for j in range(cm.shape[1]):
-            ax.text(j, i, format(cm[i, j], fmt),
-                    ha="center", va="center",
-                    color="white" if cm[i, j] > thresh else "black")
-    fig.tight_layout()
-    return ax
-
+###########################################
+################## t-SNE ##################
+###########################################
 
 def plot_seqs_projected_via_tsne(
                                  tsne_embed_x:np.ndarray,
@@ -412,3 +368,174 @@ def plot_seqs_projected_via_tsne(
     plt.savefig('./plots/feat_reps/' + model_name + '.png')
     plt.show()
     plt.clf()
+    
+##########################################
+########## CONFUSION MATRIX ##############
+##########################################
+    
+def conf_mat(
+             y_pred:np.ndarray,
+             y_true:np.ndarray,
+             normalize:bool=False,
+             metric=None,
+):
+    n = len(np.unique(y_true))
+    conf_mat = np.zeros((n, n), dtype=int)
+    for i, pred in enumerate(y_pred):
+        conf_mat[y_true[i], pred] += 1
+    
+    if normalize:
+        assert isinstance(metric, str), 'If normalized confusion matrix, metric must be defined'
+        precision_scores = conf_mat.astype('float') / conf_mat.sum(axis=0)[:, np.newaxis]
+        recall_scores = conf_mat.astype('float') / conf_mat.sum(axis=1)[:, np.newaxis]
+        f1_scores = 2 * (precision_scores * recall_scores) / (precision_scores + recall_scores)
+        
+        if metric == 'precision':
+            return precision_scores
+        elif metric == 'recall':
+            return recall_scores
+        elif metric == 'f1':
+            return f1_scores
+        
+    return conf_mat
+
+def plot_confusion_matrix(
+                          y_pred:np.ndarray,
+                          y_true:np.ndarray,
+                          labels:np.ndarray,
+                          display_labels:list,
+                          custom_conf_mat:bool,
+                          normalize:bool,
+                          metric=None,
+                          sample_weight=None,
+                          include_values=True,
+                          xticks_rotation='horizontal',
+                          values_format=None,
+                          cmap='viridis',
+                          ax=None,
+                         ):
+    """
+    This function prints and plots the confusion matrix.
+    Normalization can be applied by setting `normalize=True`.
+    """
+    if custom_conf_mat:
+        if normalize:
+            assert isinstance(metric, str), 'If normalized confusion matrix, metric must be defined'
+        cm = conf_mat(
+                      y_pred=y_pred,
+                      y_true=y_true,
+                      normalize=normalize,
+                      metric=metric,
+        )
+    else:
+        cm = confusion_matrix(
+                              y_true, 
+                              y_pred, 
+                              sample_weight=sample_weight,
+                              labels=labels,
+        )
+        
+    if display_labels is None:
+        display_labels = labels
+
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm,
+                                  display_labels=display_labels)
+    return disp.plot(include_values=include_values,
+                     cmap=cmap, ax=ax, xticks_rotation=xticks_rotation,
+                     values_format=values_format)
+
+
+class ConfusionMatrixDisplay:
+    """Confusion Matrix visualization.
+    It is recommend to use :func:`~sklearn.metrics.plot_confusion_matrix` to
+    create a :class:`ConfusionMatrixDisplay`. All parameters are stored as
+    attributes.
+    Read more in the :ref:`User Guide <visualizations>`.
+    Parameters
+    ----------
+    confusion_matrix : ndarray of shape (n_classes, n_classes)
+        Confusion matrix.
+    display_labels : ndarray of shape (n_classes,)
+        Display labels for plot.
+    Attributes
+    ----------
+    im_ : matplotlib AxesImage
+        Image representing the confusion matrix.
+    text_ : ndarray of shape (n_classes, n_classes), dtype=matplotlib Text, \
+            or None
+        Array of matplotlib axes. `None` if `include_values` is false.
+    ax_ : matplotlib Axes
+        Axes with confusion matrix.
+    figure_ : matplotlib Figure
+        Figure containing the confusion matrix.
+    """
+    def __init__(self, confusion_matrix, display_labels):
+        self.confusion_matrix = confusion_matrix
+        self.display_labels = display_labels
+
+    def plot(self, include_values=True, cmap='viridis',
+             xticks_rotation='horizontal', values_format=None, ax=None):
+        """Plot visualization.
+        Parameters
+        ----------
+        include_values : bool, default=True
+            Includes values in confusion matrix.
+        cmap : str or matplotlib Colormap, default='viridis'
+            Colormap recognized by matplotlib.
+        xticks_rotation : {'vertical', 'horizontal'} or float, \
+                         default='horizontal'
+            Rotation of xtick labels.
+        values_format : str, default=None
+            Format specification for values in confusion matrix. If `None`,
+            the format specification is '.2g'.
+        ax : matplotlib axes, default=None
+            Axes object to plot on. If `None`, a new figure and axes is
+            created.
+        Returns
+        -------
+        display : :class:`~sklearn.metrics.ConfusionMatrixDisplay`
+        """
+        check_matplotlib_support("ConfusionMatrixDisplay.plot")
+        
+        plt.figure(figsize=(14, 10), dpi=300)
+
+        if ax is None:
+            fig, ax = plt.subplots()
+        else:
+            fig = ax.figure
+
+        cm = self.confusion_matrix
+        n_classes = cm.shape[0]
+        self.im_ = ax.imshow(cm, interpolation='nearest', cmap=cmap)
+        self.text_ = None
+
+        cmap_min, cmap_max = self.im_.cmap(0), self.im_.cmap(256)
+
+        if include_values:
+            self.text_ = np.empty_like(cm, dtype=object)
+            if values_format is None:
+                values_format = '.2g'
+
+            # print text with appropriate color depending on background
+            thresh = (cm.max() + cm.min()) / 2.0
+            for i, j in product(range(n_classes), range(n_classes)):
+                color = cmap_max if cm[i, j] < thresh else cmap_min
+                self.text_[i, j] = ax.text(j, i,
+                                           format(cm[i, j], values_format),
+                                           ha="center", va="center",
+                                           color=color)
+
+        fig.colorbar(self.im_, ax=ax)
+        ax.set(xticks=np.arange(n_classes),
+               yticks=np.arange(n_classes),
+               xticklabels=self.display_labels,
+               yticklabels=self.display_labels,
+               ylabel="True label",
+               xlabel="Predicted label")
+
+        ax.set_ylim((n_classes - 0.5, -0.5))
+        plt.setp(ax.get_xticklabels(), rotation=xticks_rotation)
+
+        self.figure_ = fig
+        self.ax_ = ax
+        return self
