@@ -62,7 +62,7 @@ def f1(probas:torch.Tensor, y_true:torch.Tensor, task:str, avg:str='macro'):
     return f1_score(to_cpu(y_true), y_pred.numpy(), average=avg)
 
 def compute_rel_freq(results_per_ds:dict):
-  return {ds: {q_type: 100 * (score['correct'] / score['freq']) for q_type, score in q_types.items()} for ds, q_types in results_per_ds.items()}
+  return {dataset: {q_type: 100 * (score['correct'] / score['freq']) for q_type, score in q_types.items()} for dataset, q_types in results_per_ds.items()}
 
 def get_detailed_scores(
                         probas:torch.Tensor,
@@ -1388,7 +1388,7 @@ def test(
     print()
 
     if detailed_analysis_sbj_class:
-      #results_per_ds = compute_rel_freq(results_per_ds)
+      results_per_ds = compute_rel_freq(results_per_ds)
       return test_loss, test_acc, test_f1, results_per_ds
     if multi_qa_type_class:
       predictions = np.array(predictions).flatten().tolist()
