@@ -1388,7 +1388,7 @@ def test(
     print()
 
     if detailed_analysis_sbj_class:
-      results_per_ds = compute_rel_freq(results_per_ds)
+      #results_per_ds = compute_rel_freq(results_per_ds)
       return test_loss, test_acc, test_f1, results_per_ds
     if multi_qa_type_class:
       predictions = np.array(predictions).flatten().tolist()
