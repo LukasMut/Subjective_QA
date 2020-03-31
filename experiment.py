@@ -1066,21 +1066,15 @@ if __name__ == '__main__':
 
                 # make sure that examples from SQuAD are not just at the end of the dataset (i.e., last mini-batches)
                 np.random.shuffle(subjqa_features_test)
-            
-            if args.multi_qa_type_class:
-                subjqa_tensor_dataset_test = create_tensor_dataset(
-                                                                   subjqa_features_test, 
-                                                                   multi_qa_type_class=args.multi_qa_type_class,
-                                                                   )
 
-            elif args.detailed_analysis_sbj_class:
+            if args.detailed_analysis_sbj_class:
                 subjqa_tensor_dataset_test = create_tensor_dataset(
                                                                    subjqa_features_test,
                                                                    detailed_analysis_sbj_class=args.detailed_analysis_sbj_class,
                                                                    multi_qa_type_class=args.multi_qa_type_class,
                                                                    )
 
-            elif args.sbj_classification and args.batches == 'alternating':
+            elif (args.sbj_classification or args.multi_qa_type_class) and args.batches == 'alternating':
                 subjqa_tensor_dataset_test = create_tensor_dataset(
                                                                    subjqa_features_test,
                                                                    aux_sbj_batch=True,
