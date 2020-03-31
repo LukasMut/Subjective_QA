@@ -62,7 +62,7 @@ def f1(probas:torch.Tensor, y_true:torch.Tensor, task:str, avg:str='macro'):
     return f1_score(to_cpu(y_true), y_pred.numpy(), average=avg)
 
 def compute_rel_freq(results_per_ds:dict):
-  return {ds: {qa: 100 * (score['correct'] / score['freq']) for qa, score in qa.items()} for ds, qa in results_per_ds.items()}
+  return {ds: {qa: 100 * (score['correct'] / score['freq']) for qa, score in qas.items()} for ds, qas in results_per_ds.items()}
 
 def get_detailed_scores(
                         probas:torch.Tensor,
