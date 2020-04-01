@@ -61,8 +61,8 @@ def f1(probas:torch.Tensor, y_true:torch.Tensor, task:str, avg:str='macro'):
     y_pred = soft_to_hard(probas) if task == 'binary' else torch.argmax(to_cpu(probas, detach=True, to_numpy=False), dim=1)
     return f1_score(to_cpu(y_true), y_pred.numpy(), average=avg)
 
-def compute_rel_freq(results_per_ds:dict):
-  return {dataset: {q_type: 100 * (score['correct'] / score['freq']) for q_type, score in q_types.items()} for dataset, q_types in results_per_ds.items()}
+def compute_acc_per_ds(results_per_ds:dict):
+  return {ds: {q_type: 100 * (score['correct'] / score['freq']) for q_type, score in q_types.items()} for ds, q_types in results_per_ds.items()}
 
 def get_detailed_scores(
                         probas:torch.Tensor,
@@ -81,12 +81,10 @@ def get_detailed_scores(
       except KeyError:
         results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj'] = {}
         results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj']['freq'] = 1
+        results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj']['correct'] = 0
 
       if p == l:
-        try:
-          results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj']['correct'] += 1
-        except KeyError:
-          results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj']['correct'] = 1
+        results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj']['correct'] += 1
 
     return results_per_ds
 
@@ -1388,7 +1386,7 @@ def test(
     print()
 
     if detailed_analysis_sbj_class:
-      results_per_ds = compute_rel_freq(results_per_ds)
+      results_per_ds = compute_acc_per_ds(results_per_ds)
       return test_loss, test_acc, test_f1, results_per_ds
     if multi_qa_type_class:
       predictions = np.array(predictions).flatten().tolist()
