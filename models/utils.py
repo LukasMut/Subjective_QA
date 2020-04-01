@@ -1428,7 +1428,7 @@ def test(
     if detailed_analysis_sbj_class:
       results_per_ds = compute_acc_per_ds(results_per_ds)
       return test_loss, test_acc, test_f1, results_per_ds
-    if multi_qa_type_class:
+    if task == 'Sbj_Classification' and multi_qa_type_class:
       predictions = np.array(predictions).flatten().tolist()
       true_labels = np.array(true_labels).flatten().tolist()
       return test_loss, test_acc, test_f1, predictions, true_labels, feat_reps
