@@ -367,7 +367,7 @@ def train(
             # sample task from random distribution
             current_task = task_order[step]
 
-            # set loss back to 0 after each training iteration
+            # set loss back to 0 after every training iteration
             batch_loss = 0 
             
             if isinstance(n_aux_tasks, int):

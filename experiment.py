@@ -1125,7 +1125,7 @@ if __name__ == '__main__':
                                                                 dataset_to_idx=dataset_to_idx,
             )
 
-            if args.detailed_analysis_sbj_class or args.multi_qa_type_class:
+            if args.detailed_analysis_sbj_class or (args.multi_qa_type_class and args.sbj_classification):
 
                 squad_data_train = get_data(
                                             source='/SQuAD/',
@@ -1141,7 +1141,7 @@ if __name__ == '__main__':
                 
                 _, squad_examples_dev = split_into_train_and_dev(squad_examples_train)
 
-                if args.multi_qa_type_class:
+                if args.multi_qa_type_class and args.sbj_classification:
                     squad_examples_dev = squad_examples_dev[len(squad_examples_dev)//2:]
 
                 squad_features_dev = convert_examples_to_features(
@@ -1166,7 +1166,7 @@ if __name__ == '__main__':
                                                                    multi_qa_type_class=args.multi_qa_type_class,
                                                                    )
 
-            elif (args.sbj_classification or args.multi_qa_type_class) and args.batches == 'alternating':
+            elif (args.sbj_classification and args.batches == 'alternating') or (args.multi_qa_type_class and args.sbj_classification and args.batches == 'alternating'):
                 subjqa_tensor_dataset_test = create_tensor_dataset(
                                                                    subjqa_features_test,
                                                                    aux_sbj_batch=True,
