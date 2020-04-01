@@ -200,7 +200,7 @@ class LinearQAHead(nn.Module):
                     if self.dataset_agnostic:
                         sequence_output = sequence_output[:, 0, :]
                     else:
-                         # reverse gradients to learn qa-type invariant features (i.e., semi-supervised domain-adaptation)
+                        # reverse gradients to learn qa-type invariant features (i.e., semi-supervised domain-adaptation)
                         sequence_output = sequence_output[:, 0, :]
                         sequence_output = grad_reverse(sequence_output)
                 else:
@@ -265,10 +265,11 @@ class LinearQAHead(nn.Module):
                 return domain_logits
 
             elif task == 'Dataset_Class':
-                sequence_output = sequence_output[:, 0, :]
+                #TODO: figure out where GRL should be placed
                 # reverse gradients to learn dataset agnostic features (i.e., semi-supervised domain-adaptation)
                 assert hasattr(self, 'adversarial') and self.dataset_agnostic, 'We want dataset classification task to be defined as an adversarial task'
                 sequence_output = grad_reverse(sequence_output)
+                sequence_output = sequence_output[:, 0, :]
 
                 """
                 ## version without skip connection ##
