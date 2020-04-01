@@ -835,7 +835,6 @@ def create_question_answer_sequences(
 def create_tensor_dataset(
                           features:list,
                           aux_sbj_batch:bool=False,
-                          detailed_analysis_sbj_class:bool=False,
                           multi_qa_type_class:bool=False,
                           ):
     if aux_sbj_batch:
@@ -862,34 +861,20 @@ def create_tensor_dataset(
         all_a_sbj = torch.tensor([f.a_sbj for f in features], dtype=torch.long)
         
         all_sbj =  all_q_sbj if multi_qa_type_class else torch.stack((all_a_sbj, all_q_sbj), dim=1)
-
         all_domains = torch.tensor([f.domain for f in features], dtype=torch.long)
+        all_datasets = torch.tensor([f.dataset for f in features], dtype=torch.long)
         
-        if detailed_analysis_sbj_class:
-            all_datasets = torch.tensor([f.dataset for f in features], dtype=torch.long)
-            dataset = TensorDataset(
-                                    all_input_ids,
-                                    all_input_mask,
-                                    all_segment_ids,
-                                    all_input_lengths,
-                                    all_start_positions,
-                                    all_end_positions,
-                                    all_sbj,
-                                    all_domains,
-                                    all_datasets,
-                                    )
-
-        else:
-            dataset = TensorDataset(
-                                    all_input_ids,
-                                    all_input_mask,
-                                    all_segment_ids,
-                                    all_input_lengths,
-                                    all_start_positions,
-                                    all_end_positions,
-                                    all_sbj,
-                                    all_domains,
-                                    )
+        dataset = TensorDataset(
+                                all_input_ids,
+                                all_input_mask,
+                                all_segment_ids,
+                                all_input_lengths,
+                                all_start_positions,
+                                all_end_positions,
+                                all_sbj,
+                                all_domains,
+                                all_datasets,
+                                )
     return dataset
     
 def get_class_weights(
@@ -916,17 +901,27 @@ def get_class_weights(
             class_distrib_subjqa['squad_obj'] = n_total_squad
             class_distrib = class_distrib_subjqa
 
-        elif len(class_distrib_subjqa) == 2:
+        elif len(class_distrib_subjqa) == 2 and isinstance(qa_type, str):
             class_distrib_subjqa['obj'] += n_total_squad
+            class_distrib = class_distrib_subjqa
+
+        elif len(class_distrib_subjqa) == 1 and isinstance(qa_type, type(None)):
+            class_distrib_subjqa['SQuAD'] = n_total_squad
             class_distrib = class_distrib_subjqa
     else:
         n_total = n_total_subjqa
         class_distrib = class_distrib_subjqa
     
-    if binary:
+    if binary and isinstance(qa_type, str):
         # for binary cross-entropy we just need to compute weight for positive class
         class_weight = class_distrib['obj'] / class_distrib['sbj']
         print("Subjective {} will be weighted {} higher than objective {}".format(qa_type, class_weight, qa_type))
+        print()
+        return torch.tensor(class_weight, dtype=torch.float)
+    elif binary and isinstance(qa_type, type(None)):
+        # for binary cross-entropy we just need to compute weight for positive class
+        class_weight = class_distrib['SQuAD'] / class_distrib['SubjQA']
+        print("Examples from SubjQA will be weighted {} higher than examples from SQuAD".format(class_weight))
         print()
         return torch.tensor(class_weight, dtype=torch.float)
     else:

@@ -27,6 +27,7 @@ class DistilBertForQA(DistilBertPreTrainedModel):
                  highway_connection:bool=False,
                  multitask:bool=False,
                  adversarial:bool=False,
+                 dataset_agnostic:bool=False,
                  n_aux_tasks=None,
                  n_domain_labels=None,
                  n_qa_type_labels=None,
@@ -39,6 +40,7 @@ class DistilBertForQA(DistilBertPreTrainedModel):
         self.highway_connection = highway_connection
         self.multitask = multitask
         self.adversarial = adversarial
+        self.dataset_agnostic = dataset_agnostic
         self.n_aux_tasks = n_aux_tasks
         self.n_domain_labels = n_domain_labels
         self.n_qa_type_labels = n_qa_type_labels
@@ -58,6 +60,7 @@ class DistilBertForQA(DistilBertPreTrainedModel):
                                            n_domain_labels=self.n_domain_labels,
                                            n_qa_type_labels=self.n_qa_type_labels,
                                            adversarial=self.adversarial,
+                                           dataset_agnostic=self.dataset_agnostic,
                                            task=self.task
                                            )
         else:
@@ -71,6 +74,7 @@ class DistilBertForQA(DistilBertPreTrainedModel):
                                         n_domain_labels=self.n_domain_labels,
                                         n_qa_type_labels=self.n_qa_type_labels,
                                         adversarial=self.adversarial,
+                                        dataset_agnostic=self.dataset_agnostic,
                                         task=self.task
                                         )
         self.init_weights()

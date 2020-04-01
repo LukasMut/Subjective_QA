@@ -29,6 +29,7 @@ class LinearQAHead(nn.Module):
                  n_domain_labels=None,
                  n_qa_type_labels=None,
                  adversarial:bool=False,
+                 dataset_agnostic:bool=False,
                  task:str='QA',
     ):
         
@@ -42,9 +43,11 @@ class LinearQAHead(nn.Module):
         self.qa_dropout_p = qa_dropout_p
         self.task = task
         self.n_qa_type_labels = n_qa_type_labels
+        self.dataset_agnostic = dataset_agnostic
 
         if highway_block:
-            self.highway = Highway(self.in_size)
+            self.highway_1 = Highway(self.in_size)
+            self.highway_2 = Highway(self.in_size)
 
         # fully-connected QA output layer with dropout
         self.fc_qa = nn.Linear(self.in_size, self.n_labels)
@@ -89,13 +92,23 @@ class LinearQAHead(nn.Module):
             for fc_domain in [self.fc_domain_1, self.fc_domain_2, self.fc_domain_3]:
                 nn.init.xavier_uniform_(fc_domain.weight)
         
-        if (self.task == 'QA' and self.multitask) or self.task == 'all':
+        if self.task == 'QA' and self.multitask:
 
             # define, whether we want to perform adversarial training with a GRL between feature extractor and classifiers
             self.adversarial = adversarial
+            
+            if self.n_aux_tasks == 2 and self.dataset_agnostic:
 
-            if self.n_aux_tasks == 2 or self.task == 'all':
-                assert isinstance(n_domain_labels, int), 'If model is to perform two auxiliary tasks, domain labels must be provided'
+                # fully-connected dataset output layers (second auxiliary task)
+                self.fc_ds_1 = nn.Linear(self.in_size, self.in_size)
+                self.fc_ds_2 = nn.Linear(self.in_size, self.in_size)
+                self.fc_ds_3 = nn.Linear(self.in_size, 1)
+
+                for fc_ds in [self.fc_ds_1, self.fc_ds_2, self.fc_ds_3]:
+                    nn.init.xavier_uniform_(fc_ds.weight)
+
+            elif self.n_aux_tasks == 2 and not self.dataset_agnostic:
+                assert isinstance(n_domain_labels, int), 'Total number of domain labels must be provided'
                 self.n_domain_labels = n_domain_labels
 
                 # fully-connected review domain output layers (second auxiliary task)
@@ -108,6 +121,18 @@ class LinearQAHead(nn.Module):
 
             elif self.n_aux_tasks > 2:
                 raise ValueError("Model cannot perform more than 2 auxiliary tasks.")
+
+        elif self.task == 'all':
+            assert isinstance(n_domain_labels, int), 'If model is to perform sequential transfer, total number of domain labels must be provided'
+            self.n_domain_labels = n_domain_labels
+
+            # fully-connected review domain output layers (second auxiliary task)
+            self.fc_domain_1 = nn.Linear(self.in_size, self.in_size)
+            self.fc_domain_2 = nn.Linear(self.in_size, self.in_size)
+            self.fc_domain_3 = nn.Linear(self.in_size, self.n_domain_labels)
+
+            for fc_domain in [self.fc_domain_1, self.fc_domain_2, self.fc_domain_3]:
+                nn.init.xavier_uniform_(fc_domain.weight)
                     
     def forward(
                 self,
@@ -122,8 +147,10 @@ class LinearQAHead(nn.Module):
         sequence_output = self.qa_dropout(sequence_output)
         
         if hasattr(self, 'highway'):
-            sequence_output = self.highway(sequence_output) # pass BERT representations through highway-connection (for better information flow)
-       
+            # pass BERT representations through highway-connection (for better information flow)
+            sequence_output = self.highway_1(sequence_output) 
+            sequence_output = self.highway_2(sequence_output)
+
         if task == 'QA':
 
             if isinstance(aux_targets, torch.Tensor):
@@ -162,20 +189,22 @@ class LinearQAHead(nn.Module):
                 total_loss = (start_loss + end_loss) / 2
                 outputs = (total_loss,) + outputs
 
+            if output_feat_reps:
+                sequence_output = sequence_output[:, 0, :].squeeze(1)
+                return outputs, sequence_output
             return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)
 
         else:
-            if hasattr(self, 'adversarial'):
-                # reverse gradients to learn qa-type / domain-invariant features (i.e., semi-supervised domain-adaptation)
-                sequence_output = grad_reverse(sequence_output)
-
-            # TODO: figure out, whether we should extract contextual embedding of [CLS] token after or before reversing gradients
-            
-            # use contextual embedding of the special [CLS] token (corresponds to the semantic representation of an input sentence X)
-            sequence_output = sequence_output[:, 0, :]
-
             if task == 'Sbj_Class':
-
+                if hasattr(self, 'adversarial'):
+                    if self.dataset_agnostic:
+                        sequence_output = sequence_output[:, 0, :]
+                    else:
+                         # reverse gradients to learn qa-type invariant features (i.e., semi-supervised domain-adaptation)
+                        sequence_output = sequence_output[:, 0, :]
+                        sequence_output = grad_reverse(sequence_output)
+                else:
+                    sequence_output = sequence_output[:, 0, :]
                 """
                 ## version without skip connection ##
                 sbj_out = self.fc_sbj_1(sequence_output)
@@ -186,7 +215,6 @@ class LinearQAHead(nn.Module):
                 sbj_logits_q = self.fc_sbj_q(sbj_out)
 
                 """
-
                 # introduce skip connection (add output of previous layer to linear transformation) to encode more information
                 sbj_out = sequence_output + self.fc_sbj_2(F.relu(self.aux_dropout(self.fc_sbj_1(sequence_output))))
                 sbj_out = self.aux_dropout(sbj_out)
@@ -197,19 +225,24 @@ class LinearQAHead(nn.Module):
                     if output_feat_reps:
                         sequence_output = sequence_output.squeeze(1)
                         return sbj_logits_q, sequence_output
-                    else:
-                        return sbj_logits_q
+                    return sbj_logits_q
                 else:
                     sbj_logits_a = self.fc_sbj_a(sbj_out)
                     sbj_logits_q = self.fc_sbj_q(sbj_out)
-                    
-                    # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
+
+                    # remove 2nd dimension: [batch_size, 1] ==> [batch_size]
                     sbj_logits_a = sbj_logits_a.squeeze(-1)
                     sbj_logits_q = sbj_logits_q.squeeze(-1)
                     
                     return sbj_logits_a, sbj_logits_q
 
             elif task == 'Domain_Class':
+                if hasattr(self, 'adversarial'):
+                    # reverse gradients to learn review-domain invariant features (i.e., semi-supervised domain-adaptation)
+                    sequence_output = sequence_output[:, 0, :]
+                    sequence_output = grad_reverse(sequence_output)
+                else:
+                    sequence_output = sequence_output[:, 0, :]
 
                 """
                 ## version without skip connection ##
@@ -225,12 +258,34 @@ class LinearQAHead(nn.Module):
                 domain_out = sequence_output + self.fc_domain_2(F.relu(self.aux_dropout(self.fc_domain_1(sequence_output))))
                 domain_out = self.aux_dropout(domain_out)
                 domain_logits = self.fc_domain_3(domain_out)
-
-                # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
-                domain_logits = domain_logits.squeeze(-1)
-
+                domain_logits = domain_logits.squeeze(-1) # remove 2nd dimension - shape: [batch_size, 1] ==> shape: [batch_size]
+                if output_feat_reps:
+                    sequence_output = sequence_output.squeeze(1)
+                    return domain_logits, sequence_output
                 return domain_logits
-        
+
+            elif task == 'Dataset_Class':
+                sequence_output = sequence_output[:, 0, :]
+                # reverse gradients to learn dataset agnostic features (i.e., semi-supervised domain-adaptation)
+                assert hasattr(self, 'adversarial') and self.dataset_agnostic, 'We want dataset classification task to be defined as an adversarial task'
+                sequence_output = grad_reverse(sequence_output)
+
+                """
+                ## version without skip connection ##
+
+                domain_out = self.fc_domain_1(sequence_output)
+                domain_out = self.aux_dropout(domain_out)
+                domain_out = self.fc_domain_2(domain_out)
+                domain_out = self.aux_dropout(domain_out)
+                domain_logits = self.fc_domain_3(domain_out)
+                """
+
+                # introduce skip connection (add output of previous layer to linear transformation) to encode more information
+                ds_out = sequence_output + self.fc_ds_2(F.relu(self.aux_dropout(self.fc_ds_1(sequence_output))))
+                ds_out = self.aux_dropout(ds_out)
+                ds_logits = self.fc_ds_3(ds_out)
+                ds_logits = ds_logits.squeeze(-1) # remove 2nd dimension - shape: [batch_size, 1] ==> shape: [batch_size]
+                return ds_logits
         
 class RecurrentQAHead(nn.Module):
     
@@ -247,6 +302,7 @@ class RecurrentQAHead(nn.Module):
                  n_domain_labels=None,
                  n_qa_type_labels=None,
                  adversarial:bool=False,
+                 dataset_agnostic:bool=False,
                  task:str='QA',
     ):
         super(RecurrentQAHead, self).__init__()
@@ -262,6 +318,7 @@ class RecurrentQAHead(nn.Module):
         self.rnn_version = 'LSTM'
         self.task = task
         self.n_qa_type_labels = n_qa_type_labels
+        self.dataset_agnostic = dataset_agnostic
 
         self.rnn_encoder = BiLSTM(max_seq_length, in_size=self.in_size, n_layers=self.n_recurrent_layers) if self.rnn_version == 'LSTM' else BiGRU(max_seq_length, in_size=self.in_size, n_layers=self.n_recurrent_layers)
         
@@ -274,18 +331,19 @@ class RecurrentQAHead(nn.Module):
         self.qa_dropout = nn.Dropout(p = self.qa_dropout_p)
 
         if (self.task == 'QA' and self.multitask) or self.task == 'Sbj_Classification' or self.task == 'all':
-            
-            # define dropout layer for auxiliary classification tasks
+             # define dropout layer for auxiliary classification tasks
             self.aux_dropout = nn.Dropout(p = self.aux_dropout_p)
             
-            # fully-connected subjectivity output layers (must be present in every MTL setting and sbj classification)
+            # fully-connected subjectivity output layers (must be present in every MTL setting)
             self.fc_sbj_1 = nn.Linear(self.in_size, self.in_size)
             self.fc_sbj_2 = nn.Linear(self.in_size, self.in_size)
 
             if isinstance(self.n_qa_type_labels, int):
+                # multi-way qa_type classification task
                 self.fc_sbj_q = nn.Linear(self.in_size, n_qa_type_labels) # fc subj. layer for questions
                 sbj_layers = [self.fc_sbj_1, self.fc_sbj_2, self.fc_sbj_q]
             else:
+                # binary qa_type classification task
                 self.fc_sbj_a = nn.Linear(self.in_size, 1) # fc subj. layer for answers
                 self.fc_sbj_q = nn.Linear(self.in_size, 1) # fc subj. layer for questions
                 sbj_layers = [self.fc_sbj_1, self.fc_sbj_2, self.fc_sbj_a, self.fc_sbj_q]
@@ -293,6 +351,7 @@ class RecurrentQAHead(nn.Module):
             for fc_sbj in sbj_layers:
                 nn.init.xavier_uniform_(fc_sbj.weight)
 
+        
         elif self.task == 'Domain_Classification':
 
              # define dropout layer for auxiliary classification tasks
@@ -308,14 +367,24 @@ class RecurrentQAHead(nn.Module):
 
             for fc_domain in [self.fc_domain_1, self.fc_domain_2, self.fc_domain_3]:
                 nn.init.xavier_uniform_(fc_domain.weight)
-
         
-        if (self.task == 'QA' and self.multitask) or self.task == 'all':
+        if self.task == 'QA' and self.multitask:
+
             # define, whether we want to perform adversarial training with a GRL between feature extractor and classifiers
             self.adversarial = adversarial
+            
+            if self.n_aux_tasks == 2 and self.dataset_agnostic:
 
-            if self.n_aux_tasks == 2 or self.task == 'all':
-                assert isinstance(n_domain_labels, int), 'If model is to perform two auxiliary tasks, domain labels must be provided'
+                # fully-connected dataset output layers (second auxiliary task)
+                self.fc_ds_1 = nn.Linear(self.in_size, self.in_size)
+                self.fc_ds_2 = nn.Linear(self.in_size, self.in_size)
+                self.fc_ds_3 = nn.Linear(self.in_size, 1)
+
+                for fc_ds in [self.fc_ds_1, self.fc_ds_2, self.fc_ds_3]:
+                    nn.init.xavier_uniform_(fc_ds.weight)
+
+            elif self.n_aux_tasks == 2 and not self.dataset_agnostic:
+                assert isinstance(n_domain_labels, int), 'Total number of domain labels must be provided'
                 self.n_domain_labels = n_domain_labels
 
                 # fully-connected review domain output layers (second auxiliary task)
@@ -328,6 +397,18 @@ class RecurrentQAHead(nn.Module):
 
             elif self.n_aux_tasks > 2:
                 raise ValueError("Model cannot perform more than 2 auxiliary tasks.")
+
+        elif self.task == 'all':
+            assert isinstance(n_domain_labels, int), 'If model is to perform sequential transfer, total number of domain labels must be provided'
+            self.n_domain_labels = n_domain_labels
+
+            # fully-connected review domain output layers (second auxiliary task)
+            self.fc_domain_1 = nn.Linear(self.in_size, self.in_size)
+            self.fc_domain_2 = nn.Linear(self.in_size, self.in_size)
+            self.fc_domain_3 = nn.Linear(self.in_size, self.n_domain_labels)
+
+            for fc_domain in [self.fc_domain_1, self.fc_domain_2, self.fc_domain_3]:
+                nn.init.xavier_uniform_(fc_domain.weight)
 
     def forward(
                 self,
@@ -381,14 +462,16 @@ class RecurrentQAHead(nn.Module):
             return outputs  #, hidden_rnn  # (loss), start_logits, end_logits, (hidden_states), (attentions)
 
         else:
-            if hasattr(self, 'adversarial'):
-                # reverse gradients to learn qa-type / domain-invariant features (i.e., semi-supervised domain-adaptation)
-                sequence_output = grad_reverse(sequence_output)
-            
-            # we need hidden states of only the last time step (summary of the sequence) (i.e., seq[batch_size, -1, hidden_size])
-            sequence_output = sequence_output[:, -1, :]
-
             if task == 'Sbj_Class':
+                if hasattr(self, 'adversarial'):
+                    if self.dataset_agnostic:
+                        sequence_output = sequence_output[:, -1, :]
+                    else:
+                         # reverse gradients to learn qa-type invariant features (i.e., semi-supervised domain-adaptation)
+                        sequence_output = sequence_output[:, -1, :]
+                        sequence_output = grad_reverse(sequence_output)
+                else:
+                    sequence_output = sequence_output[:, -1, :]
 
                 """
                 ## version without skip connection ##
@@ -420,6 +503,12 @@ class RecurrentQAHead(nn.Module):
                     return sbj_logits_a, sbj_logits_q #, hidden_rnn
 
             elif task == 'Domain_Class':
+                if hasattr(self, 'adversarial'):
+                    # reverse gradients to learn review-domain invariant features (i.e., semi-supervised domain-adaptation)
+                    sequence_output = sequence_output[:, -1, :]
+                    sequence_output = grad_reverse(sequence_output)
+                else:
+                    sequence_output = sequence_output[:, -1, :]
 
                 """
                 ## version without skip connection ##
@@ -435,8 +524,28 @@ class RecurrentQAHead(nn.Module):
                 domain_out = sequence_output + self.fc_domain_2(F.relu(self.aux_dropout(self.fc_domain_1(sequence_output))))
                 domain_out = self.aux_dropout(domain_out)
                 domain_logits = self.fc_domain_3(domain_out)
-
-                # transform shape of logits from [batch_size, 1] to [batch_size] (necessary for passing logits to loss function)
                 domain_logits = domain_logits.squeeze(-1)
-
                 return domain_logits #, hidden_rnn
+
+            elif task == 'Dataset_Class':
+                sequence_output = sequence_output[:, -1, :]
+                # reverse gradients to learn dataset agnostic features (i.e., semi-supervised domain-adaptation)
+                assert hasattr(self, 'adversarial') and self.dataset_agnostic, 'We want dataset classification task to be defined as an adversarial task'
+                sequence_output = grad_reverse(sequence_output)
+
+                """
+                ## version without skip connection ##
+
+                domain_out = self.fc_domain_1(sequence_output)
+                domain_out = self.aux_dropout(domain_out)
+                domain_out = self.fc_domain_2(domain_out)
+                domain_out = self.aux_dropout(domain_out)
+                domain_logits = self.fc_domain_3(domain_out)
+                """
+
+                # introduce skip connection (add output of previous layer to linear transformation) to encode more information
+                ds_out = sequence_output + self.fc_ds_2(F.relu(self.aux_dropout(self.fc_ds_1(sequence_output))))
+                ds_out = self.aux_dropout(ds_out)
+                ds_logits = self.fc_ds_3(ds_out)
+                ds_logits = ds_logits.squeeze(-1) # remove 2nd dimension - shape: [batch_size, 1] ==> shape: [batch_size]
+                return ds_logits

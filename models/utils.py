@@ -75,17 +75,14 @@ def get_detailed_scores(
     y_ds = to_cpu(y_ds.type_as(y_pred), to_numpy=False)
 
     for p, l, ds in zip(y_pred, y_true, y_ds):
-
       try:
         results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj']['freq'] += 1
       except KeyError:
         results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj'] = {}
         results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj']['freq'] = 1
         results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj']['correct'] = 0
-
       if p == l:
         results_per_ds['SubjQA' if ds == 1 else 'SQuAD']['sbj' if l == 1 else 'obj']['correct'] += 1
-
     return results_per_ds
 
 def freeze_transformer_layers(
@@ -179,6 +176,8 @@ def create_optimizer(
         head = 'fc_sbj'
     elif task == 'domain_class':
         head = 'fc_domain'
+    elif task == 'dataset_class':
+        head = 'fc_ds'
     else:
         raise ValueError('Incorrect task name provided')
   
@@ -207,16 +206,20 @@ def train(
           optimizer_qa,
           optimizer_sbj=None,
           optimizer_dom=None,
+          optimizer_ds=None,
           scheduler_qa=None,
           scheduler_sbj=None,
           scheduler_dom=None,
+          scheduler_ds=None,
           early_stopping:bool=True,
           n_aux_tasks=None,
           qa_type_weights=None,
           domain_weights=None,
+          ds_weights=None,
           max_epochs:int=3,
           adversarial_simple:bool=False,
           multi_qa_type_class:bool=False,
+          dataset_agnostic:bool=False,
           plot_task_distrib:bool=False,
 ):
     n_iters = args['n_steps'] * args['n_epochs']
@@ -252,19 +255,24 @@ def train(
 
       if isinstance(n_aux_tasks, int):
           tasks.append('Sbj_Class')
-          if args['dataset'] == 'combined':
+          if args['dataset'] == 'combined' and multi_qa_type_class:
             assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
-            print("Weights for subjective Anwers: {}".format(qa_type_weights[0]))
-            print()
-            print("Weights for subjective Questions: {}".format(qa_type_weights[1]))
-            print()
+            sbj_loss_func = nn.CrossEntropyLoss(weight=qa_type_weights.to(device))
+          elif args['dataset'] == 'combined':
+            assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
             sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
           else:
             sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=torch.ones(2).to(device))
 
           batch_accs_sbj, batch_f1s_sbj = [], []
+
+          if n_aux_tasks == 2 and dataset_agnostic:
+              assert isinstance(ds_weights, torch.Tensor), 'Tensor of class weights for the two datasets is not provided'
+              ds_loss_func = nn.BCEWithLogitsLoss(weight=ds_weights.to(device))
+              batch_accs_ds, batch_f1s_ds = [], []
+              tasks.append('Dataset_Class')
         
-          if n_aux_tasks == 2:
+          elif n_aux_tasks == 2 and not dataset_agnostic:
               assert isinstance(domain_weights, torch.Tensor), 'Tensor of class weights for different domains is not provided'
               domain_loss_func = nn.CrossEntropyLoss(weight=domain_weights.to(device))
               batch_accs_domain, batch_f1s_domain = [], []
@@ -282,10 +290,6 @@ def train(
         sbj_loss_func = nn.CrossEntropyLoss(weight=qa_type_weights.to(device))
       elif args['dataset'] == 'combined':
         assert isinstance(qa_type_weights, torch.Tensor), 'Tensor of class weights for question-answer types is not provided'
-        print("Weights for subjective Anwers: {}".format(qa_type_weights[0]))
-        print()
-        print("Weights for subjective Questions: {}".format(qa_type_weights[1]))
-        print()
         sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=qa_type_weights.to(device))
       else:
         sbj_loss_func = nn.BCEWithLogitsLoss(pos_weight=torch.ones(2).to(device))
@@ -328,14 +332,18 @@ def train(
 
         model.train()
 
-        if isinstance(n_aux_tasks, int):
-          batch_acc_sbj, batch_f1_sbj = 0, 0
-
-          if n_aux_tasks == 2:
-            batch_acc_domain, batch_f1_domain = 0, 0
-
         if args['task'] == 'QA':
           correct_answers, batch_f1 = 0, 0
+
+          if isinstance(n_aux_tasks, int):
+            if 'Sbj_Class' in tasks:
+              batch_acc_sbj, batch_f1_sbj = 0, 0
+
+            if 'Dataset_Class' in tasks:
+              batch_acc_ds, batch_f1_ds = 0, 0
+            
+            if 'Domain_Class' in tasks:
+              batch_acc_domain, batch_f1_domain = 0, 0
 
         elif args['task'] == 'Sbj_Classification':
           batch_acc_sbj, batch_f1_sbj = 0, 0
@@ -369,8 +377,12 @@ def train(
               print()
 
             if current_task == 'QA':
-              # unpack inputs from dataloader for main task           
-              b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _ = main_batch
+
+              ######################################
+              ###### QUESTION ANSWERING TASK #######
+              ######################################
+
+              b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _, _ = main_batch
 
               start_logits, end_logits = model(
                              input_ids=b_input_ids,
@@ -434,13 +446,15 @@ def train(
                   b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj = main_batch
 
                 else:
-                  b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, b_sbj, _ = main_batch
+                  b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, b_sbj, _, _ = main_batch
 
 
                 if multi_qa_type_class:
+
                   ##########################################################################
                   ##### MULTI-WAY SEQUENCE CLASSIFICATION OF QA TYPE (ONLY QUESTIONS) ######
                   ##########################################################################
+
                   sbj_logits = model(
                                      input_ids=b_input_ids,
                                      attention_masks=b_attn_masks,
@@ -461,9 +475,11 @@ def train(
                   batch_f1_aux = batch_f1_sbj
 
                 else:
+
                   ######################################################################
                   ##### BINARY SEQUENCE CLASSIFICATION OF BOTH ANSWERS & QUESTIONS #####
                   ######################################################################
+
                   sbj_logits_a, sbj_logits_q = model(
                                                      input_ids=b_input_ids,
                                                      attention_masks=b_attn_masks,
@@ -496,39 +512,13 @@ def train(
                   batch_acc_aux = batch_acc_sbj
                   batch_f1_aux = batch_f1_sbj
 
-                """
-                ## ANSWER CLASSIFICATION ##
-                sbj_logits = model(
-                                   input_ids=b_input_ids,
-                                   attention_masks=b_attn_masks,
-                                   token_type_ids=b_token_type_ids,
-                                   input_lengths=b_input_lengths,
-                                   task=current_task,
-                                   )
-                      
-                b_sbj = b_sbj.type_as(sbj_logits)
-
-                if adversarial_simple:
-                  batch_loss -= sbj_loss_func(sbj_logits, b_sbj[:, 0])
-
-                else:
-                  batch_loss += sbj_loss_func(sbj_logits, b_sbj[:, 0])
-
-                batch_acc_sbj += accuracy(probas=torch.sigmoid(sbj_logits), y_true=b_sbj[:, 0], task='binary')  
-                batch_f1_sbj += f1(probas=torch.sigmoid(sbj_logits), y_true=b_sbj[:, 0], task='binary')
-
-                batch_acc_aux = batch_acc_sbj
-                batch_f1_aux = batch_f1_sbj
-
-                """
-
               elif current_task == 'Domain_Class':
 
-                  ##########################################################################
-                  ##### MULTI-WAY SEQUENCE CLASSIFICATION OF RESPECTIVE REVIEW DOMAINS #####
-                  ##########################################################################
+                ##########################################################################
+                ##### MULTI-WAY SEQUENCE CLASSIFICATION OF RESPECTIVE REVIEW DOMAINS #####
+                ##########################################################################
 
-                b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, _, b_domains = main_batch
+                b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, _, b_domains, _ = main_batch
 
                 domain_logits = model(
                                       input_ids=b_input_ids,
@@ -549,6 +539,37 @@ def train(
 
                 batch_acc_aux = batch_acc_domain
                 batch_f1_aux = batch_f1_domain
+
+              elif current_task == 'Dataset_Class':
+
+                ################################################################################
+                ##### BINARY SEQUENCE CLASSIFICATION OF DATASETS (i.e., SQUAD vs. SUBJQA ) #####
+                ###################### NOTE: THIS IS AN ADVERSARIAL TASK #######################
+                ################################################################################
+
+                b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, _, _, b_ds = main_batch
+
+                ds_logits = model(
+                                  input_ids=b_input_ids,
+                                  attention_masks=b_attn_masks,
+                                  token_type_ids=b_token_type_ids,
+                                  input_lengths=b_input_lengths,
+                                  task=current_task,
+                  )
+
+                b_ds = b_ds.type_as(ds_logits)
+
+                if adversarial_simple:
+                  batch_loss -= ds_loss_func(ds_logits, b_ds)
+
+                else:
+                  batch_loss += ds_loss_func(ds_logits, b_ds)
+
+                  batch_acc_ds += accuracy(probas=torch.sigmoid(ds_logits), y_true=b_ds, task='binary')  
+                  batch_f1_ds += f1(probas=torch.sigmoid(ds_logits), y_true=b_ds, task='binary')
+
+                batch_acc_aux = batch_acc_ds
+                batch_f1_aux = batch_f1_ds
               
               # keep track of steps taken per task (don't use overall steps)
               nb_tr_steps_aux = Counter(task_order[:step+1])[current_task]
@@ -571,6 +592,10 @@ def train(
                   elif current_task == 'Domain_Class':
                     batch_accs_domain.append(current_batch_acc_aux)
                     batch_f1s_domain.append(current_batch_f1_aux)
+
+                  elif current_task == 'Dataset_Class':
+                    batch_accs_ds.append(current_batch_acc_aux)
+                    batch_f1s_ds.append(current_batch_f1_aux)
 
                   running_tasks.pop(running_tasks.index(current_task))
 
@@ -607,6 +632,12 @@ def train(
               if not isinstance(scheduler_sbj, type(None)):
                 scheduler_sbj.step()
               optimizer_sbj.zero_grad()
+
+            elif current_task == 'Dataset_Class':
+              optimizer_ds.step()
+              if not isinstance(scheduler_ds, type(None)):
+                scheduler_ds.step()
+              optimizer_ds.zero_grad()
 
             elif current_task == 'Domain_Class':
               optimizer_dom.step()
@@ -669,8 +700,15 @@ def train(
              print("------------------------------------")
              print()
 
-             if n_aux_tasks == 2:
+             if n_aux_tasks == 2 and dataset_agnostic:
 
+                print("------------------------------------")
+                print("----- Train dataset acc: {} % -----".format(batch_accs_ds[-1]))
+                print("----- Train dataset F1: {} % -----".format(batch_f1s_ds[-1]))
+                print("------------------------------------")
+                print()
+
+             elif n_aux_tasks == 2 and not dataset_agnostic:  
                 print("------------------------------------")
                 print("----- Train domain acc: {} % -----".format(batch_accs_domain[-1]))
                 print("----- Train domain F1: {} % -----".format(batch_f1s_domain[-1]))
@@ -733,7 +771,9 @@ def train(
       return batch_losses, batch_accs_domain, batch_f1s_domain, val_losses, val_accs, val_f1s, model
     elif n_aux_tasks == 1:
       return batch_losses, batch_accs_qa, batch_f1s_qa, batch_accs_sbj, batch_f1s_sbj, val_losses, val_accs, val_f1s, model
-    elif n_aux_tasks == 2:
+    elif n_aux_tasks == 2 and dataset_agnostic:
+      return batch_losses, batch_accs_qa, batch_f1s_qa, batch_accs_sbj, batch_f1s_sbj, batch_accs_ds, batch_f1s_ds, val_losses, val_accs, val_f1s, model
+    elif n_aux_tasks == 2 and not dataset_agnostic:
       return batch_losses, batch_accs_qa, batch_f1s_qa, batch_accs_sbj, batch_f1s_sbj, batch_accs_domain, batch_f1s_domain, val_losses, val_accs, val_f1s, model
 
 def val(
@@ -785,19 +825,19 @@ def val(
         ### UNPACK INPUTS FROM MINI-BATCH FOR CURRENT TASK ###
 
         if args['task'] == 'QA' and sequential_transfer:
-          b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_sbj, b_domains = batch
+          b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_sbj, b_domains, _ = batch
 
         elif args['task'] == 'QA' and not sequential_transfer:
-          b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _ = batch
+          b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _, _ = batch
 
         elif args['task'] == 'Sbj_Classification':
           if args['batch_presentation'] == 'alternating':
             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj = batch
           else:
-            b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, b_sbj, _ = batch
+            b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, b_sbj, _, _ = batch
             
         elif args['task'] == 'Domain_Classification':
-          b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _,  _, b_domains = batch
+          b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _,  _, b_domains, _ = batch
 
         else:
           raise ValueError('Incorrect task name provided')
@@ -1111,10 +1151,10 @@ def test(
         ### UNPACK INPUTS FROM MINI-BATCH FOR RESPECTIVE TASK ###
 
         if task == 'QA' and sequential_transfer:
-          b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_sbj, b_domains = batch
+          b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_sbj, b_domains, _ = batch
 
         elif task == 'QA' and not sequential_transfer:
-          b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _ = batch
+          b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _, _ = batch
 
         elif task == 'Sbj_Classification':
 
@@ -1122,13 +1162,13 @@ def test(
             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, b_sbj, _, b_ds = batch
 
           elif input_sequence == 'question_context':
-            b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, b_sbj, _ = batch
+            b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, b_sbj, _, _ = batch
 
           elif input_sequence == 'question_answer':
-            b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj = batch
+            b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj, _ = batch
 
         elif task == 'Domain_Classification':
-          b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _,  _, b_domains = batch
+          b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _,  _, b_domains, _ = batch
 
         else:
           raise ValueError('Incorrect task name provided')
@@ -1562,7 +1602,7 @@ def train_all(
                     assert eval_round == False
 
                     # unpack inputs from dataloader for main task           
-                    b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _ = batch
+                    b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _, _ = batch
 
                     if args['training_regime'] == 'oracle':
                         # inform model about true labels corresponding to auxiliary tasks
@@ -1647,7 +1687,7 @@ def train_all(
                             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj = batch
                         else:
                             # unpack inputs from main data loader for (q, c) sequence pair inputs
-                            b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, b_sbj, _ = batch
+                            b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, b_sbj, _, _ = batch
 
                         if eval_round:
                             # no gradient calculations in eval mode to speed up computation
@@ -1695,7 +1735,7 @@ def train_all(
 
                     elif task == 'Domain_Class':
                         # unpack inputs from main data loader to perform context-domain classification on (q, c) sequence pairs
-                        b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, _, b_domains = batch
+                        b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, _, b_domains, _ = batch
 
                         if eval_round:
                             # no gradient calculations in eval mode to speed up computation for storing model's predictions

@@ -43,6 +43,8 @@ if __name__ == '__main__':
             help='If provided, perform domain classification (multi-class) instead of QA.')
     parser.add_argument('--multitask', action='store_true',
             help='If provided, MTL instead of STL setting.')
+    parser.add_argument('--dataset_agnostic', action='store_true',
+            help='If provided, MTL with two auxiliary tasks, of which one is an adversarial task to learn dataset agnostic (i.e., domain invariant) features.')
     parser.add_argument('--sequential_transfer', action='store_true',
             help='If provided, model will be fine-tuned sequentially on all tasks until convergence.')
     parser.add_argument('--sequential_transfer_training', type=str, default=None,
@@ -103,7 +105,7 @@ if __name__ == '__main__':
     domains = domains[:-1] if args.finetuning == 'SubjQA' else domains
    
     qa_types = ['subjqa_obj', 'subjqa_sbj', 'squad_obj'] if args.finetuning == 'combined' and args.multi_qa_type_class else ['obj', 'sbj']
-    datasets = ['SQuAD', 'SubjQA'] # not sure, whether this auxiliary task is actually useful
+    datasets = ['SQuAD', 'SubjQA']
     
     # create domain_to_idx, qa_type_to_idx and dataset_to_idx mappings (necessary for auxiliary tasks)
     idx_to_domains = idx_to_class(domains)
@@ -142,6 +144,10 @@ if __name__ == '__main__':
     encoding = 'recurrent' if args.encoder else 'linear'
     highway = 'Highway' if args.highway_connection else ''
     train_method = 'multitask' + '_' + str(args.n_aux_tasks) if args.multitask else 'singletask'
+
+    if args.dataset_agnostic:
+        train_method += 'dataset_agnostic'
+
     eval_setup = args.n_evals
     
     if args.sequential_transfer:
@@ -594,7 +600,18 @@ if __name__ == '__main__':
                 if args.multitask:  
                     assert isinstance(args.n_aux_tasks, int), 'If MTL, number auf auxiliary tasks must be defined'
                 
-                if args.n_aux_tasks == 2 or args.sequential_transfer:
+                if args.n_aux_tasks == 2 and args.dataset_agnostic:
+                    
+                    squad_ds = np.zeros(len(squad_features_train), dtype=int).tolist()
+                    subjqa_ds = np.ones(len(subjqa_features_train), dtype=int).tolist()
+                    ds_weights = get_class_weights(
+                                                   subjqa_classes=subjqa_ds,
+                                                   idx_to_class=idx_to_dataset,
+                                                   squad_classes=squad_ds,
+                                                   binary=True,
+                                                   )
+
+                elif args.n_aux_tasks == 2 or args.sequential_transfer:
                     
                     squad_domains = [f.domain for f in squad_features_train]
                     subjqa_domains = [f.domain for f in subjqa_features_train]
@@ -609,24 +626,36 @@ if __name__ == '__main__':
                 
                 subjqa_a_types = [f.a_sbj for f in subjqa_features_train]
                 squad_a_types = [f.a_sbj for f in squad_features_train]
-                
-                q_type_weights = get_class_weights(
-                                                   subjqa_classes=subjqa_q_types,
-                                                   idx_to_class=idx_to_qa_types,
-                                                   squad_classes=squad_q_types,
-                                                   binary=True,
-                                                   qa_type='questions',
-                )
 
-                a_type_weights = get_class_weights(
-                                                  subjqa_classes=subjqa_a_types,
-                                                  idx_to_class=idx_to_qa_types,
-                                                  squad_classes=squad_a_types,
-                                                  binary=True,
-                                                  qa_type='answers',
-                )
+                if args.multi_qa_type_class:
+                    q_type_weights = get_class_weights(
+                                                       subjqa_classes=subjqa_q_types,
+                                                       idx_to_class=idx_to_qa_types,
+                                                       squad_classes=squad_q_types,
+                                                       binary=False,
+                                                       qa_type='questions',
+                                                       multi_qa_type_class=True,
+                    )
 
-                qa_type_weights = torch.stack((a_type_weights, q_type_weights))
+                    qa_type_weights = q_type_weights
+                else:
+                    q_type_weights = get_class_weights(
+                                                       subjqa_classes=subjqa_q_types,
+                                                       idx_to_class=idx_to_qa_types,
+                                                       squad_classes=squad_q_types,
+                                                       binary=True,
+                                                       qa_type='questions',
+                    )
+
+                    a_type_weights = get_class_weights(
+                                                      subjqa_classes=subjqa_a_types,
+                                                      idx_to_class=idx_to_qa_types,
+                                                      squad_classes=squad_a_types,
+                                                      binary=True,
+                                                      qa_type='answers',
+                    )
+
+                    qa_type_weights = torch.stack((a_type_weights, q_type_weights))
 
             elif args.sbj_classification:
 
@@ -717,16 +746,17 @@ if __name__ == '__main__':
             task = 'QA'
 
         model = DistilBertForQA.from_pretrained(
-                                              pretrained_weights,
-                                              max_seq_length = max_seq_length,
-                                              encoder = True if encoding == 'recurrent' else False,
-                                              highway_connection = args.highway_connection,
-                                              multitask = args.multitask,
-                                              adversarial = True if args.adversarial == 'GRL' else False,
-                                              n_aux_tasks = args.n_aux_tasks,
-                                              n_domain_labels = n_domain_labels,
-                                              n_qa_type_labels = n_qa_type_labels if args.multi_qa_type_class else None,
-                                              task = task,
+                                                pretrained_weights,
+                                                max_seq_length = max_seq_length,
+                                                encoder = True if encoding == 'recurrent' else False,
+                                                highway_connection = args.highway_connection,
+                                                multitask = args.multitask,
+                                                adversarial = True if args.adversarial == 'GRL' else False,
+                                                dataset_agnostic = args.dataset_agnostic,
+                                                n_aux_tasks = args.n_aux_tasks,
+                                                n_domain_labels = n_domain_labels,
+                                                n_qa_type_labels = n_qa_type_labels if args.multi_qa_type_class else None,
+                                                task = task,
         )
 
         # set model to device
@@ -796,9 +826,11 @@ if __name__ == '__main__':
                                                                                             optimizer_qa=None,
                                                                                             optimizer_sbj=optimizer_sbj,
                                                                                             optimizer_dom=None,
+                                                                                            optimizer_ds=None,
                                                                                             scheduler_qa=None,
                                                                                             scheduler_sbj=scheduler_sbj,
                                                                                             scheduler_dom=None,
+                                                                                            scheduler_ds=None,
                                                                                             early_stopping=True,
                                                                                             qa_type_weights=qa_type_weights,
                                                                                             domain_weights=domain_weights,
@@ -827,9 +859,11 @@ if __name__ == '__main__':
                                                                                             optimizer_qa=None,
                                                                                             optimizer_sbj=None,
                                                                                             optimizer_dom=optimizer_dom,
+                                                                                            optimizer_ds=None,
                                                                                             scheduler_qa=None,
                                                                                             scheduler_sbj=None,
                                                                                             scheduler_dom=scheduler_dom,
+                                                                                            scheduler_ds=None,
                                                                                             early_stopping=True,
                                                                                             qa_type_weights=qa_type_weights,
                                                                                             domain_weights=domain_weights,
@@ -857,13 +891,16 @@ if __name__ == '__main__':
                                                                                             optimizer_qa=optimizer_qa,
                                                                                             optimizer_sbj=None,
                                                                                             optimizer_dom=None,
+                                                                                            optimizer_ds=None,
                                                                                             scheduler_qa=scheduler_qa,
                                                                                             scheduler_sbj=None,
                                                                                             scheduler_dom=None,
+                                                                                            scheduler_ds=None,
                                                                                             early_stopping=True,
                                                                                             qa_type_weights=qa_type_weights,
                                                                                             domain_weights=domain_weights,
                                                                                             adversarial_simple=True if args.adversarial == 'simple' else False,
+
             )
 
 
@@ -896,19 +933,72 @@ if __name__ == '__main__':
                                                                                                                             optimizer_qa=optimizer_qa,
                                                                                                                             optimizer_sbj=optimizer_sbj,
                                                                                                                             optimizer_dom=None,
+                                                                                                                            optimizer_ds=None,
                                                                                                                             scheduler_qa=scheduler_qa,
                                                                                                                             scheduler_sbj=scheduler_sbj,
                                                                                                                             scheduler_dom=None,
+                                                                                                                            scheduler_ds=None,
                                                                                                                             early_stopping=True,
                                                                                                                             qa_type_weights=qa_type_weights,
                                                                                                                             domain_weights=domain_weights,
                                                                                                                             adversarial_simple=True if args.adversarial == 'simple' else False,
+                                                                                                                            multi_qa_type_class=args.multi_qa_type_class,
             )
 
             train_results['batch_accs_sbj'] = batch_accs_sbj
             train_results['batch_f1s_sbj'] = batch_f1s_sbj
+
+        elif args.n_aux_tasks == 2 and args.dataset_agnostic:
+
+            optimizer_qa = create_optimizer(model=model, task='QA', eta=hypers['lr_adam'])
+
+            scheduler_qa = get_linear_schedule_with_warmup(
+                                                           optimizer_qa, 
+                                                           num_warmup_steps=hypers["warmup_steps"], 
+                                                           num_training_steps=t_total,
+            )
+
+            optimizer_sbj = create_optimizer(model=model, task='sbj_class', eta=hypers['lr_adam'])
+            
+            scheduler_sbj = get_linear_schedule_with_warmup(
+                                                            optimizer_sbj, 
+                                                            num_warmup_steps=hypers["warmup_steps"], 
+                                                            num_training_steps=t_total,
+            )
+            
+            optimizer_ds = create_optimizer(model=model, task='dataset_class', eta=hypers['lr_adam'])
+
+            batch_losses, batch_accs, batch_f1s, batch_accs_sbj, batch_f1s_sbj, batch_accs_ds, batch_f1s_ds, val_losses, val_accs, val_f1s, model = train(
+                                                                                                                                                            model=model,
+                                                                                                                                                            tokenizer=bert_tokenizer,
+                                                                                                                                                            train_dl=train_dl,
+                                                                                                                                                            val_dl=val_dl,
+                                                                                                                                                            batch_size=batch_size,
+                                                                                                                                                            n_aux_tasks=args.n_aux_tasks,
+                                                                                                                                                            args=hypers,
+                                                                                                                                                            optimizer_qa=optimizer_qa,
+                                                                                                                                                            optimizer_sbj=optimizer_sbj,
+                                                                                                                                                            optimizer_dom=None,
+                                                                                                                                                            optimizer_ds=optimizer_ds,
+                                                                                                                                                            scheduler_qa=scheduler_qa,
+                                                                                                                                                            scheduler_sbj=scheduler_sbj,
+                                                                                                                                                            scheduler_dom=None,
+                                                                                                                                                            scheduler_ds=None,
+                                                                                                                                                            early_stopping=True,
+                                                                                                                                                            qa_type_weights=qa_type_weights,
+                                                                                                                                                            domain_weights=None,
+                                                                                                                                                            ds_weights=ds_weights,
+                                                                                                                                                            adversarial_simple=True if args.adversarial == 'simple' else False,
+                                                                                                                                                            dataset_agnostic=args.dataset_agnostic,
+                                                                                                                                                            multi_qa_type_class=args.multi_qa_type_class,
+            )
+
+            train_results['batch_accs_sbj'] = batch_accs_sbj
+            train_results['batch_f1s_sbj'] = batch_f1s_sbj
+            train_results['batch_accs_ds'] = batch_accs_ds
+            train_results['batch_f1s_ds'] = batch_f1s_ds
         
-        elif args.n_aux_tasks == 2 or args.sequential_transfer:
+        elif (args.n_aux_tasks == 2 or args.sequential_transfer) and not args.dataset_agnostic:
 
             optimizer_qa = create_optimizer(model=model, task='QA', eta=hypers['lr_adam'])
 
@@ -947,13 +1037,16 @@ if __name__ == '__main__':
                                                                                                                                                                         optimizer_qa=optimizer_qa,
                                                                                                                                                                         optimizer_sbj=optimizer_sbj,
                                                                                                                                                                         optimizer_dom=optimizer_dom,
+                                                                                                                                                                        optimizer_ds=None,
                                                                                                                                                                         scheduler_qa=scheduler_qa,
                                                                                                                                                                         scheduler_sbj=None, #scheduler_sbj,
                                                                                                                                                                         scheduler_dom=None, #scheduler_dom,
+                                                                                                                                                                        scheduler_ds=None,
                                                                                                                                                                         early_stopping=True,
                                                                                                                                                                         qa_type_weights=qa_type_weights,
                                                                                                                                                                         domain_weights=domain_weights,
                                                                                                                                                                         adversarial_simple=True if args.adversarial == 'simple' else False,
+                                                                                                                                                                        multi_qa_type_class=args.multi_qa_type_class,
                 )
 
             elif args.sequential_transfer:
@@ -1070,7 +1163,6 @@ if __name__ == '__main__':
             if args.detailed_analysis_sbj_class:
                 subjqa_tensor_dataset_test = create_tensor_dataset(
                                                                    subjqa_features_test,
-                                                                   detailed_analysis_sbj_class=args.detailed_analysis_sbj_class,
                                                                    multi_qa_type_class=args.multi_qa_type_class,
                                                                    )
 
@@ -1121,6 +1213,7 @@ if __name__ == '__main__':
                                                         highway_connection = args.highway_connection,
                                                         multitask = args.multitask,
                                                         adversarial = True if args.adversarial == 'GRL' else False,
+                                                        dataset_agnostic = args.dataset_agnostic,
                                                         n_aux_tasks = args.n_aux_tasks,
                                                         n_domain_labels = n_domain_labels,
                                                         n_qa_type_labels = n_qa_type_labels if args.multi_qa_type_class else None,
