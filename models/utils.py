@@ -385,12 +385,12 @@ def train(
               b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _, _ = main_batch
 
               start_logits, end_logits = model(
-                             input_ids=b_input_ids,
-                             attention_masks=b_attn_masks,
-                             token_type_ids=b_token_type_ids,
-                             input_lengths=b_input_lengths,
-                             task=current_task,
-                             )
+                                               input_ids=b_input_ids,
+                                               attention_masks=b_attn_masks,
+                                               token_type_ids=b_token_type_ids,
+                                               input_lengths=b_input_lengths,
+                                               task=current_task,
+                                               )
 
               # start and end loss must be computed separately and then averaged
               start_loss = qa_loss_func(start_logits, b_start_pos)
@@ -1099,6 +1099,8 @@ def test(
         inference_strategy:str=None,
         detailed_analysis_sbj_class:bool=False,
         multi_qa_type_class:bool=False,
+        output_last_hiddens:bool=False,
+        output_all_hiddens:bool=False,
 
 ):
     n_steps = len(test_dl)
@@ -1121,13 +1123,28 @@ def test(
       batch_acc_test = 0
       if multi_qa_type_class:
         loss_func = nn.CrossEntropyLoss()
-        predictions, true_labels, feat_reps = [], [], []
       else:
         loss_func = nn.BCEWithLogitsLoss()
 
     elif task == 'Domain_Classification':
       batch_acc_test = 0
       loss_func = nn.CrossEntropyLoss()
+
+    ######################################################################  
+    ####### STORE PREDS, TRUE LABELS AND HIDDENS FOR VISUALISATION #######
+    ######################################################################
+
+    if output_last_hiddens:
+      if task == 'QA':
+        predicted_answers, true_answers, sent_pairs, feat_reps = [], [], [], []
+      else:
+        predictions, true_labels, feat_reps = [], [], []
+    elif output_all_hiddens:
+      if task == 'QA':
+        predicted_answers, true_answers, sent_pairs = [], [], []
+      else:
+        predictions, true_labels = [], []
+      feat_reps = defaultdict(list)
 
     ###################################################
 
@@ -1183,10 +1200,13 @@ def test(
         with torch.no_grad():
             if task == 'QA':
               if not_finetuned:
-                  start_logits_test, end_logits_test = model(
-                                                             input_ids=b_input_ids,
-                                                             attention_mask=b_attn_masks,
+                  outputs = model(
+                                 input_ids=b_input_ids,
+                                 attention_mask=b_attn_masks,
+                                 output_last_hiddens=output_last_hiddens,
+                                 output_all_hiddens=output_all_hiddens,
                   )
+
               else:
                 if sequential_transfer:
                   if inference_strategy == 'oracle':
@@ -1196,14 +1216,17 @@ def test(
                     b_aux_hard_targets = torch.cat((b_sbj, one_hot_domains), dim=1)
 
                     # perform QA task with hard targets from both auxiliary tasks as additional information about question-context sequence pair
-                    start_logits_test, end_logits_test = model(
-                                                               input_ids=b_input_ids,
-                                                               attention_masks=b_attn_masks,
-                                                               token_type_ids=b_token_type_ids,
-                                                               input_lengths=b_input_lengths,
-                                                               task='QA',
-                                                               aux_targets=b_aux_hard_targets,
+                    outputs = model(
+                                   input_ids=b_input_ids,
+                                   attention_masks=b_attn_masks,
+                                   token_type_ids=b_token_type_ids,
+                                   input_lengths=b_input_lengths,
+                                   task='QA',
+                                   aux_targets=b_aux_hard_targets,
+                                   output_last_hiddens=output_last_hiddens,
+                                   output_all_hiddens=output_all_hiddens,
                     )
+
                   elif inference_strategy == 'soft_targets':
                       # perform subjectivity classification task
                       sbj_logits_a, sbj_logits_q = model( 
@@ -1225,6 +1248,7 @@ def test(
                                             input_lengths=b_input_lengths,
                                             task='Domain_Class',
                                             )
+
                       # pass model's raw (context-domain) output logits through softmax function to yield probability distribution over domain classes 
                       soft_domains = F.softmax(domain_logits, dim=1)
 
@@ -1232,14 +1256,17 @@ def test(
                       b_aux_soft_targets = torch.cat((sbj_probas, soft_domains), dim=1)
 
                       # perform QA task with soft targets from both auxiliary tasks as additional information about question-context sequence pair
-                      start_logits_test, end_logits_test = model(
-                                                                input_ids=b_input_ids,
-                                                                attention_masks=b_attn_masks,
-                                                                token_type_ids=b_token_type_ids,
-                                                                input_lengths=b_input_lengths,
-                                                                task='QA',
-                                                                aux_targets=b_aux_soft_targets,
-                                                                )
+                      outputs = model(
+                                      input_ids=b_input_ids,
+                                      attention_masks=b_attn_masks,
+                                      token_type_ids=b_token_type_ids,
+                                      input_lengths=b_input_lengths,
+                                      task='QA',
+                                      aux_targets=b_aux_soft_targets,
+                                      output_last_hiddens=output_last_hiddens,
+                                      output_all_hiddens=output_all_hiddens,
+                                      )
+
                   elif inference_strategy == 'no_aux_targets':
 
                       ### make sure model does not constain weights for soft targets from auxiliary tasks ###
@@ -1254,23 +1281,54 @@ def test(
                       ########################################################################################
 
                       # perform QA task without any additional information about auxiliary tasks at test time
-                      start_logits_test, end_logits_test = model(
-                                                                 input_ids=b_input_ids,
-                                                                 attention_masks=b_attn_masks,
-                                                                 token_type_ids=b_token_type_ids,
-                                                                 input_lengths=b_input_lengths,
-                                                                 task='QA',
-                                                                 )
+                      outputs = model(
+                                     input_ids=b_input_ids,
+                                     attention_masks=b_attn_masks,
+                                     token_type_ids=b_token_type_ids,
+                                     input_lengths=b_input_lengths,
+                                     task='QA',
+                                     output_last_hiddens=output_last_hiddens,
+                                     output_all_hiddens=output_all_hiddens,
+                                     )
                   else:
                     raise ValueError('Incorrect name for inference strategy in sequential transfer setting provided.')
                 else:
-                    start_logits_test, end_logits_test = model(
-                                                               input_ids=b_input_ids,
-                                                               attention_masks=b_attn_masks,
-                                                               token_type_ids=b_token_type_ids,
-                                                               input_lengths=b_input_lengths,
-                                                               task='QA',
-                                                               )
+                    outputs = model(
+                                     input_ids=b_input_ids,
+                                     attention_masks=b_attn_masks,
+                                     token_type_ids=b_token_type_ids,
+                                     input_lengths=b_input_lengths,
+                                     task='QA',
+                                     output_last_hiddens=output_last_hiddens,
+                                     output_all_hiddens=output_all_hiddens,
+                                     )
+              #####################################################################################
+              ############## STORE MODEL'S HIDDEN REPRESENTATIONS FOR VISUALISATION ############### 
+              #####################################################################################
+
+              if output_last_hiddens:
+                start_logits_test, end_logits_test = outputs[:2]
+                cls_last_hiddens = outputs[2]
+                cls_last_hiddens = to_cpu(cls_last_hiddens, detach=True, to_numpy=True).tolist()
+                
+                for cls_last_hidden in cls_last_hiddens:
+                  feat_reps.append(cls_last_hidden)
+              
+              elif output_all_hiddens:
+                start_logits_test, end_logits_test = outputs[:2]
+                hiddens_all_layers = outputs[2]
+
+                for l, hiddens in enumerate(hiddens_all_layers):
+                  hiddens = to_cpu(hiddens, detach=True, to_numpy=True).tolist()
+                  for hidden in hiddens:
+                    feat_reps['Layer' + '_' + str(l + 1)].append(hidden)
+              else:
+                assert len(outputs) == 2
+                start_logits_test, end_logits_test = outputs
+
+              #############################################################################
+              #############################################################################
+              #############################################################################
 
               # move true start and end positions of answer span to CPU
               start_true_test = to_cpu(b_start_pos)
@@ -1304,17 +1362,68 @@ def test(
               correct_answers_test += compute_exact_batch(true_answers, pred_answers)
               batch_f1_test += compute_f1_batch(true_answers, pred_answers)
 
+
+              ##################################################
+              #### MODEL'S PREDICTED ANSWERS & TRUE ANSWERS ####
+              ##################################################
+
+              if output_last_hiddens or output_all_hiddens:
+                predicted_answers.append(pred_answers)
+                correct_answers.append(true_answers)
+
+                b_sent_pairs = get_answers(
+                                          tokenizer=tokenizer,
+                                          b_input_ids=b_input_ids,
+                                          start_logs=torch.zeros(batch_size).type_as(b_start_pos).to(device),
+                                          end_logs=torch.tensor([seq_len - 1 for seq_len in b_input_lengths]).type_as(b_end_pos).to(device),
+                                          predictions=False,
+                                         )
+
+                sent_pairs.append(b_sent_pairs)
+
+              ##################################################
+              ##################################################
+              ##################################################S
+
             elif task == 'Sbj_Classification':
 
               if multi_qa_type_class:
-                  sbj_logits, feat_reps_cls = model(
-                                                input_ids=b_input_ids,
-                                                attention_masks=b_attn_masks,
-                                                token_type_ids=b_token_type_ids,
-                                                input_lengths=b_input_lengths,
-                                                task='Sbj_Class',
-                                                output_feat_reps=True,
-                                                )
+                  outputs = model(
+                                  input_ids=b_input_ids,
+                                  attention_masks=b_attn_masks,
+                                  token_type_ids=b_token_type_ids,
+                                  input_lengths=b_input_lengths,
+                                  task='Sbj_Class',
+                                  output_last_hiddens=output_last_hiddens,
+                                  output_all_hiddens=output_all_hiddens,
+                                  )
+
+              #####################################################################################
+              ############## STORE MODEL'S HIDDEN REPRESENTATIONS FOR VISUALISATION ############### 
+              #####################################################################################
+
+                  if output_last_hiddens:
+                    sbj_logits = outputs[0]
+                    cls_last_hiddens = outputs[1]
+                    cls_last_hiddens = to_cpu(cls_last_hiddens, detach=True, to_numpy=True).tolist()
+                    
+                    for cls_last_hidden in cls_last_hiddens:
+                      feat_reps.append(cls_last_hidden)
+                  
+                  elif output_all_hiddens:
+                    sbj_logits = outputs[0]
+                    hiddens_all_layers = outputs[1]
+
+                    for l, hiddens in enumerate(hiddens_all_layers):
+                      hiddens = to_cpu(hiddens, detach=True, to_numpy=True).tolist()
+                      for hidden in hiddens:
+                        feat_reps['Layer' + '_' + str(l + 1)].append(hidden)
+                  else:
+                    sbj_logits = outputs
+
+                  #############################################################################
+                  #############################################################################
+                  #############################################################################
 
                   batch_loss_test += loss_func(sbj_logits, b_sbj)
 
@@ -1323,18 +1432,21 @@ def test(
                   batch_acc_test += accuracy(probas=sbj_log_probas, y_true=b_sbj, task='multi-way')  
                   batch_f1_test += f1(probas=sbj_log_probas, y_true=b_sbj, task='multi-way')
 
-                  #### STORE FEATURE REPRESENTATIONS PER LABEL & MODEL'S PREDICTIONS ####
+                  ###########################################
+                  #### MODEL'S PREDICTIONS & TRUE LABELS ####
+                  ###########################################
 
-                  y_hat_q_type = torch.argmax(to_cpu(sbj_log_probas, detach=True, to_numpy=False), dim=1).numpy().tolist()
-                  y_true = to_cpu(b_sbj, detach=False, to_numpy=True).tolist()
-                  feat_reps_cls = to_cpu(feat_reps_cls, detach=True, to_numpy=True).tolist()
+                  if output_last_hiddens or output_all_hiddens:
+                    y_hat_q_type = torch.argmax(to_cpu(sbj_log_probas, detach=True, to_numpy=False), dim=1).numpy().tolist()
+                    y_true = to_cpu(b_sbj, detach=False, to_numpy=True).tolist()
 
-                  predictions.append(y_hat_q_type)
-                  true_labels.append(y_true)
+                    predictions.append(y_hat_q_type)
+                    true_labels.append(y_true)
+
+                  ###########################################
+                  ###########################################
+                  ###########################################
                   
-                  for feat_rep in feat_reps_cls:
-                    feat_reps.append(feat_rep)
-
               else:
                   sbj_logits_a, sbj_logits_q = model(
                                                      input_ids=b_input_ids,
@@ -1366,19 +1478,65 @@ def test(
 
             elif task == 'Domain_Classification':
 
-              domain_logits = model(
-                                    input_ids=b_input_ids,
-                                    attention_masks=b_attn_masks,
-                                    token_type_ids=b_token_type_ids,
-                                    input_lengths=b_input_lengths,
-                                    task='Domain_Class',
-                    )
+              outputs = model(
+                              input_ids=b_input_ids,
+                              attention_masks=b_attn_masks,
+                              token_type_ids=b_token_type_ids,
+                              input_lengths=b_input_lengths,
+                              task='Domain_Class',
+                              output_last_hiddens=output_last_hiddens,
+                              output_all_hiddens=output_all_hiddens,
+                              )
+
+              #####################################################################################
+              ############## STORE MODEL'S HIDDEN REPRESENTATIONS FOR VISUALISATION ############### 
+              #####################################################################################
+
+              if output_last_hiddens:
+                domain_logits = outputs[0]
+                cls_last_hiddens = outputs[1]
+                cls_last_hiddens = to_cpu(cls_last_hiddens, detach=True, to_numpy=True).tolist()
+                
+                for cls_last_hidden in cls_last_hiddens:
+                  feat_reps.append(cls_last_hidden)
+              
+              elif output_all_hiddens:
+                domain_logits = outputs[0]
+                hiddens_all_layers = outputs[1]
+
+                for l, hiddens in enumerate(hiddens_all_layers):
+                  hiddens = to_cpu(hiddens, detach=True, to_numpy=True).tolist()
+                  for hidden in hiddens:
+                    feat_reps['Layer' + '_' + str(l + 1)].append(hidden)
+              else:
+                domain_logits = outputs
+
+              #############################################################################
+              #############################################################################
+              #############################################################################
 
 
               batch_loss_test += loss_func(domain_logits, b_domains)
 
-              batch_acc_test += accuracy(probas=F.log_softmax(domain_logits, dim=1), y_true=b_domains, task='multi-way')  
-              batch_f1_test += f1(probas=F.log_softmax(domain_logits, dim=1), y_true=b_domains, task='multi-way')
+              domain_log_probas = F.log_softmax(domain_logits, dim=1)
+
+              batch_acc_test += accuracy(probas=domain_log_probas, y_true=b_domains, task='multi-way')  
+              batch_f1_test += f1(probas=domain_log_probas, y_true=b_domains, task='multi-way')
+
+              ###########################################
+              #### MODEL'S PREDICTIONS & TRUE LABELS ####
+              ###########################################
+
+              if output_last_hiddens or output_all_hiddens:
+                y_hat_domains = torch.argmax(to_cpu(domain_log_probas, detach=True, to_numpy=False), dim=1).numpy().tolist()
+                y_true = to_cpu(b_domains, detach=False, to_numpy=True).tolist()
+
+                predictions.append(y_hat_domains)
+                true_labels.append(y_true)
+
+              ###########################################
+              ###########################################
+              ###########################################
 
             test_loss += batch_loss_test.item()
             nb_test_examples += b_input_ids.size(0)
@@ -1428,10 +1586,19 @@ def test(
     if detailed_analysis_sbj_class:
       results_per_ds = compute_acc_per_ds(results_per_ds)
       return test_loss, test_acc, test_f1, results_per_ds
-    if task == 'Sbj_Classification' and multi_qa_type_class:
-      predictions = np.array(predictions).flatten().tolist()
-      true_labels = np.array(true_labels).flatten().tolist()
+
+    elif task == 'QA' and (output_last_hiddens or output_all_hiddens):
+      # nested lists of strings must be flattened via list comprehensions (not possible with np.array().flatten())
+      predicted_answers = [pred_ans for b_pred_answers in predicted_answers for pred_ans in b_pred_answers]
+      true_answers = [pred_ans for b_true_answers in true_answers for true_ans in b_true_answers]
+      sent_pairs = [sent_pair for b_sent_pairs in sent_pairs for sent_pair in b_sent_pairs]
+      return test_loss, test_acc, test_f1, predicted_answers, true_answers, sent_pairs, feat_reps
+
+    elif (task == 'Sbj_Classification' or task == 'Domain_Classification') and (output_last_hiddens or output_all_hiddens):
+        predictions = np.array(predictions).flatten().tolist()
+        true_labels = np.array(true_labels).flatten().tolist()
       return test_loss, test_acc, test_f1, predictions, true_labels, feat_reps
+
     else:
       return test_loss, test_acc, test_f1
 

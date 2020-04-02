@@ -35,6 +35,7 @@ class DistilBertForQA(DistilBertPreTrainedModel):
                  task:str='QA',
     ):        
         super(DistilBertForQA, self).__init__(config)
+        config.output_hidden_states = True
         self.distilbert = DistilBertModel(config)
         self.max_seq_length = max_seq_length
         self.encoder = encoder
@@ -95,7 +96,8 @@ class DistilBertForQA(DistilBertPreTrainedModel):
                 input_lengths=None,
                 start_positions=None,
                 end_positions=None,
-                output_feat_reps:bool=False,
+                output_last_hiddens:bool=False,
+                output_all_hiddens:bool=False,
     ):
         #NOTE: token_type_ids == segment_ids (!)
         distilbert_output = self.distilbert(
@@ -113,7 +115,8 @@ class DistilBertForQA(DistilBertPreTrainedModel):
                                 aux_targets=aux_targets,
                                 start_positions=start_positions,
                                 end_positions=end_positions,
-                                output_feat_reps=output_feat_reps,
+                                output_last_hiddens=output_last_hiddens,
+                                output_all_hiddens=output_all_hiddens,
             )
         else:
             return self.qa_head(
@@ -122,5 +125,7 @@ class DistilBertForQA(DistilBertPreTrainedModel):
                                 aux_targets=aux_targets,
                                 start_positions=start_positions,
                                 end_positions=end_positions,
-                                output_feat_reps=output_feat_reps,
+                                output_last_hiddens=output_last_hiddens,
+                                output_all_hiddens=output_all_hiddens,
+                                seq_lengths=input_lengths,
             )

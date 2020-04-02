@@ -144,9 +144,11 @@ class LinearQAHead(nn.Module):
                 aux_targets=None,
                 start_positions=None,
                 end_positions=None,
-                output_feat_reps:bool=False,
+                output_last_hiddens:bool=False,
+                output_all_hiddens:bool=False,
+                input_lengths=None,
     ):
-        sequence_output = distilbert_output[0]
+        sequence_output = distilbert_output[0] # last hidden-state is the first element of the output tuple
         sequence_output = self.qa_dropout(sequence_output)
         
         if hasattr(self, 'highway'):
@@ -192,9 +194,22 @@ class LinearQAHead(nn.Module):
                 total_loss = (start_loss + end_loss) / 2
                 outputs = (total_loss,) + outputs
 
-            if output_feat_reps:
+            if output_last_hiddens:
                 sequence_output = sequence_output[:, 0, :].squeeze(1)
                 return outputs, sequence_output
+
+            if output_all_hiddens:
+                assert isinstance(input_lengths, torch.Tensor)
+                bert_hidden_states = distilbert_output[1] # tuple of all hidden states (output of embeddings + output for each transformer layer)
+                bert_hidden_states = bert_hidden_states[1:] # extract hidden states from all transformer layers
+
+                def remove_pad_token_hiddens(input_lengths:torch.Tensor, hidden_states:tuple):
+                    n_layers = len(hidden_states)
+                    return tuple(torch.stack([hidden_states[l][i, :seq_len, :] for i, seq_len in enumerate(input_lengths)], dim=0) for l in range(n_layers))
+
+                bert_hidden_states = remove_pad_token_hiddens(input_lengths, bert_hidden_states)
+                return sbj_logits_q, bert_hidden_states_cls
+
             return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)
 
         else:
@@ -229,9 +244,15 @@ class LinearQAHead(nn.Module):
                     sbj_logits_q = self.fc_sbj_q(sbj_out)
                     sbj_logits_q = sbj_logits_q.squeeze(-1)
 
-                    if output_feat_reps:
+                    if output_last_hiddens:
                         sequence_output = sequence_output.squeeze(1)
                         return sbj_logits_q, sequence_output
+                    
+                    if output_all_hiddens:
+                        bert_hidden_states = distilbert_output[1] # tuple of all hidden states (output of embeddings + output for each transformer layer)
+                        bert_hidden_states = bert_hidden_states[1:] # extract hidden states from each of the 6 transformer layers
+                        bert_hidden_states_cls = tuple(hidden[:, 0, :].squeeze(1) for hidden in bert_hidden_states) 
+                        return sbj_logits_q, bert_hidden_states_cls
 
                     return sbj_logits_q
                 else:
@@ -270,7 +291,7 @@ class LinearQAHead(nn.Module):
                 domain_logits = self.fc_domain_3(domain_out)
                 domain_logits = domain_logits.squeeze(-1) # remove 2nd dimension -> shape: [batch_size, 1] ==> shape: [batch_size]
                 
-                if output_feat_reps:
+                if output_last_hiddens:
                     sequence_output = sequence_output.squeeze(1)
                     return domain_logits, sequence_output
 
@@ -433,9 +454,9 @@ class RecurrentQAHead(nn.Module):
                 aux_targets=None,
                 start_positions=None,
                 end_positions=None,
-                output_feat_reps:bool=False,
+                output_last_hiddens:bool=False,
     ):
-        sequence_output = distilbert_output[0]
+        sequence_output = distilbert_output[0] # last hidden-state is the first element of the output tuple
         sequence_output = self.qa_dropout(sequence_output)
 
         if hasattr(self, 'highway'):
