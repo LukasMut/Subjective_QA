@@ -90,9 +90,13 @@ if __name__ == '__main__':
         # if we are on GPU, set cuda random seeds
         torch.cuda.manual_seed_all(42)
 
-    # set some crucial hyperparameters
-    # NOTE: BERT cannot deal with sequences, where T > 512
-    # TODO: figure out, whether should stick to 384 (default for fine-tuning BERT on SQuAD) or move up to 512 (due to the fact that reviews in SubjQA are longer than paragraphs in SQuAD)
+    #NOTE: BERT cannot deal with sequences, where T > 512
+    #TODO: figure out, whether should stick to 384 (default for fine-tuning BERT on SQuAD) or move up to 512 (due to the fact that reviews in SubjQA are longer than paragraphs in SQuAD)
+   
+    ################################################################   
+    ####################### HYPERPARAMETERS ########################
+    ################################################################
+
     max_seq_length = 384
     doc_stride = 128
     max_query_length = 64
@@ -123,7 +127,7 @@ if __name__ == '__main__':
     n_domain_labels = None if args.finetuning == 'SQuAD' else len(domains)
     n_qa_type_labels = len(qa_types)
     
-    # NOTE: we use pre-trained cased model since both BERT and DistilBERT cased models perform significantly better on SQuAD than uncased versions     
+    #NOTE: we use pre-trained cased model since both BERT and DistilBERT cased models perform significantly better on SQuAD than uncased versions 
     bert_tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-cased')
     
     if args.bert_weights == 'not_finetuned':
@@ -142,7 +146,7 @@ if __name__ == '__main__':
 
     dataset = args.finetuning
     encoding = 'recurrent' if args.encoder else 'linear'
-    highway = 'Highway' if args.highway_connection else ''
+    highway = 'highway' if args.highway_connection else ''
     train_method = 'multitask' + '_' + str(args.n_aux_tasks) if args.multitask else 'singletask'
 
     if args.dataset_agnostic:
@@ -180,6 +184,10 @@ if __name__ == '__main__':
     if args.version == 'train':
         
         if args.finetuning == 'SubjQA':
+
+            ##################################################################   
+            ####################### SUBJQA FINETUNING ########################
+            ##################################################################
         
             subjqa_data_train_df, hidden_domain_idx_train = get_data(
                                                                      source='/SubjQA/',
@@ -362,6 +370,10 @@ if __name__ == '__main__':
                 ) 
 
         elif args.finetuning == 'SQuAD':
+
+            #################################################################   
+            ####################### SQUAD FINETUNING ########################
+            #################################################################
             
             squad_data_train = get_data(
                                         source='/SQuAD/',
@@ -421,6 +433,10 @@ if __name__ == '__main__':
             n_steps = len(train_dl)
             
         elif args.finetuning == 'combined':
+
+            ##########################################################################   
+            ####################### SUBJQA & SQUAD FINETUNING ########################
+            ##########################################################################
              
             # load SubjQA data 
             subjqa_data_train_df, hidden_domain_idx_train = get_data(
@@ -524,7 +540,7 @@ if __name__ == '__main__':
                                                                   multi_qa_type_class=args.multi_qa_type_class,
                                                                   )
             if args.multi_qa_type_class:
-                # split development set into dev and test sets
+                # split development set into dev and test sets (use first half as dev set)
                 squad_examples_dev = squad_examples_dev[:len(squad_examples_dev)//2]
 
                 squad_features_dev = convert_examples_to_features(
@@ -765,7 +781,7 @@ if __name__ == '__main__':
         hypers = {
                   "lr_adam": 5e-5,
                   "warmup_steps": 0, 
-                  "max_grad_norm": 1.0, # TODO: might it beneficial to modify max_grad_norm per task?
+                  "max_grad_norm": 1.0, #TODO: might it beneficial to modify max_grad_norm per task?
         }
 
         hypers["max_seq_length"] = max_seq_length
@@ -779,9 +795,9 @@ if __name__ == '__main__':
         hypers["n_domains"] = n_domain_labels
 
         if args.n_evals == 'multiple_per_epoch':
-            hypers["n_evals_per_epoch"] = 10 # number of times we evaluate model on dev set per epoch (not necessary, if we just evaluate once after an epoch)
+            hypers["n_evals_per_epoch"] = 10 #number of times we evaluate model on dev set per epoch (not necessary, if we just evaluate once after an epoch)
 
-        hypers["early_stopping_thresh"] = 5 # if validation loss does not decrease for 5 evaluation steps (i.e., half an epoch), stop training early
+        hypers["early_stopping_thresh"] = 5 #if validation loss does not decrease for 5 evaluation steps (i.e., half an epoch), stop training early
         hypers["freeze_bert"] = freeze_bert
         hypers["pretrained_model"] = 'distilbert'
         hypers["model_dir"] = args.sd
@@ -799,7 +815,7 @@ if __name__ == '__main__':
             hypers["task"] = task
             hypers["sequential_transfer"] = False
         
-        t_total = n_steps * hypers['n_epochs'] # total number of training steps (i.e., step = iteration)
+        t_total = n_steps * hypers['n_epochs'] #total number of training steps (i.e., step = iteration)
         hypers["t_total"] = t_total
             
         # store train results in dict
