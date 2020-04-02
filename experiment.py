@@ -1185,21 +1185,18 @@ if __name__ == '__main__':
                 # make sure that examples from SQuAD are not just at the end of the dataset (i.e., last mini-batches)
                 np.random.shuffle(subjqa_features_test)
 
-            if args.detailed_analysis_sbj_class:
-                subjqa_tensor_dataset_test = create_tensor_dataset(
-                                                                   subjqa_features_test,
-                                                                   multi_qa_type_class=args.multi_qa_type_class,
-                                                                   )
-
-            elif (args.sbj_classification and args.batches == 'alternating') or (args.multi_qa_type_class and args.sbj_classification and args.batches == 'alternating'):
+            if (args.sbj_classification and args.batches == 'alternating') or (args.multi_qa_type_class and args.sbj_classification and args.batches == 'alternating'):
                 subjqa_tensor_dataset_test = create_tensor_dataset(
                                                                    subjqa_features_test,
                                                                    aux_sbj_batch=True,
                                                                    multi_qa_type_class=args.multi_qa_type_class,
                                                                    )
-
-            elif not args.sbj_classification or (args.sbj_classification and args.batches == 'normal'):
-                subjqa_tensor_dataset_test = create_tensor_dataset(subjqa_features_test)
+            else:
+                subjqa_tensor_dataset_test = create_tensor_dataset(
+                                                                   subjqa_features_test,
+                                                                   aux_sbj_batch=False,
+                                                                   multi_qa_type_class=args.multi_qa_type_class,
+                                                                   )
 
             test_dl = BatchGenerator(
                                     dataset=subjqa_tensor_dataset_test,
@@ -1287,7 +1284,7 @@ if __name__ == '__main__':
                                                                                                              output_last_hiddens = args.output_last_hiddens,
                                                                                                              output_all_hiddens = args.output_all_hiddens,
                                                                                                              )
-            elif args.output_last_hiddens or output_all_hiddens:
+            elif args.output_last_hiddens or args.output_all_hiddens:
                  test_loss, test_acc, test_f1, predictions, true_labels, feat_reps = test(
                                                                                           model = model,
                                                                                           tokenizer = bert_tokenizer,

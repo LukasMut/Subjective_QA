@@ -127,5 +127,5 @@ class DistilBertForQA(DistilBertPreTrainedModel):
                                 end_positions=end_positions,
                                 output_last_hiddens=output_last_hiddens,
                                 output_all_hiddens=output_all_hiddens,
-                                seq_lengths=input_lengths,
+                                input_lengths=input_lengths,
             )
