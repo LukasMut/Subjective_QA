@@ -94,7 +94,7 @@ class DistilBertForQA(DistilBertPreTrainedModel):
                 end_positions=None,
                 output_feat_reps:bool=False,
     ):
-        # NOTE: token_type_ids == segment_ids
+        #NOTE: token_type_ids == segment_ids (!)
         distilbert_output = self.distilbert(
                                         input_ids=input_ids,
                                         #token_type_ids=token_type_ids,
