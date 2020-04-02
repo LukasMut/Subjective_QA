@@ -30,6 +30,7 @@ class LinearQAHead(nn.Module):
                  n_qa_type_labels=None,
                  adversarial:bool=False,
                  dataset_agnostic:bool=False,
+                 review_agnostic:bool=False,
                  task:str='QA',
     ):
         
@@ -44,6 +45,7 @@ class LinearQAHead(nn.Module):
         self.task = task
         self.n_qa_type_labels = n_qa_type_labels
         self.dataset_agnostic = dataset_agnostic
+        self.review_agnostic = review_agnostic
 
         if highway_block:
             self.highway_1 = Highway(self.in_size)
@@ -198,7 +200,7 @@ class LinearQAHead(nn.Module):
         else:
             if task == 'Sbj_Class':
                 if hasattr(self, 'adversarial'):
-                    if self.dataset_agnostic:
+                    if self.dataset_agnostic or self.review_agnostic:
                         sequence_output = sequence_output[:, 0, :]
                     else:
                         # reverse gradients to learn qa-type invariant features (i.e., semi-supervised domain-adaptation)

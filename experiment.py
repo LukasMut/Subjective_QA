@@ -45,6 +45,8 @@ if __name__ == '__main__':
             help='If provided, MTL instead of STL setting.')
     parser.add_argument('--dataset_agnostic', action='store_true',
             help='If provided, MTL with two auxiliary tasks, of which one is an adversarial task to learn dataset agnostic (i.e., domain invariant) features.')
+    parser.add_argument('--review_agnostic', action='store_true',
+            help='If provided, MTL with two auxiliary tasks, of which one is an adversarial task to learn review-domain agnostic features.')
     parser.add_argument('--sequential_transfer', action='store_true',
             help='If provided, model will be fine-tuned sequentially on all tasks until convergence.')
     parser.add_argument('--sequential_transfer_training', type=str, default=None,
@@ -151,6 +153,8 @@ if __name__ == '__main__':
 
     if args.dataset_agnostic:
         train_method += 'dataset_agnostic'
+    elif args.review_agnostic:
+        train_method += 'review_agnostic'
 
     eval_setup = args.n_evals
     
@@ -769,6 +773,7 @@ if __name__ == '__main__':
                                                 multitask = args.multitask,
                                                 adversarial = True if args.adversarial == 'GRL' else False,
                                                 dataset_agnostic = args.dataset_agnostic,
+                                                review_agnostic = args.review_agnostic,
                                                 n_aux_tasks = args.n_aux_tasks,
                                                 n_domain_labels = n_domain_labels,
                                                 n_qa_type_labels = n_qa_type_labels if args.multi_qa_type_class else None,
@@ -1055,8 +1060,8 @@ if __name__ == '__main__':
                                                                                                                                                                         optimizer_dom=optimizer_dom,
                                                                                                                                                                         optimizer_ds=None,
                                                                                                                                                                         scheduler_qa=scheduler_qa,
-                                                                                                                                                                        scheduler_sbj=None, #scheduler_sbj,
-                                                                                                                                                                        scheduler_dom=None, #scheduler_dom,
+                                                                                                                                                                        scheduler_sbj=None if isinstance(args.adversarial, str) and not args.review_agnostic else scheduler_sbj,
+                                                                                                                                                                        scheduler_dom=None if isinstance(args.adversarial, str) else scheduler_dom,
                                                                                                                                                                         scheduler_ds=None,
                                                                                                                                                                         early_stopping=True,
                                                                                                                                                                         qa_type_weights=qa_type_weights,
@@ -1230,6 +1235,7 @@ if __name__ == '__main__':
                                                         multitask = args.multitask,
                                                         adversarial = True if args.adversarial == 'GRL' else False,
                                                         dataset_agnostic = args.dataset_agnostic,
+                                                        review_agnostic = args.review_agnostic,
                                                         n_aux_tasks = args.n_aux_tasks,
                                                         n_domain_labels = n_domain_labels,
                                                         n_qa_type_labels = n_qa_type_labels if args.multi_qa_type_class else None,
