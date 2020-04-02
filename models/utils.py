@@ -1595,8 +1595,8 @@ def test(
       return test_loss, test_acc, test_f1, predicted_answers, true_answers, sent_pairs, feat_reps
 
     elif (task == 'Sbj_Classification' or task == 'Domain_Classification') and (output_last_hiddens or output_all_hiddens):
-        predictions = np.array(predictions).flatten().tolist()
-        true_labels = np.array(true_labels).flatten().tolist()
+      predictions = np.array(predictions).flatten().tolist()
+      true_labels = np.array(true_labels).flatten().tolist()
       return test_loss, test_acc, test_f1, predictions, true_labels, feat_reps
 
     else:
