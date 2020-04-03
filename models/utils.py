@@ -1573,7 +1573,7 @@ def test(
 
             if task == 'QA' and output_all_hiddens:
               # it seems as if we cannot load all hidden representations into memory
-              if n == 20:
+              if n == 50:
                 break
 
     test_loss /= nb_test_steps
@@ -1615,7 +1615,7 @@ def test(
     elif task == 'QA' and output_all_hiddens:
       # nested lists of strings must be flattened via list comprehensions (not possible with np.array().flatten())
       predicted_answers = [pred_ans for b_pred_answers in predicted_answers for pred_ans in b_pred_answers]
-      true_answers = [pred_ans for b_true_answers in true_answers for true_ans in b_true_answers]
+      true_answers = [true_ans for b_true_answers in true_answers for true_ans in b_true_answers]
       sent_pairs = [sent_pair for b_sent_pairs in sent_pairs for sent_pair in b_sent_pairs]
       true_start_pos = np.array(true_start_pos).flatten().tolist()
       true_end_pos = np.array(true_end_pos).flatten().tolist()
