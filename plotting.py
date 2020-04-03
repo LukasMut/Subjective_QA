@@ -348,10 +348,10 @@ def plot_seqs_projected_via_tsne(
                                  plot_qa:bool=False,
                                  sent_pair:list=None,
 ):
-    plt.figure(figsize=(16,10), dpi=300) #NOTE: the higher the dpi the better the resolution
+    plt.figure(figsize=(16,10), dpi=300) #NOTE: the higher the dpi the better the resolution of the plot
     ax = plt.subplot(111)
     
-    dataset = '$D_{SubjQA} \: \cup \: D_{SQuAD}$' if combined_ds else 'D_{SubjQA}'
+    dataset = '$D_{SubjQA} \: \cup \: D_{SQuAD}$' if combined_ds else '$D_{SubjQA}$'
     
     # set hyperparameters
     legend_fontsize = 14
