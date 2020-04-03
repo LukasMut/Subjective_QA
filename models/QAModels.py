@@ -96,7 +96,8 @@ class DistilBertForQA(DistilBertPreTrainedModel):
                 input_lengths=None,
                 start_positions=None,
                 end_positions=None,
-                output_last_hiddens:bool=False,
+                output_last_hiddens_cls:bool=False,
+                output_all_hiddens_cls:bool=False,
                 output_all_hiddens:bool=False,
     ):
         #NOTE: token_type_ids == segment_ids (!)
@@ -115,8 +116,9 @@ class DistilBertForQA(DistilBertPreTrainedModel):
                                 aux_targets=aux_targets,
                                 start_positions=start_positions,
                                 end_positions=end_positions,
-                                output_last_hiddens=output_last_hiddens,
-                                output_all_hiddens=output_all_hiddens,
+                                output_last_hiddens_cls=output_last_hiddens_cls,
+                                output_all_hiddens_cls=output_all_hiddens_cls,
+                                output_all_hiddens=output_all_hiddens, 
             )
         else:
             return self.qa_head(
@@ -125,7 +127,8 @@ class DistilBertForQA(DistilBertPreTrainedModel):
                                 aux_targets=aux_targets,
                                 start_positions=start_positions,
                                 end_positions=end_positions,
-                                output_last_hiddens=output_last_hiddens,
-                                output_all_hiddens=output_all_hiddens,
                                 input_lengths=input_lengths,
+                                output_last_hiddens_cls=output_last_hiddens_cls,
+                                output_all_hiddens_cls=output_all_hiddens_cls,
+                                output_all_hiddens=output_all_hiddens,                             
             )

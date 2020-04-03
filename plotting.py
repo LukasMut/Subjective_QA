@@ -5,6 +5,7 @@ __all__ = [
            'plotting',
            'plot_confusion_matrix',
            'plot_seqs_projected_via_tsne',
+           'plot_feat_reps_per_layer',
 ]
 
 import numpy as np
@@ -18,7 +19,10 @@ import re
 
 from collections import defaultdict
 from itertools import islice, product
+from mpl_toolkits.mplot3d import Axes3D
 
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
 from sklearn.metrics import confusion_matrix
 from sklearn.utils import check_matplotlib_support
 from sklearn.utils.multiclass import unique_labels
@@ -337,12 +341,18 @@ def plot_seqs_projected_via_tsne(
                                  y_true:np.ndarray,
                                  class_to_idx:dict,
                                  model_name:str,
+                                 combined_ds:bool=False,
+                                 layer_wise:bool=False,
+                                 n_layer:str=None,
 ):
     plt.figure(figsize=(16,10), dpi=300) #NOTE: the higher the dpi the better the resolution
     ax = plt.subplot(111)
     
+    dataset = '$D_{SubjQA} \: \cup \: D_{SQuAD}$' if combined_ds else 'D_{SubjQA}'
+    
     # set hyperparameters
     legend_fontsize = 13
+    title_fontsize = 16 
     
     # hide the right and top spines
     ax.spines['right'].set_visible(False)
@@ -363,11 +373,52 @@ def plot_seqs_projected_via_tsne(
         ax.scatter(tsne_embed_x[y_true == lab], tsne_embed_y[y_true == lab], alpha=.6, color=colors[lab], label=classes[lab])
 
     ax.legend(fancybox=True, shadow=True, loc='upper right', fontsize=legend_fontsize)
-
-    plt.tight_layout()
-    plt.savefig('./plots/feat_reps/' + model_name + '.png')
+    
+    if layer_wise:
+        n_layer = n_layer.split('_')
+        layer_title = ' '.join(n_layer).capitalize()
+        ax.set_title('Model fine-tuned on' + dataset + ':' + ' ' + layer_title, fontsize=title_fontsize)
+        plt.tight_layout()
+        plt.savefig('./plots/feat_reps/layer_wise' + model_name + '_' + n_layer[-1] + '.png')
+    else:
+        ax.set_title('Model fine-tuned on' + dataset, fontsize=title_fontsize)
+        plt.tight_layout()
+        plt.savefig('./plots/feat_reps/' + model_name + '.png')
+    
     plt.show()
     plt.clf()
+    
+
+def plot_feat_reps_per_layer(
+                             y_true:np.ndarray,
+                             feat_reps_per_layer:dict,
+                             class_to_idx:dict,
+                             retained_variance:float,
+                             rnd_state:int,
+                             model_name:str,
+):
+    for layer, feat_reps in feat_reps_per_layer.items():
+        # initiliase PCA
+        pca = PCA(n_components=retained_variance, svd_solver='full', random_state=rnd_state)
+        # project feat reps onto n principial components
+        transformed_feats = pca.fit_transform(feat_reps)
+        # initiliase TSNE
+        tsne = TSNE(n_components=2, random_state=rnd_state)
+        # transform projected feat reps via t-SNE
+        tsne_embeds = tsne.fit_transform(transformed_feats)
+        # get x_pos and y_pos of transformed data
+        tsne_embed_x = tsne_embeds[:, 0]
+        tsne_embed_y = tsne_embeds[:, 1]
+        # plot model's feature representations at layer l in 2D space
+        plot_seqs_projected_via_tsne(
+                                     tsne_embed_x,
+                                     tsne_embed_y,
+                                     y_true,
+                                     class_to_idx,
+                                     model_name,
+                                     layer_wise=True,
+                                     n_layer=layer,
+                                     )
     
 ##########################################
 ########## CONFUSION MATRIX ##############
@@ -428,6 +479,7 @@ def plot_confusion_matrix(
                       metric=metric,
         )
     else:
+        normalize = False
         cm = confusion_matrix(
                               y_true, 
                               y_pred, 

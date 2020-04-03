@@ -79,10 +79,13 @@ if __name__ == '__main__':
             help='If provided, test DistilBERT model previously pre-trained on SQuAD on SubjQA (no prior task-specific fine-tuning); only possible in test version.')
     parser.add_argument('--detailed_analysis_sbj_class', action='store_true',
             help='If provided, compute detailed analysis of subjectivity classification test results w.r.t datasets')
-    parser.add_argument('--output_last_hiddens', action='store_true',
-            help='If provided, hidden states at last layer will be stored for each input sequence in test set')
+    parser.add_argument('--output_last_hiddens_cls', action='store_true',
+            help='If provided, feature representations of [CLS] token at last layer will be stored for each input sequence in test set')
+    parser.add_argument('--output_all_hiddens_cls', action='store_true',
+        help='If provided, feature representations of [CLS] token at each layer will be stored for each input sequence in test set')
     parser.add_argument('--output_all_hiddens', action='store_true',
-        help='If provided, hidden states at each layer will be stored for each input sequence in test set')
+        help='If provided, hidden states for each layer at every timestep will be stored for each input sequence in test set. Inference must be performed on QA'.)
+
     args = parser.parse_args()
     
     # check whether arg.parser works correctly
@@ -1268,7 +1271,23 @@ if __name__ == '__main__':
                                                                     detailed_analysis_sbj_class = True,
                                                                     )
 
-            elif task == 'QA' and (args.output_last_hiddens or args.output_all_hiddens):
+            elif task == 'QA' and (args.output_last_hiddens_cls or args.output_all_hiddens_cls):
+                 test_loss, test_acc, test_f1, sbj_labels, feat_reps = test(
+                                                                            model = model,
+                                                                            tokenizer = bert_tokenizer,
+                                                                            test_dl = test_dl,
+                                                                            batch_size = batch_size,
+                                                                            not_finetuned = args.not_finetuned,
+                                                                            task = 'QA' if task == 'all' else task,
+                                                                            n_domains = n_domain_labels,
+                                                                            input_sequence = 'question_answer' if args.batches == 'alternating' else 'question_context',
+                                                                            sequential_transfer = args.sequential_transfer,
+                                                                            inference_strategy = args.sequential_transfer_evaluation,
+                                                                            multi_qa_type_class = args.multi_qa_type_class,
+                                                                            output_last_hiddens_cls = args.output_last_hiddens_cls,
+                                                                            output_all_hiddens_cls = args.output_all_hiddens_cls,
+                                                                             )
+            elif task == 'QA' and args.output_all_hiddens:
                  test_loss, test_acc, test_f1, predicted_answers, true_answers, sent_pairs, feat_reps = test(
                                                                                                              model = model,
                                                                                                              tokenizer = bert_tokenizer,
@@ -1281,10 +1300,9 @@ if __name__ == '__main__':
                                                                                                              sequential_transfer = args.sequential_transfer,
                                                                                                              inference_strategy = args.sequential_transfer_evaluation,
                                                                                                              multi_qa_type_class = args.multi_qa_type_class,
-                                                                                                             output_last_hiddens = args.output_last_hiddens,
                                                                                                              output_all_hiddens = args.output_all_hiddens,
                                                                                                              )
-            elif args.output_last_hiddens or args.output_all_hiddens:
+            elif args.output_last_hiddens_cls or args.output_all_hiddens_cls:
                  test_loss, test_acc, test_f1, predictions, true_labels, feat_reps = test(
                                                                                           model = model,
                                                                                           tokenizer = bert_tokenizer,
@@ -1297,8 +1315,8 @@ if __name__ == '__main__':
                                                                                           sequential_transfer = args.sequential_transfer,
                                                                                           inference_strategy = args.sequential_transfer_evaluation,
                                                                                           multi_qa_type_class = args.multi_qa_type_class,
-                                                                                          output_last_hiddens = args.output_last_hiddens,
-                                                                                          output_all_hiddens = args.output_all_hiddens,
+                                                                                          output_last_hiddens_cls = args.output_last_hiddens_cls,
+                                                                                          output_all_hiddens_cls = args.output_all_hiddens_cls,
                                                                                           )
 
             else:
@@ -1323,13 +1341,17 @@ if __name__ == '__main__':
             if args.detailed_analysis_sbj_class:
                 test_results['test_results_per_ds'] = results_per_ds
 
-            elif task == 'QA' and (args.output_last_hiddens or args.output_all_hiddens):
+            elif task == 'QA' and (args.output_last_hiddens_cls or args.output_all_hiddens_cls):
+                test_results['sbj_labels'] = sbj_labels
+                test_results['feat_reps'] = feat_reps
+
+            elif task == 'QA' and args.output_all_hiddens:
                 test_results['predicted_answers'] = predicted_answers
                 test_results['true_answers'] = true_answers
                 test_results['sent_pairs'] = sent_pairs
                 test_results['feat_reps'] = feat_reps
 
-            elif args.output_last_hiddens or args.output_all_hiddens:
+            elif args.output_last_hiddens _cls or args.output_all_hiddens_cls:
                 test_results['predictions'] = predictions
                 test_results['true_labels'] = true_labels
                 test_results['feat_reps'] = feat_reps

@@ -1099,7 +1099,8 @@ def test(
         inference_strategy:str=None,
         detailed_analysis_sbj_class:bool=False,
         multi_qa_type_class:bool=False,
-        output_last_hiddens:bool=False,
+        output_last_hiddens_cls:bool=False,
+        output_all_hiddens_cls:bool=False,
         output_all_hiddens:bool=False,
 
 ):
@@ -1134,17 +1135,17 @@ def test(
     ####### STORE PREDS, TRUE LABELS AND HIDDENS FOR VISUALISATION #######
     ######################################################################
 
-    if output_last_hiddens:
+    if output_last_hiddens_cls or output_all_hiddens_cls:
       if task == 'QA':
-        predicted_answers, true_answers, sent_pairs, feat_reps = [], [], [], []
-      else:
-        predictions, true_labels, feat_reps = [], [], []
-    elif output_all_hiddens:
-      if task == 'QA':
-        predicted_answers, true_answers, sent_pairs = [], [], []
+        sbj_labels, ds_labels = [], []
       else:
         predictions, true_labels = [], []
-      feat_reps = defaultdict(list)
+      feat_reps = defaultdict(list) if output_all_hiddens_cls else []
+
+    elif output_all_hiddens:
+        assert task == 'QA', 'Model must perform QA, if we want to store hidden representations for each transformer layer at every timestep'
+        predicted_answers, true_answers, sent_pairs = [], [], []
+        feat_reps = defaultdict(list)
 
     ###################################################
 
@@ -1171,7 +1172,7 @@ def test(
           b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_sbj, b_domains, _ = batch
 
         elif task == 'QA' and not sequential_transfer:
-          b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _, _ = batch
+          b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_sbj, _, b_ds = batch
 
         elif task == 'Sbj_Classification':
 
@@ -1203,7 +1204,8 @@ def test(
                   outputs = model(
                                  input_ids=b_input_ids,
                                  attention_mask=b_attn_masks,
-                                 output_last_hiddens=output_last_hiddens,
+                                 output_last_hiddens_cls=output_last_hiddens_cls,
+                                 output_all_hiddens_cls=output_all_hiddens_cls,
                                  output_all_hiddens=output_all_hiddens,
                   )
 
@@ -1223,7 +1225,8 @@ def test(
                                    input_lengths=b_input_lengths,
                                    task='QA',
                                    aux_targets=b_aux_hard_targets,
-                                   output_last_hiddens=output_last_hiddens,
+                                   output_last_hiddens_cls=output_last_hiddens_cls,
+                                   output_all_hiddens_cls=output_all_hiddens_cls,
                                    output_all_hiddens=output_all_hiddens,
                     )
 
@@ -1263,7 +1266,8 @@ def test(
                                       input_lengths=b_input_lengths,
                                       task='QA',
                                       aux_targets=b_aux_soft_targets,
-                                      output_last_hiddens=output_last_hiddens,
+                                      output_last_hiddens_cls=output_last_hiddens_cls,
+                                      output_all_hiddens_cls=output_all_hiddens_cls,
                                       output_all_hiddens=output_all_hiddens,
                                       )
 
@@ -1287,7 +1291,8 @@ def test(
                                      token_type_ids=b_token_type_ids,
                                      input_lengths=b_input_lengths,
                                      task='QA',
-                                     output_last_hiddens=output_last_hiddens,
+                                     output_last_hiddens_cls=output_last_hiddens_cls,
+                                     output_all_hiddens_cls=output_all_hiddens_cls,
                                      output_all_hiddens=output_all_hiddens,
                                      )
                   else:
@@ -1299,14 +1304,15 @@ def test(
                                      token_type_ids=b_token_type_ids,
                                      input_lengths=b_input_lengths,
                                      task='QA',
-                                     output_last_hiddens=output_last_hiddens,
+                                     output_last_hiddens_cls=output_last_hiddens_cls,
+                                     output_all_hiddens_cls=output_all_hiddens_cls,
                                      output_all_hiddens=output_all_hiddens,
                                      )
               #####################################################################################
               ############## STORE MODEL'S HIDDEN REPRESENTATIONS FOR VISUALISATION ############### 
               #####################################################################################
 
-              if output_last_hiddens:
+              if output_last_hiddens_cls:
                 start_logits_test, end_logits_test = outputs[:2]
                 cls_last_hiddens = outputs[2]
                 cls_last_hiddens = to_cpu(cls_last_hiddens, detach=True, to_numpy=True).tolist()
@@ -1314,7 +1320,7 @@ def test(
                 for cls_last_hidden in cls_last_hiddens:
                   feat_reps.append(cls_last_hidden)
               
-              elif output_all_hiddens:
+              elif output_all_hiddens or output_all_hiddens_cls:
                 start_logits_test, end_logits_test = outputs[:2]
                 hiddens_all_layers = outputs[2]
 
@@ -1367,7 +1373,7 @@ def test(
               #### MODEL'S PREDICTED ANSWERS & TRUE ANSWERS ####
               ##################################################
 
-              if output_last_hiddens or output_all_hiddens:
+              if output_all_hiddens:
                 predicted_answers.append(pred_answers)
                 correct_answers.append(true_answers)
 
@@ -1380,6 +1386,14 @@ def test(
                                          )
 
                 sent_pairs.append(b_sent_pairs)
+
+              elif output_last_hiddens_cls or output_all_hiddens_cls:
+
+                  b_sbj = to_cpu(b_sbj, to_numpy=True).tolist()
+                  b_ds = to_cpu(b_ds, to_numpy=True).tolist()
+
+                  sbj_labels.append(b_sbj)
+                  ds_labels.append(b_ds)
 
               ##################################################
               ##################################################
@@ -1394,15 +1408,15 @@ def test(
                                   token_type_ids=b_token_type_ids,
                                   input_lengths=b_input_lengths,
                                   task='Sbj_Class',
-                                  output_last_hiddens=output_last_hiddens,
-                                  output_all_hiddens=output_all_hiddens,
+                                  output_last_hiddens_cls=output_last_hiddens_cls,
+                                  output_all_hiddens_cls=output_all_hiddens_cls,
                                   )
 
               #####################################################################################
               ############## STORE MODEL'S HIDDEN REPRESENTATIONS FOR VISUALISATION ############### 
               #####################################################################################
 
-                  if output_last_hiddens:
+                  if output_last_hiddens_cls:
                     sbj_logits = outputs[0]
                     cls_last_hiddens = outputs[1]
                     cls_last_hiddens = to_cpu(cls_last_hiddens, detach=True, to_numpy=True).tolist()
@@ -1410,7 +1424,7 @@ def test(
                     for cls_last_hidden in cls_last_hiddens:
                       feat_reps.append(cls_last_hidden)
                   
-                  elif output_all_hiddens:
+                  elif output_all_hiddens_cls:
                     sbj_logits = outputs[0]
                     hiddens_all_layers = outputs[1]
 
@@ -1436,7 +1450,7 @@ def test(
                   #### MODEL'S PREDICTIONS & TRUE LABELS ####
                   ###########################################
 
-                  if output_last_hiddens or output_all_hiddens:
+                  if output_last_hiddens_cls or output_all_hiddens_cls:
                     y_hat_q_type = torch.argmax(to_cpu(sbj_log_probas, detach=True, to_numpy=False), dim=1).numpy().tolist()
                     y_true = to_cpu(b_sbj, detach=False, to_numpy=True).tolist()
 
@@ -1484,15 +1498,15 @@ def test(
                               token_type_ids=b_token_type_ids,
                               input_lengths=b_input_lengths,
                               task='Domain_Class',
-                              output_last_hiddens=output_last_hiddens,
-                              output_all_hiddens=output_all_hiddens,
+                              output_last_hiddens_cls=output_last_hiddens_cls,
+                              output_all_hiddens_cls=output_all_hiddens_cls,
                               )
 
               #####################################################################################
               ############## STORE MODEL'S HIDDEN REPRESENTATIONS FOR VISUALISATION ############### 
               #####################################################################################
 
-              if output_last_hiddens:
+              if output_last_hiddens_cls:
                 domain_logits = outputs[0]
                 cls_last_hiddens = outputs[1]
                 cls_last_hiddens = to_cpu(cls_last_hiddens, detach=True, to_numpy=True).tolist()
@@ -1500,7 +1514,7 @@ def test(
                 for cls_last_hidden in cls_last_hiddens:
                   feat_reps.append(cls_last_hidden)
               
-              elif output_all_hiddens:
+              elif output_all_hiddens_cls:
                 domain_logits = outputs[0]
                 hiddens_all_layers = outputs[1]
 
@@ -1527,7 +1541,7 @@ def test(
               #### MODEL'S PREDICTIONS & TRUE LABELS ####
               ###########################################
 
-              if output_last_hiddens or output_all_hiddens:
+              if output_last_hiddens_cls or output_all_hiddens_cls:
                 y_hat_domains = torch.argmax(to_cpu(domain_log_probas, detach=True, to_numpy=False), dim=1).numpy().tolist()
                 y_true = to_cpu(b_domains, detach=False, to_numpy=True).tolist()
 
@@ -1587,14 +1601,20 @@ def test(
       results_per_ds = compute_acc_per_ds(results_per_ds)
       return test_loss, test_acc, test_f1, results_per_ds
 
-    elif task == 'QA' and (output_last_hiddens or output_all_hiddens):
+    elif task == 'QA' and output_all_hiddens:
       # nested lists of strings must be flattened via list comprehensions (not possible with np.array().flatten())
       predicted_answers = [pred_ans for b_pred_answers in predicted_answers for pred_ans in b_pred_answers]
       true_answers = [pred_ans for b_true_answers in true_answers for true_ans in b_true_answers]
       sent_pairs = [sent_pair for b_sent_pairs in sent_pairs for sent_pair in b_sent_pairs]
       return test_loss, test_acc, test_f1, predicted_answers, true_answers, sent_pairs, feat_reps
 
-    elif (task == 'Sbj_Classification' or task == 'Domain_Classification') and (output_last_hiddens or output_all_hiddens):
+    elif task == 'QA' and (output_last_hiddens_cls or output_all_hiddens_cls):
+      sbj_labels = np.array(sbj_labels).flatten().tolist()
+      ds_labels = np.array(ds_labels).flatten().tolist()
+      sbj_labels[ds_labels == 0] += max(np.unique(sbj_labels)) + 1 # synthetically create three labels to visualise differences among the objective class (dependent on the dataset)
+      return test_loss, test_acc, test_f1, sbj_labels, feat_reps
+
+    elif (task == 'Sbj_Classification' or task == 'Domain_Classification') and (output_last_hiddens_cls or output_all_hiddens_cls):
       predictions = np.array(predictions).flatten().tolist()
       true_labels = np.array(true_labels).flatten().tolist()
       return test_loss, test_acc, test_f1, predictions, true_labels, feat_reps
