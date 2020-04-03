@@ -830,7 +830,9 @@ def create_question_answer_sequences(
     all_a_sbj = torch.tensor(all_a_sbj, dtype=torch.long)
     all_sbj = all_q_sbj if multi_qa_type_class else torch.stack((all_a_sbj, all_q_sbj), dim=1)
 
-    return all_input_ids, all_input_masks, all_segment_ids, all_input_lengths, all_sbj
+    all_datasets = torch.tensor([f.dataset for f in features], dtype=torch.long)
+
+    return all_input_ids, all_input_masks, all_segment_ids, all_input_lengths, all_sbj, all_datasets
 
 def create_tensor_dataset(
                           features:list,
@@ -838,10 +840,10 @@ def create_tensor_dataset(
                           multi_qa_type_class:bool=False,
                           ):
     if aux_sbj_batch:
-        all_input_ids,  all_input_mask, all_segment_ids, all_input_lengths, all_sbj = create_question_answer_sequences(
-                                                                                                                        features=features,
-                                                                                                                        multi_qa_type_class=multi_qa_type_class,
-                                                                                                                        )
+        all_input_ids,  all_input_mask, all_segment_ids, all_input_lengths, all_sbj, all_datasets = create_question_answer_sequences(
+                                                                                                                                    features=features,
+                                                                                                                                    multi_qa_type_class=multi_qa_type_class,
+                                                                                                                                    )
         dataset = TensorDataset(
                                 all_input_ids,
                                 all_input_mask,

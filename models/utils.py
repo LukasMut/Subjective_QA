@@ -440,10 +440,10 @@ def train(
             else:
               if current_task == 'Sbj_Class':
                 if args['task'] == 'QA' and args['batch_presentation'] == 'alternating':
-                  b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj = aux_sbj_batch
+                  b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj, _ = aux_sbj_batch
 
                 elif args['task'] == 'Sbj_Classification' and args['batch_presentation'] == 'alternating':
-                  b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj = main_batch
+                  b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj, _ = main_batch
 
                 else:
                   b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, b_sbj, _, _ = main_batch
@@ -832,7 +832,7 @@ def val(
 
         elif args['task'] == 'Sbj_Classification':
           if args['batch_presentation'] == 'alternating':
-            b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj = batch
+            b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj, _ = batch
           else:
             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, b_sbj, _, _ = batch
             
@@ -1871,7 +1871,7 @@ def train_all(
                     if task == 'Sbj_Class':
                         if args['batch_presentation'] == 'alternating':
                             # unpack inputs from data loader for (q, a) sequence pair inputs
-                            b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj = batch
+                            b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_sbj, _ = batch
                         else:
                             # unpack inputs from main data loader for (q, c) sequence pair inputs
                             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, b_sbj, _, _ = batch
