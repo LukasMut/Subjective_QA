@@ -78,13 +78,13 @@ if __name__ == '__main__':
     parser.add_argument('--not_finetuned', action='store_true',
             help='If provided, test DistilBERT model previously pre-trained on SQuAD on SubjQA (no prior task-specific fine-tuning); only possible in test version.')
     parser.add_argument('--detailed_analysis_sbj_class', action='store_true',
-            help='If provided, compute detailed analysis of subjectivity classification test results w.r.t datasets')
+            help='If provided, compute detailed analysis of subjectivity classification test results w.r.t datasets.')
     parser.add_argument('--output_last_hiddens_cls', action='store_true',
-            help='If provided, feature representations of [CLS] token at last layer will be stored for each input sequence in test set')
+            help='If provided, feature representations of [CLS] token at last layer will be stored for each input sequence in test set.')
     parser.add_argument('--output_all_hiddens_cls', action='store_true',
-        help='If provided, feature representations of [CLS] token at each layer will be stored for each input sequence in test set')
+        help='If provided, feature representations of [CLS] token at each layer will be stored for each input sequence in test set.')
     parser.add_argument('--output_all_hiddens', action='store_true',
-        help='If provided, hidden states for each layer at every timestep will be stored for each input sequence in test set. Inference must be performed on QA'.)
+        help='If provided, hidden states for each layer at every timestep will be stored for each input sequence in test set. Inference must be performed on QA.')
 
     args = parser.parse_args()
     
@@ -1351,7 +1351,7 @@ if __name__ == '__main__':
                 test_results['sent_pairs'] = sent_pairs
                 test_results['feat_reps'] = feat_reps
 
-            elif args.output_last_hiddens _cls or args.output_all_hiddens_cls:
+            elif args.output_last_hiddens_cls or args.output_all_hiddens_cls:
                 test_results['predictions'] = predictions
                 test_results['true_labels'] = true_labels
                 test_results['feat_reps'] = feat_reps
