@@ -1313,16 +1313,16 @@ def test(
               #####################################################################################
 
               if output_last_hiddens_cls:
-                start_logits_test, end_logits_test = outputs[:2]
-                cls_last_hiddens = outputs[2]
+                start_logits_test, end_logits_test = outputs[0]
+                cls_last_hiddens = outputs[1]
                 cls_last_hiddens = to_cpu(cls_last_hiddens, detach=True, to_numpy=True).tolist()
                 
                 for cls_last_hidden in cls_last_hiddens:
                   feat_reps.append(cls_last_hidden)
               
               elif output_all_hiddens or output_all_hiddens_cls:
-                start_logits_test, end_logits_test = outputs[:2]
-                hiddens_all_layers = outputs[2]
+                start_logits_test, end_logits_test = outputs[0]
+                hiddens_all_layers = outputs[1]
 
                 for l, hiddens in enumerate(hiddens_all_layers):
                   hiddens = to_cpu(hiddens, detach=True, to_numpy=True).tolist()

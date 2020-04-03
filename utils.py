@@ -849,7 +849,8 @@ def create_tensor_dataset(
                                 all_input_mask,
                                 all_segment_ids,
                                 all_input_lengths,
-                                all_sbj)
+                                all_sbj,
+                                all_datasets)
     else:
         all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
         all_input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
