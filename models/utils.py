@@ -1144,7 +1144,7 @@ def test(
 
     elif output_all_hiddens:
         assert task == 'QA', 'Model must perform QA, if we want to store hidden representations for each transformer layer at every timestep'
-        predicted_answers, true_answers, sent_pairs = [], [], []
+        predicted_answers, true_answers, true_start_pos, true_end_pos, sent_pairs = [], [], [], [], []
         feat_reps = defaultdict(list)
 
     ###################################################
@@ -1325,12 +1325,12 @@ def test(
                 hiddens_all_layers = outputs[1]
 
                 for l, hiddens in enumerate(hiddens_all_layers):
-                  hiddens = to_cpu(hiddens, detach=True, to_numpy=True).tolist() # 2D if output [CLS] else 3D
+                  hiddens = to_cpu(hiddens, detach=True, to_numpy=True) # 2D if output [CLS] else 3D
                   for i, hidden in enumerate(hiddens):
                     if output_all_hiddens: # 2D Matrix
-                      feat_reps['Layer' + '_' + str(l + 1)].append(hidden[:b_input_lengths[i], :]) # remove PAD token representations
+                      feat_reps['Layer' + '_' + str(l + 1)].append(hidden[:b_input_lengths[i], :].tolist()) # remove PAD token representations
                     else: # 1D vector
-                      feat_reps['Layer' + '_' + str(l + 1)].append(hidden)
+                      feat_reps['Layer' + '_' + str(l + 1)].append(hidden.tolist())
               else:
                 assert len(outputs) == 2
                 start_logits_test, end_logits_test = outputs
@@ -1379,6 +1379,8 @@ def test(
               if output_all_hiddens:
                 predicted_answers.append(pred_answers)
                 correct_answers.append(true_answers)
+                true_start_pos.append(to_cpu(b_start_pos, to_numpy=True).tolist())
+                true_end_pos.append(to_cpu(b_end_pos, to_numpy=True).tolist())
 
                 b_sent_pairs = get_answers(
                                           tokenizer=tokenizer,
@@ -1610,7 +1612,9 @@ def test(
       predicted_answers = [pred_ans for b_pred_answers in predicted_answers for pred_ans in b_pred_answers]
       true_answers = [pred_ans for b_true_answers in true_answers for true_ans in b_true_answers]
       sent_pairs = [sent_pair for b_sent_pairs in sent_pairs for sent_pair in b_sent_pairs]
-      return test_loss, test_acc, test_f1, predicted_answers, true_answers, sent_pairs, feat_reps
+      true_start_pos = np.array(true_start_pos).flatten().tolist()
+      true_end_pos = np.array(true_end_pos).flatten().tolist()
+      return test_loss, test_acc, test_f1, predicted_answers, true_answers, true_start_pos, true_end_pos, sent_pairs, feat_reps
 
     elif task == 'QA' and (output_last_hiddens_cls or output_all_hiddens_cls):
       sbj_labels = np.array(sbj_labels).flatten()

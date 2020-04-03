@@ -1288,20 +1288,20 @@ if __name__ == '__main__':
                                                                             output_all_hiddens_cls = args.output_all_hiddens_cls,
                                                                              )
             elif task == 'QA' and args.output_all_hiddens:
-                 test_loss, test_acc, test_f1, predicted_answers, true_answers, sent_pairs, feat_reps = test(
-                                                                                                             model = model,
-                                                                                                             tokenizer = bert_tokenizer,
-                                                                                                             test_dl = test_dl,
-                                                                                                             batch_size = batch_size,
-                                                                                                             not_finetuned = args.not_finetuned,
-                                                                                                             task = 'QA' if task == 'all' else task,
-                                                                                                             n_domains = n_domain_labels,
-                                                                                                             input_sequence = 'question_answer' if args.batches == 'alternating' else 'question_context',
-                                                                                                             sequential_transfer = args.sequential_transfer,
-                                                                                                             inference_strategy = args.sequential_transfer_evaluation,
-                                                                                                             multi_qa_type_class = args.multi_qa_type_class,
-                                                                                                             output_all_hiddens = args.output_all_hiddens,
-                                                                                                             )
+                 test_loss, test_acc, test_f1, predicted_answers, true_answers, true_start_pos, true_end_pos, sent_pairs, feat_reps = test(
+                                                                                                                                             model = model,
+                                                                                                                                             tokenizer = bert_tokenizer,
+                                                                                                                                             test_dl = test_dl,
+                                                                                                                                             batch_size = batch_size,
+                                                                                                                                             not_finetuned = args.not_finetuned,
+                                                                                                                                             task = 'QA' if task == 'all' else task,
+                                                                                                                                             n_domains = n_domain_labels,
+                                                                                                                                             input_sequence = 'question_answer' if args.batches == 'alternating' else 'question_context',
+                                                                                                                                             sequential_transfer = args.sequential_transfer,
+                                                                                                                                             inference_strategy = args.sequential_transfer_evaluation,
+                                                                                                                                             multi_qa_type_class = args.multi_qa_type_class,
+                                                                                                                                             output_all_hiddens = args.output_all_hiddens,
+                                                                                                                                             )
             elif args.output_last_hiddens_cls or args.output_all_hiddens_cls:
                  test_loss, test_acc, test_f1, predictions, true_labels, feat_reps = test(
                                                                                           model = model,
@@ -1348,6 +1348,8 @@ if __name__ == '__main__':
             elif task == 'QA' and args.output_all_hiddens:
                 test_results['predicted_answers'] = predicted_answers
                 test_results['true_answers'] = true_answers
+                test_results['true_start_pos'] = true_start_pos
+                test_results['true_end_pos'] = true_end_pos
                 test_results['sent_pairs'] = sent_pairs
                 test_results['feat_reps'] = feat_reps
 
