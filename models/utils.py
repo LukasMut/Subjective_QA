@@ -1352,7 +1352,7 @@ def test(
               start_log_probs_test = to_cpu(F.log_softmax(start_logits_test, dim=1), detach=True, to_numpy=False)
               end_log_probs_test = to_cpu(F.log_softmax(end_logits_test, dim=1), detach=True, to_numpy=False)
 
-              pred_answers = get_answers(
+              b_pred_answers = get_answers(
                                          tokenizer=tokenizer,
                                          b_input_ids=b_input_ids,
                                          start_logs=start_log_probs_test,
@@ -1360,7 +1360,7 @@ def test(
                                          predictions=True,
               )
 
-              true_answers = get_answers(
+              b_true_answers = get_answers(
                                          tokenizer=tokenizer,
                                          b_input_ids=b_input_ids,
                                          start_logs=b_start_pos,
@@ -1368,8 +1368,8 @@ def test(
                                          predictions=False,
               )
 
-              correct_answers_test += compute_exact_batch(true_answers, pred_answers)
-              batch_f1_test += compute_f1_batch(true_answers, pred_answers)
+              correct_answers_test += compute_exact_batch(b_true_answers, b_pred_answers)
+              batch_f1_test += compute_f1_batch(b_true_answers, b_pred_answers)
 
 
               ##################################################
@@ -1377,8 +1377,8 @@ def test(
               ##################################################
 
               if output_all_hiddens:
-                predicted_answers.append(pred_answers)
-                correct_answers.append(true_answers)
+                predicted_answers.append(b_pred_answers)
+                true_answers.append(b_true_answers)
                 true_start_pos.append(to_cpu(b_start_pos, to_numpy=True).tolist())
                 true_end_pos.append(to_cpu(b_end_pos, to_numpy=True).tolist())
 
