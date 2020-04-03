@@ -341,9 +341,12 @@ def plot_seqs_projected_via_tsne(
                                  y_true:np.ndarray,
                                  class_to_idx:dict,
                                  model_name:str,
+                                 task:str,
                                  combined_ds:bool=False,
                                  layer_wise:bool=False,
                                  n_layer:str=None,
+                                 plot_qa:bool=False,
+                                 sentence_pair:list=None,
 ):
     plt.figure(figsize=(16,10), dpi=300) #NOTE: the higher the dpi the better the resolution
     ax = plt.subplot(111)
@@ -366,11 +369,37 @@ def plot_seqs_projected_via_tsne(
     if len(np.unique(y_true)) > 3:
         classes = list(class_to_idx.keys())
     else:
-        classes = ['$\mathbf{D}_{SubjQA}^{obj}$', '$\mathbf{D}_{SubjQA}^{sbj}$', '$\mathbf{D}_{SQuAD}$']
-        colors = ['royalblue', 'palevioletred', 'green']
+        if plot_qa:
+            classes = ['question', 'answer', 'context']
+            markers = ['d', '*', 'o']
+            colors = ['royalblue', 'firebrick', 'dimgrey']
+        else:
+            classes = ['$\mathbf{D}_{SubjQA}^{obj}$', '$\mathbf{D}_{SubjQA}^{sbj}$', '$\mathbf{D}_{SQuAD}$']
+            colors = ['royalblue', 'palevioletred', 'green']
 
     for cat, lab in class_to_idx.items():
-        ax.scatter(tsne_embed_x[y_true == lab], tsne_embed_y[y_true == lab], alpha=.6, color=colors[lab], label=classes[lab])
+        if plot_qa:
+            ax.scatter(
+                       tsne_embed_x[y_true == lab],
+                       tsne_embed_y[y_true == lab],
+                       c=colors[lab],
+                       marker=markers[lab],
+                       alpha=.6,
+                       label=classes[lab],
+            )
+        else:   
+            ax.scatter(
+                       tsne_embed_x[y_true == lab],
+                       tsne_embed_y[y_true == lab],
+                       color=colors[lab],
+                       alpha=.6,
+                       label=classes[lab],
+            )
+        
+    if plot_qa:
+        assert isinstance(sentence_pair, list)
+        for t, tok in enumerate(sentence_pair):
+            ax.annotate(tok, (tsne_embed_x[t], tsne_embed_y[t]))
 
     ax.legend(fancybox=True, shadow=True, loc='upper right', fontsize=legend_fontsize)
     
@@ -379,7 +408,7 @@ def plot_seqs_projected_via_tsne(
         layer = ' '.join(layer).capitalize()
         ax.set_title('Model fine-tuned on' + ' ' + dataset + ':' + ' ' + layer, fontsize=title_fontsize)
         plt.tight_layout()
-        plt.savefig('./plots/feat_reps/layer_wise/' + model_name + '_' + n_layer.lower() + '.png')
+        plt.savefig('./plots/feat_reps/layer_wise/' + task + '/' + model_name + '_' + n_layer.lower() + '.png')
     else:
         ax.set_title('Model fine-tuned on' + ' ' + dataset, fontsize=title_fontsize)
         plt.tight_layout()
@@ -396,7 +425,10 @@ def plot_feat_reps_per_layer(
                              retained_variance:float,
                              rnd_state:int,
                              model_name:str,
+                             task:str,
                              combined_ds:bool=False,
+                             plot_qa:bool=False,
+                             sentence_pair:list=None,
 ):
     for layer, feat_reps in feat_reps_per_layer.items():
         # initiliase PCA
@@ -417,9 +449,12 @@ def plot_feat_reps_per_layer(
                                      y_true,
                                      class_to_idx,
                                      model_name,
+                                     task=task,
                                      combined_ds=combined_ds,
                                      layer_wise=True,
                                      n_layer=layer,
+                                     plot_qa=plot_qa,
+                                     sentence_pair=sentence_pair,
                                      )
     
 ##########################################
