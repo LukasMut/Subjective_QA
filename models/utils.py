@@ -1325,9 +1325,12 @@ def test(
                 hiddens_all_layers = outputs[1]
 
                 for l, hiddens in enumerate(hiddens_all_layers):
-                  hiddens = to_cpu(hiddens, detach=True, to_numpy=True).tolist()
-                  for hidden in hiddens:
-                    feat_reps['Layer' + '_' + str(l + 1)].append(hidden)
+                  hiddens = to_cpu(hiddens, detach=True, to_numpy=True).tolist() # 2D if output [CLS] else 3D
+                  for i, hidden in enumerate(hiddens):
+                    if output_all_hiddens: # 2D Matrix
+                      feat_reps['Layer' + '_' + str(l + 1)].append(hidden[:b_input_lengths[i], :]) # remove PAD token representations
+                    else: # 1D vector
+                      feat_reps['Layer' + '_' + str(l + 1)].append(hidden)
               else:
                 assert len(outputs) == 2
                 start_logits_test, end_logits_test = outputs

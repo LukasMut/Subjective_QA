@@ -214,11 +214,13 @@ class LinearQAHead(nn.Module):
                 bert_hidden_states = distilbert_output[1] # tuple of all hidden states (output of embeddings + output for each transformer layer)
                 bert_hidden_states = bert_hidden_states[1:] # extract hidden states from all transformer layers
 
+                """
                 def remove_pad_token_hiddens(input_lengths:torch.Tensor, hidden_states:tuple):
                     n_layers = len(hidden_states)
                     return tuple(torch.stack([hidden_states[l][i, :seq_len, :] for i, seq_len in enumerate(input_lengths)], dim=0) for l in range(n_layers))
-
                 bert_hidden_states = remove_pad_token_hiddens(input_lengths, bert_hidden_states)
+                """
+                
                 return outputs, bert_hidden_states
 
             return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)
