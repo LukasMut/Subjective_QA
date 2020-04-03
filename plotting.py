@@ -351,7 +351,7 @@ def plot_seqs_projected_via_tsne(
     dataset = '$D_{SubjQA} \: \cup \: D_{SQuAD}$' if combined_ds else 'D_{SubjQA}'
     
     # set hyperparameters
-    legend_fontsize = 13
+    legend_fontsize = 14
     title_fontsize = 16 
     
     # hide the right and top spines
@@ -375,13 +375,13 @@ def plot_seqs_projected_via_tsne(
     ax.legend(fancybox=True, shadow=True, loc='upper right', fontsize=legend_fontsize)
     
     if layer_wise:
-        n_layer = n_layer.split('_')
-        layer_title = ' '.join(n_layer).capitalize()
-        ax.set_title('Model fine-tuned on' + dataset + ':' + ' ' + layer_title, fontsize=title_fontsize)
+        layer = n_layer.split('_')
+        layer = ' '.join(layer).capitalize()
+        ax.set_title('Model fine-tuned on' + ' ' + dataset + ':' + ' ' + layer, fontsize=title_fontsize)
         plt.tight_layout()
-        plt.savefig('./plots/feat_reps/layer_wise' + model_name + '_' + n_layer[-1] + '.png')
+        plt.savefig('./plots/feat_reps/layer_wise/' + model_name + '_' + n_layer.lower() + '.png')
     else:
-        ax.set_title('Model fine-tuned on' + dataset, fontsize=title_fontsize)
+        ax.set_title('Model fine-tuned on' + ' ' + dataset, fontsize=title_fontsize)
         plt.tight_layout()
         plt.savefig('./plots/feat_reps/' + model_name + '.png')
     
@@ -396,6 +396,7 @@ def plot_feat_reps_per_layer(
                              retained_variance:float,
                              rnd_state:int,
                              model_name:str,
+                             combined_ds:bool=False,
 ):
     for layer, feat_reps in feat_reps_per_layer.items():
         # initiliase PCA
@@ -416,6 +417,7 @@ def plot_feat_reps_per_layer(
                                      y_true,
                                      class_to_idx,
                                      model_name,
+                                     combined_ds=combined_ds,
                                      layer_wise=True,
                                      n_layer=layer,
                                      )
