@@ -1389,10 +1389,11 @@ def test(
 
               elif output_last_hiddens_cls or output_all_hiddens_cls:
 
-                  b_sbj = to_cpu(b_sbj, to_numpy=True).tolist()
+                  b_sbj_q = b_sbj[:, 1]
+                  b_sbj_q = to_cpu(b_sbj_q, to_numpy=True).tolist()
                   b_ds = to_cpu(b_ds, to_numpy=True).tolist()
 
-                  sbj_labels.append(b_sbj)
+                  sbj_labels.append(b_sbj_q)
                   ds_labels.append(b_ds)
 
               ##################################################

@@ -1169,7 +1169,7 @@ if __name__ == '__main__':
                 
                 _, squad_examples_dev = split_into_train_and_dev(squad_examples_train)
 
-                if args.multi_qa_type_class and args.sbj_classification:
+                if (args.multi_qa_type_class and args.sbj_classification) or (args.dataset_agnostic and (args.output_last_hiddens_cls or args.output_all_hiddens_cls)):
                     squad_examples_dev = squad_examples_dev[len(squad_examples_dev)//2:]
 
                 squad_features_dev = convert_examples_to_features(
