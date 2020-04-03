@@ -346,7 +346,7 @@ def plot_seqs_projected_via_tsne(
                                  layer_wise:bool=False,
                                  n_layer:str=None,
                                  plot_qa:bool=False,
-                                 sentence_pair:list=None,
+                                 sent_pair:list=None,
 ):
     plt.figure(figsize=(16,10), dpi=300) #NOTE: the higher the dpi the better the resolution
     ax = plt.subplot(111)
@@ -387,6 +387,13 @@ def plot_seqs_projected_via_tsne(
                        alpha=.6,
                        label=classes[lab],
             )
+        elif len(np.unique(y_true)) > 3:
+            ax.scatter(
+                       tsne_embed_x[y_true == lab],
+                       tsne_embed_y[y_true == lab],
+                       alpha=.6,
+                       label=cat,
+            )
         else:   
             ax.scatter(
                        tsne_embed_x[y_true == lab],
@@ -397,7 +404,7 @@ def plot_seqs_projected_via_tsne(
             )
         
     if plot_qa:
-        assert isinstance(sentence_pair, list)
+        assert isinstance(sent_pair, list)
         special_toks = ['[CLS]', '[SEP]']
         for t, tok in enumerate(sent_pair):
             if tok not in special_toks:
