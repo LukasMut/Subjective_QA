@@ -1609,10 +1609,10 @@ def test(
       return test_loss, test_acc, test_f1, predicted_answers, true_answers, sent_pairs, feat_reps
 
     elif task == 'QA' and (output_last_hiddens_cls or output_all_hiddens_cls):
-      sbj_labels = np.array(sbj_labels).flatten().tolist()
-      ds_labels = np.array(ds_labels).flatten().tolist()
+      sbj_labels = np.array(sbj_labels).flatten()
+      ds_labels = np.array(ds_labels).flatten()
       sbj_labels[ds_labels == 0] += max(np.unique(sbj_labels)) + 1 # synthetically create three labels to visualise differences among the objective class (dependent on the dataset)
-      return test_loss, test_acc, test_f1, sbj_labels, feat_reps
+      return test_loss, test_acc, test_f1, sbj_labels.tolist(), feat_reps
 
     elif (task == 'Sbj_Classification' or task == 'Domain_Classification') and (output_last_hiddens_cls or output_all_hiddens_cls):
       predictions = np.array(predictions).flatten().tolist()
