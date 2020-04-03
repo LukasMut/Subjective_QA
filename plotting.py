@@ -398,8 +398,10 @@ def plot_seqs_projected_via_tsne(
         
     if plot_qa:
         assert isinstance(sentence_pair, list)
-        for t, tok in enumerate(sentence_pair):
-            ax.annotate(tok, (tsne_embed_x[t], tsne_embed_y[t]))
+        special_toks = ['[CLS]', '[SEP]']
+        for t, tok in enumerate(sent_pair):
+            if tok not in special_toks:
+                ax.annotate(tok, (tsne_embed_x[t], tsne_embed_y[t]))
 
     ax.legend(fancybox=True, shadow=True, loc='upper right', fontsize=legend_fontsize)
     
@@ -428,7 +430,7 @@ def plot_feat_reps_per_layer(
                              task:str,
                              combined_ds:bool=False,
                              plot_qa:bool=False,
-                             sentence_pair:list=None,
+                             sent_pair:list=None,
 ):
     for layer, feat_reps in feat_reps_per_layer.items():
         # initiliase PCA
@@ -454,7 +456,7 @@ def plot_feat_reps_per_layer(
                                      layer_wise=True,
                                      n_layer=layer,
                                      plot_qa=plot_qa,
-                                     sentence_pair=sentence_pair,
+                                     sent_pair=sent_pair,
                                      )
     
 ##########################################

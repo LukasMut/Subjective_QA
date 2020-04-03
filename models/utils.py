@@ -1571,6 +1571,11 @@ def test(
             print("--------------------------------------------")
             print()
 
+            if task == 'QA' and output_all_hiddens:
+              # it seems as if we cannot load all hidden representations into memory
+              if n == 20:
+                break
+
     test_loss /= nb_test_steps
 
     print("-----------------------------------")
