@@ -550,7 +550,7 @@ if __name__ == '__main__':
                                                                   combined_features_train,
                                                                   multi_qa_type_class=args.multi_qa_type_class,
                                                                   )
-            if args.multi_qa_type_class:
+            if args.multi_qa_type_class or args.dataset_agnostic:
                 # split development set into dev and test sets (use first half as dev set)
                 squad_examples_dev = squad_examples_dev[:len(squad_examples_dev)//2]
 
@@ -1153,7 +1153,7 @@ if __name__ == '__main__':
                                                                 dataset_to_idx=dataset_to_idx,
             )
 
-            if args.detailed_analysis_sbj_class or (args.multi_qa_type_class and args.sbj_classification):
+            if args.detailed_analysis_sbj_class or (args.multi_qa_type_class and args.sbj_classification) or (args.dataset_agnostic and (args.output_last_hiddens_cls or args.output_all_hiddens_cls)):
 
                 squad_data_train = get_data(
                                             source='/SQuAD/',
