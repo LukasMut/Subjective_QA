@@ -176,14 +176,17 @@ class LinearQAHead(nn.Module):
             start_logits = start_logits.squeeze(-1)
             end_logits = end_logits.squeeze(-1)
 
-            outputs = (start_logits, end_logits,) + distilbert_output[1:]
+            outputs = (start_logits, end_logits,) # + distilbert_output[1:]
 
+            """
             if (start_positions is not None) and (end_positions is not None):
+
                 # If we are on multi-GPU, split add a dimension
                 if len(start_positions.size()) > 1:
                     start_positions = start_positions.squeeze(-1)
                 if len(end_positions.size()) > 1:
                     end_positions = end_positions.squeeze(-1)
+
                 # sometimes the start/end positions are outside our model inputs, we ignore these terms
                 ignored_index = start_logits.size(1)
                 start_positions.clamp_(0, ignored_index)
@@ -194,6 +197,7 @@ class LinearQAHead(nn.Module):
                 end_loss = loss_fct(end_logits, end_positions)
                 total_loss = (start_loss + end_loss) / 2
                 outputs = (total_loss,) + outputs
+            """
 
             if output_last_hiddens_cls:
                 sequence_output = sequence_output[:, 0, :].squeeze(1)
@@ -494,8 +498,9 @@ class RecurrentQAHead(nn.Module):
             start_logits = start_logits.squeeze(-1)
             end_logits = end_logits.squeeze(-1)
 
-            outputs = (start_logits, end_logits,) + distilbert_output[1:]
+            outputs = (start_logits, end_logits,) #+ distilbert_output[1:]
 
+            """
             if (start_positions is not None) and (end_positions is not None):
                 # If we are on multi-GPU, split add a dimension
                 if len(start_positions.size()) > 1:
@@ -513,8 +518,10 @@ class RecurrentQAHead(nn.Module):
                 end_loss = loss_fct(end_logits, end_positions)
                 total_loss = (start_loss + end_loss) / 2
                 outputs = (total_loss,) + outputs
+            """
 
             return outputs  #, (loss), start_logits, end_logits, (hidden_states), (attentions)
+
 
         else:
             if task == 'Sbj_Class':
