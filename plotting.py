@@ -19,6 +19,7 @@ import os
 import re
 
 from collections import defaultdict
+from eval_squad import compute_exact
 from itertools import islice, product
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -486,10 +487,13 @@ def get_random_sent_feat_reps(
     
     if prediction == 'correct':
         # indices for correct predictions
-        indices = np.array([i for i, pred_ans in enumerate(pred_answers) if pred_ans == true_answers[i] and len(pred_ans.strip()) > 0])
+        indices = np.array([i for i, pred_ans in enumerate(pred_answers)
+                            if compute_exact(true_answers[i], pred_ans) and true_answers[i].strip() != '[CLS]'])
+        
     elif prediction == 'wrong':
         # indices for wrong predictions
-        indices = np.array([i for i, pred_ans in enumerate(pred_answers) if pred_ans != true_answers[i] and len(pred_ans.strip()) > 0])
+        indices = np.array([i for i, pred_ans in enumerate(pred_answers)
+                            if not compute_exact(true_answers[i], pred_ans) and true_answers[i].strip() != '[CLS]'])
     
     # get random idx
     rnd_sent_idx = np.random.choice(indices)
@@ -500,16 +504,28 @@ def get_random_sent_feat_reps(
     # get sep idx (NOTE: .index() returns first occurrence of element in list)
     sep_idx = rnd_sent.index('[SEP]')
     # get question indices
-    q_indices = np.arange(1, sep_idx)    
+    q_indices = np.arange(1, sep_idx)
+    
+    print("=============================================================")
+    print("===== Question: {} =====".format(' '.join(rnd_sent[q_indices[0]:q_indices[-1]+1])))
+    print("=============================================================")
+    print()
+    
     # get answer indices
     a_indices = np.arange(true_start_pos[rnd_sent_idx], true_end_pos[rnd_sent_idx] + 1)
+    
+    print("=============================================================")
+    print("===== Answer: {} =====".format(' '.join(rnd_sent[a_indices[0]:a_indices[-1]+1])))
+    print("=============================================================")
+    print()
+    
     # create list of special token indices
     special_tok_indices = np.array([0, sep_idx, len(rnd_sent)-1])
     
     # extract feat reps for random sent on token level and convert to NumPy
-    print("========================================================================")
-    print("========= Currently extracting hidden reps for random sentence =========")
-    print("========================================================================")
+    print("============================================================================")
+    print("================ Obtaining hidden reps for random sentence =================")
+    print("============================================================================")
     print()
     feat_reps_per_layer = {l: np.array(hiddens)[rnd_sent_idx] for l, hiddens in feat_reps.items()}
     

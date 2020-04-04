@@ -17,8 +17,8 @@ from sklearn.manifold import TSNE
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.utils.multiclass import unique_labels
 
-np.random.seed(42)
-random.seed(42)
+#np.random.seed(42)
+#random.seed(42)
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -140,10 +140,7 @@ if __name__ == '__main__':
         model_name_copy = model_name[:]
         
         for k, pred in enumerate(predictions):
-            print("============================================================================")
-            print("================ Obtaining hidden reps for random sentence =================")
-            print("============================================================================")
-            print()
+            
             feat_reps_per_layer, token_labels, rnd_sent = get_random_sent_feat_reps(test_results, pred)
             
             if k == 0:
