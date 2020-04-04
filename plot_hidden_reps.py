@@ -147,6 +147,7 @@ if __name__ == '__main__':
                 model_name += '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred
             else:
                 model_name = model_name_copy + '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred
+                break
             
             print("================================================================")
             print("=========== Started plotting: {} prediction =============".format(pred))
