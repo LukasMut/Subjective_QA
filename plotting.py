@@ -1,5 +1,6 @@
 __all__ = [
            'conf_mat',
+           'get_random_sent_feat_reps',
            'get_results',
            'plot_results',
            'plotting',
@@ -27,6 +28,7 @@ from sklearn.metrics import confusion_matrix
 from sklearn.utils import check_matplotlib_support
 from sklearn.utils.multiclass import unique_labels
 
+from tqdm import trange, tqdm
 
 def get_results(
                 task:str,
@@ -366,13 +368,13 @@ def plot_seqs_projected_via_tsne(
     ax.xaxis.set_ticks_position('bottom')
     
     # specify both labels for legend and colors for data points
-    if len(np.unique(y_true)) > 3:
+    if len(np.unique(y_true)) > 3 and not plot_qa:
         classes = list(class_to_idx.keys())
     else:
         if plot_qa:
-            classes = ['question', 'answer', 'context']
-            markers = ['d', '*', 'o']
-            colors = ['royalblue', 'firebrick', 'dimgrey']
+            classes = list(class_to_idx.keys())
+            markers = ['o', 'd', '*']
+            colors = ['dimgrey', 'royalblue', 'firebrick']
         else:
             classes = ['$\mathbf{D}_{SubjQA}^{obj}$', '$\mathbf{D}_{SubjQA}^{sbj}$', '$\mathbf{D}_{SQuAD}$']
             colors = ['royalblue', 'palevioletred', 'green']
@@ -384,7 +386,7 @@ def plot_seqs_projected_via_tsne(
                        tsne_embed_y[y_true == lab],
                        c=colors[lab],
                        marker=markers[lab],
-                       alpha=.6,
+                       alpha=.8,
                        label=classes[lab],
             )
         elif len(np.unique(y_true)) > 3:
@@ -408,9 +410,9 @@ def plot_seqs_projected_via_tsne(
         special_toks = ['[CLS]', '[SEP]']
         for t, tok in enumerate(sent_pair):
             if tok not in special_toks:
-                ax.annotate(tok, (tsne_embed_x[t], tsne_embed_y[t]))
+                ax.annotate(tok, (tsne_embed_x[t], tsne_embed_y[t] + .5))
 
-    ax.legend(fancybox=True, shadow=True, loc='upper right', fontsize=legend_fontsize)
+    ax.legend(fancybox=True, shadow=True, loc='best', fontsize=legend_fontsize)
     
     if layer_wise:
         layer = n_layer.split('_')
@@ -423,8 +425,9 @@ def plot_seqs_projected_via_tsne(
         plt.tight_layout()
         plt.savefig('./plots/feat_reps/' + model_name + '.png')
     
-    plt.show()
-    plt.clf()
+    #plt.show()
+    #plt.clf()
+    plt.close()
     
 
 def plot_feat_reps_per_layer(
@@ -465,6 +468,64 @@ def plot_feat_reps_per_layer(
                                      plot_qa=plot_qa,
                                      sent_pair=sent_pair,
                                      )
+#################################################################        
+##### OBTAIN FEAT REPS ON TOKEN LEVEL FOR RANDOM SENTENCE #######
+################################################################
+
+def get_random_sent_feat_reps(
+                              test_results:dict,
+                              prediction:str,
+):
+    # unpack test results
+    pred_answers = test_results['predicted_answers']
+    true_answers = test_results['true_answers']
+    true_start_pos = test_results['true_start_pos']
+    true_end_pos = test_results['true_end_pos']
+    sent_pairs = test_results['sent_pairs']
+    feat_reps = test_results['feat_reps']
+    
+    if prediction == 'correct':
+        # indices for correct predictions
+        indices = np.array([i for i, pred_ans in enumerate(pred_answers) if pred_ans == true_answers[i] and len(pred_ans.strip()) > 0])
+    elif prediction == 'wrong':
+        # indices for wrong predictions
+        indices = np.array([i for i, pred_ans in enumerate(pred_answers) if pred_ans != true_answers[i] and len(pred_ans.strip()) > 0])
+    
+    # get random idx
+    rnd_sent_idx = np.random.choice(indices)
+    # get random sent according to random idx
+    rnd_sent = sent_pairs[rnd_sent_idx]
+    # convert sent into list
+    rnd_sent = rnd_sent.split()
+    # get sep idx (NOTE: .index() returns first occurrence of element in list)
+    sep_idx = rnd_sent.index('[SEP]')
+    # get question indices
+    q_indices = np.arange(1, sep_idx)    
+    # get answer indices
+    a_indices = np.arange(true_start_pos[rnd_sent_idx], true_end_pos[rnd_sent_idx] + 1)
+    # create list of special token indices
+    special_tok_indices = np.array([0, sep_idx, len(rnd_sent)-1])
+    
+    # extract feat reps for random sent on token level and convert to NumPy
+    print("========================================================================")
+    print("========= Currently extracting hidden reps for random sentence =========")
+    print("========================================================================")
+    print()
+    feat_reps_per_layer = {l: np.array(hiddens)[rnd_sent_idx] for l, hiddens in feat_reps.items()}
+    
+    # create synthetic labels for token sequence
+    T = len(rnd_sent)
+    token_labels = np.zeros(T, dtype=int)
+    
+    for i in range(T):
+        if i in special_tok_indices:
+            token_labels[i] += 99
+        elif i in q_indices:
+            token_labels[i] += 1
+        elif i in a_indices:
+            token_labels[i] += 2
+    
+    return feat_reps_per_layer, token_labels, rnd_sent
     
 ##########################################
 ########## CONFUSION MATRIX ##############

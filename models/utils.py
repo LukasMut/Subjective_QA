@@ -1572,7 +1572,7 @@ def test(
             print()
 
             if task == 'QA' and output_all_hiddens:
-              # it seems as if we cannot load all hidden representations into memory
+              # it seems as if we cannot load all hidden representations into memory (lets load 10 * batch_size for now)
               if n == 10:
                 break
 
