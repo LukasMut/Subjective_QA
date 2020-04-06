@@ -45,7 +45,7 @@ if __name__ == '__main__':
     # create PATH
     cwd = '.'
     PATH = cwd + folder + subdir + subsubdir
-    # we only want .json files
+    # we only want to capture .json files
     files = [file for file in os.listdir(PATH) if file.endswith('.json')]
     
     # load files
@@ -128,7 +128,7 @@ if __name__ == '__main__':
     
     elif args.hidden_reps == 'per_token':
         # plot random sentence for both correct and wrong prediction 
-        predictions = ['correct', 'wrong']
+        predictions = ['correct_unanswerable', 'correct_answerable', 'wrong']
         classes = ['context', 'question', 'answer']
         labels = np.arange(len(classes))
         class_to_idx = {c: l for c, l in zip(classes, labels)}

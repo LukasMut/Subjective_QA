@@ -408,7 +408,7 @@ def plot_seqs_projected_via_tsne(
         
     if plot_qa:
         assert isinstance(sent_pair, list)
-        special_toks = ['[CLS]', '[SEP]']
+        special_toks = ['[SEP]'] if y_true[y_true == class_to_idx['answer']] == np.array([0]) else ['[CLS]', '[SEP]']
         for t, tok in enumerate(sent_pair):
             if tok not in special_toks:
                 ax.annotate(tok, (tsne_embed_x[t], tsne_embed_y[t] + .5))
@@ -484,11 +484,19 @@ def get_random_sent_feat_reps(
     true_end_pos = test_results['true_end_pos']
     sent_pairs = test_results['sent_pairs']
     feat_reps = test_results['feat_reps']
+
+    # [CLS] token id
+    cls_tok_id = 0
     
-    if prediction == 'correct':
+    if prediction == 'correct_answerable':
         # indices for correct predictions
         indices = np.array([i for i, pred_ans in enumerate(pred_answers)
                             if compute_exact(true_answers[i], pred_ans) and true_answers[i].strip() != '[CLS]'])
+
+    elif prediction == 'correct_unanswerable':
+        # indices for correct predictions for an unanswerable question
+        indices = np.array([i for i, pred_ans in enumerate(pred_answers)
+                            if compute_exact(true_answers[i], pred_ans) and true_answers[i].strip() == '[CLS]'])
         
     elif prediction == 'wrong':
         # indices for wrong predictions
@@ -520,7 +528,12 @@ def get_random_sent_feat_reps(
     print()
     
     # create list of special token indices
-    special_tok_indices = np.array([0, sep_idx, len(rnd_sent)-1])
+    special_tok_indices = [cls_tok_id, sep_idx, len(rnd_sent)-1]
+
+    if a_indices == np.array([cls_tok_id]):
+        special_tok_indices.pop(special_tok_indices.index(cls_tok_id))
+    
+    special_tok_indices = np.array(special_tok_indices)
     
     # extract feat reps for random sent on token level and convert to NumPy
     print("============================================================================")

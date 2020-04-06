@@ -1137,13 +1137,13 @@ def test(
 
     if output_last_hiddens_cls or output_all_hiddens_cls:
       if task == 'QA':
-        sbj_labels, ds_labels = [], []
+        domain_labels, sbj_labels, ds_labels = [], [], []
       else:
         predictions, true_labels = [], []
       feat_reps = defaultdict(list) if output_all_hiddens_cls else []
 
     elif output_all_hiddens:
-        assert task == 'QA', 'Model must perform QA, if we want to store hidden representations for each transformer layer at every timestep'
+        assert task == 'QA', 'Model must perform QA, if we want to store hidden representations for every token in a word sequence at each layer'
         predicted_answers, true_answers, true_start_pos, true_end_pos, sent_pairs = [], [], [], [], []
         feat_reps = defaultdict(list)
 
@@ -1169,10 +1169,7 @@ def test(
         ### UNPACK INPUTS FROM MINI-BATCH FOR RESPECTIVE TASK ###
 
         if task == 'QA' and sequential_transfer:
-          b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_sbj, b_domains, _ = batch
-
-        elif task == 'QA' and not sequential_transfer:
-          b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_sbj, _, b_ds = batch
+          b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_sbj, b_domains, b_ds = batch
 
         elif task == 'Sbj_Classification':
 
@@ -1397,7 +1394,9 @@ def test(
                   b_sbj_q = b_sbj[:, 1]
                   b_sbj_q = to_cpu(b_sbj_q, to_numpy=True).tolist()
                   b_ds = to_cpu(b_ds, to_numpy=True).tolist()
+                  b_domains = to_cpu(b_domains, to_numpy=True).tolist()
 
+                  domin_labels.append(b_domains)
                   sbj_labels.append(b_sbj_q)
                   ds_labels.append(b_ds)
 
@@ -1622,10 +1621,11 @@ def test(
       return test_loss, test_acc, test_f1, predicted_answers, true_answers, true_start_pos, true_end_pos, sent_pairs, feat_reps
 
     elif task == 'QA' and (output_last_hiddens_cls or output_all_hiddens_cls):
+      domain_labels = np.array(domain_labels).flatten().tolist()
       sbj_labels = np.array(sbj_labels).flatten()
       ds_labels = np.array(ds_labels).flatten()
       sbj_labels[ds_labels == 0] += max(np.unique(sbj_labels)) + 1 # synthetically create three labels to visualise differences among the objective class (dependent on the dataset)
-      return test_loss, test_acc, test_f1, sbj_labels.tolist(), feat_reps
+      return test_loss, test_acc, test_f1, domain_labels, sbj_labels.tolist(), feat_reps
 
     elif (task == 'Sbj_Classification' or task == 'Domain_Classification') and (output_last_hiddens_cls or output_all_hiddens_cls):
       predictions = np.array(predictions).flatten().tolist()

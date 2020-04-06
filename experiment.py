@@ -1272,21 +1272,21 @@ if __name__ == '__main__':
                                                                     )
 
             elif task == 'QA' and (args.output_last_hiddens_cls or args.output_all_hiddens_cls):
-                 test_loss, test_acc, test_f1, sbj_labels, feat_reps = test(
-                                                                            model = model,
-                                                                            tokenizer = bert_tokenizer,
-                                                                            test_dl = test_dl,
-                                                                            batch_size = batch_size,
-                                                                            not_finetuned = args.not_finetuned,
-                                                                            task = 'QA' if task == 'all' else task,
-                                                                            n_domains = n_domain_labels,
-                                                                            input_sequence = 'question_answer' if args.batches == 'alternating' else 'question_context',
-                                                                            sequential_transfer = args.sequential_transfer,
-                                                                            inference_strategy = args.sequential_transfer_evaluation,
-                                                                            multi_qa_type_class = args.multi_qa_type_class,
-                                                                            output_last_hiddens_cls = args.output_last_hiddens_cls,
-                                                                            output_all_hiddens_cls = args.output_all_hiddens_cls,
-                                                                             )
+                 test_loss, test_acc, test_f1, domain_labels, sbj_labels, feat_reps = test(
+                                                                                            model = model,
+                                                                                            tokenizer = bert_tokenizer,
+                                                                                            test_dl = test_dl,
+                                                                                            batch_size = batch_size,
+                                                                                            not_finetuned = args.not_finetuned,
+                                                                                            task = 'QA' if task == 'all' else task,
+                                                                                            n_domains = n_domain_labels,
+                                                                                            input_sequence = 'question_answer' if args.batches == 'alternating' else 'question_context',
+                                                                                            sequential_transfer = args.sequential_transfer,
+                                                                                            inference_strategy = args.sequential_transfer_evaluation,
+                                                                                            multi_qa_type_class = args.multi_qa_type_class,
+                                                                                            output_last_hiddens_cls = args.output_last_hiddens_cls,
+                                                                                            output_all_hiddens_cls = args.output_all_hiddens_cls,
+                                                                                             )
             elif task == 'QA' and args.output_all_hiddens:
                  test_loss, test_acc, test_f1, predicted_answers, true_answers, true_start_pos, true_end_pos, sent_pairs, feat_reps = test(
                                                                                                                                              model = model,
@@ -1342,6 +1342,7 @@ if __name__ == '__main__':
                 test_results['test_results_per_ds'] = results_per_ds
 
             elif task == 'QA' and (args.output_last_hiddens_cls or args.output_all_hiddens_cls):
+                test_results['domain_labels'] = domain_labels
                 test_results['sbj_labels'] = sbj_labels
                 test_results['feat_reps'] = feat_reps
 
