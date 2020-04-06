@@ -408,7 +408,7 @@ def plot_seqs_projected_via_tsne(
         
     if plot_qa:
         assert isinstance(sent_pair, list)
-        special_toks = ['[SEP]'] if y_true[y_true == class_to_idx['answer']] == np.array([0]) else ['[CLS]', '[SEP]']
+        special_toks = ['[SEP]'] if y_true.tolist().index(class_to_idx['answer']) == 0 else ['[CLS]', '[SEP]']
         for t, tok in enumerate(sent_pair):
             if tok not in special_toks:
                 ax.annotate(tok, (tsne_embed_x[t], tsne_embed_y[t] + .5))

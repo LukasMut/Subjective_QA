@@ -1321,6 +1321,8 @@ def test(
                 start_logits_test, end_logits_test = outputs[0]
                 hiddens_all_layers = outputs[1]
 
+                #NOTE: uncomment code block, if you want to store correct and incorrect (answer span) predictions for both answerable and unanswerable questions
+                """
                 for l, hiddens in enumerate(hiddens_all_layers):
                   hiddens = to_cpu(hiddens, detach=True, to_numpy=True) # 2D if output [CLS] else 3D
                   for i, hidden in enumerate(hiddens):
@@ -1328,6 +1330,7 @@ def test(
                       feat_reps['Layer' + '_' + str(l + 1)].append(hidden[:b_input_lengths[i], :].tolist()) # remove PAD token vector representations
                     else: # 1D vector
                       feat_reps['Layer' + '_' + str(l + 1)].append(hidden.tolist())
+                """
               else:
                 assert len(outputs) == 2
                 start_logits_test, end_logits_test = outputs
@@ -1367,6 +1370,22 @@ def test(
 
               correct_answers_test += compute_exact_batch(b_true_answers, b_pred_answers)
               batch_f1_test += compute_f1_batch(b_true_answers, b_pred_answers)
+
+
+              #####################################################################################
+              ############## STORE MODEL'S HIDDEN REPRESENTATIONS FOR VISUALISATION ############### 
+              ####################################################################################
+
+              if output_all_hiddens or output_all_hiddens_cls:
+                for l, hiddens in enumerate(hiddens_all_layers):
+                    hiddens = to_cpu(hiddens, detach=True, to_numpy=True) # 2D if output [CLS] else 3D
+                    for i, hidden in enumerate(hiddens):
+                      if output_all_hiddens: # 2D Matrix
+                        #NOTE: for now, we just want to store correct (answer span) predictions for answerable (!) questions
+                        if compute_exact(b_true_answers[i], b_pred_answers[i]) and b_true_answers[i].strip() != '[CLS]':
+                          feat_reps['Layer' + '_' + str(l + 1)].append(hidden[:b_input_lengths[i], :].tolist()) # remove PAD token vector representations
+                      else: # 1D vector
+                        feat_reps['Layer' + '_' + str(l + 1)].append(hidden.tolist())
 
 
               ##################################################
