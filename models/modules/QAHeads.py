@@ -11,6 +11,7 @@ import torch.nn.functional as F
 from models.modules.RNNs import *
 from models.modules.GradReverse import *
 from models.modules.Highway import Highway
+from models.utils import to_cpu
 
 # set device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -217,7 +218,7 @@ class LinearQAHead(nn.Module):
                 """
                 def remove_pad_token_hiddens(input_lengths:torch.Tensor, hidden_states:tuple):
                     n_layers = len(hidden_states)
-                    return tuple(torch.stack([hidden_states[l][i, :seq_len, :] for i, seq_len in enumerate(input_lengths)], dim=0) for l in range(n_layers))
+                    return tuple([to_cpu(hidden_states[l], detach=True, to_numpy=True)[i, :seq_len, :].tolist() for i, seq_len in enumerate(input_lengths)] for l in range(n_layers))
                 bert_hidden_states = remove_pad_token_hiddens(input_lengths, bert_hidden_states)
                 """
                 
