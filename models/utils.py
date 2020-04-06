@@ -1384,22 +1384,22 @@ def test(
                         #NOTE: for now, we just want to store correct (answer span) predictions w.r.t answerable (!) questions
                         if compute_exact(b_true_answers[i], b_pred_answers[i]) and b_true_answers[i].strip() != '[CLS]':
                           feat_reps['Layer' + '_' + str(l + 1)].append(hidden[:b_input_lengths[i], :].tolist()) # remove PAD token vector representations
-                          
-                          # store both true and predicted answer spans for respective word sequences
-                          predicted_answers.append(b_pred_answers[i])
-                          true_answers.append(b_true_answers[i])
-                          true_start_pos.append(to_cpu(b_start_pos[i], to_numpy=True).tolist())
-                          true_end_pos.append(to_cpu(b_end_pos[i], to_numpy=True).tolist())
+                          if l == 0:
+                            # store both true and predicted answer spans for respective word sequences once (NOT FOR EVERY LAYER)
+                            predicted_answers.append(b_pred_answers[i])
+                            true_answers.append(b_true_answers[i])
+                            true_start_pos.append(to_cpu(b_start_pos[i], to_numpy=True).tolist())
+                            true_end_pos.append(to_cpu(b_end_pos[i], to_numpy=True).tolist())
 
-                          b_sent_pairs = get_answers(
-                                                    tokenizer=tokenizer,
-                                                    b_input_ids=b_input_ids,
-                                                    start_logs=torch.zeros(batch_size).type_as(b_start_pos).to(device),
-                                                    end_logs=torch.tensor([seq_len - 1 for seq_len in b_input_lengths]).type_as(b_end_pos).to(device),
-                                                    predictions=False,
-                                                   )
+                            b_sent_pairs = get_answers(
+                                                      tokenizer=tokenizer,
+                                                      b_input_ids=b_input_ids,
+                                                      start_logs=torch.zeros(batch_size).type_as(b_start_pos).to(device),
+                                                      end_logs=torch.tensor([seq_len - 1 for seq_len in b_input_lengths]).type_as(b_end_pos).to(device),
+                                                      predictions=False,
+                                                     )
 
-                          sent_pairs.append(b_sent_pairs[i])
+                            sent_pairs.append(b_sent_pairs[i])
 
                       else: # 1D vector
                         feat_reps['Layer' + '_' + str(l + 1)].append(hidden.tolist())
@@ -1654,8 +1654,8 @@ def test(
       return test_loss, test_acc, test_f1, results_per_ds
 
     elif task == 'QA' and output_all_hiddens:
+      # nested lists of string batches must be flattened via list comprehensions (not possible with np.array().flatten())
       #NOTE: uncomment lines below, if you want to store correct and incorrect (answer span) predictions w.r.t. both answerable and unanswerable questions
-      # nested lists of strings must be flattened via list comprehensions (not possible with np.array().flatten())
       #predicted_answers = [pred_ans for b_pred_answers in predicted_answers for pred_ans in b_pred_answers]
       #true_answers = [true_ans for b_true_answers in true_answers for true_ans in b_true_answers]
       #sent_pairs = [sent_pair for b_sent_pairs in sent_pairs for sent_pair in b_sent_pairs]
