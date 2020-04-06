@@ -530,8 +530,11 @@ def get_random_sent_feat_reps(
     # create list of special token indices
     special_tok_indices = [cls_tok_id, sep_idx, len(rnd_sent)-1]
 
-    if a_indices == np.array([cls_tok_id]):
-        special_tok_indices.pop(special_tok_indices.index(cls_tok_id))
+    try:
+      if a_indices == np.array([cls_tok_id]):
+          special_tok_indices.pop(special_tok_indices.index(cls_tok_id))
+    except ValueError:
+      pass
     
     special_tok_indices = np.array(special_tok_indices)
     
