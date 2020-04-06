@@ -127,8 +127,8 @@ if __name__ == '__main__':
     ################################################################################################################
     
     elif args.hidden_reps == 'per_token':
-        # plot random sentence for both correct and wrong prediction 
-        predictions = ['correct_unanswerable', 'correct_answerable', 'wrong']
+        # plot random sentence for both correct and incorrect (answer span) predictions 
+        predictions = ['correct_answerable', 'correct_unanswerable',  'wrong']
         classes = ['context', 'question', 'answer']
         labels = np.arange(len(classes))
         class_to_idx = {c: l for c, l in zip(classes, labels)}
