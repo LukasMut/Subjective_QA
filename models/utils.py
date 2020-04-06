@@ -1428,7 +1428,7 @@ def test(
                 sent_pairs.append(b_sent_pairs)
               """
 
-              elif output_last_hiddens_cls or output_all_hiddens_cls:
+              if output_last_hiddens_cls or output_all_hiddens_cls:
 
                   b_sbj_q = b_sbj[:, 1]
                   b_sbj_q = to_cpu(b_sbj_q, to_numpy=True).tolist()
