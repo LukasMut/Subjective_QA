@@ -1168,7 +1168,7 @@ def test(
         
         ### UNPACK INPUTS FROM MINI-BATCH FOR RESPECTIVE TASK ###
 
-        if task == 'QA' and sequential_transfer:
+        if task == 'QA':
           b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, b_sbj, b_domains, b_ds = batch
 
         elif task == 'Sbj_Classification':
