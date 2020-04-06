@@ -385,25 +385,25 @@ def plot_seqs_projected_via_tsne(
             ax.scatter(
                        tsne_embed_x[y_true == lab],
                        tsne_embed_y[y_true == lab],
-                       c=colors[lab],
-                       marker=markers[lab],
-                       alpha=.8,
-                       label=classes[lab],
+                       c = colors[lab],
+                       marker = markers[lab],
+                       alpha = .6 if lab == 0 else .9,
+                       label = classes[lab],
             )
         elif len(np.unique(y_true)) > 3:
             ax.scatter(
                        tsne_embed_x[y_true == lab],
                        tsne_embed_y[y_true == lab],
-                       alpha=.6,
-                       label=cat,
+                       alpha = .6,
+                       label = cat,
             )
         else:   
             ax.scatter(
                        tsne_embed_x[y_true == lab],
                        tsne_embed_y[y_true == lab],
-                       color=colors[lab],
-                       alpha=.6,
-                       label=classes[lab],
+                       color = colors[lab],
+                       alpha = .6,
+                       label = classes[lab],
             )
         
     if plot_qa:
@@ -428,7 +428,7 @@ def plot_seqs_projected_via_tsne(
     
     #plt.show()
     #plt.clf()
-    plt.close()
+    plt.close() # don't use plt.show() if you want to close window after plotting automatically 
     
 
 def plot_feat_reps_per_layer(
