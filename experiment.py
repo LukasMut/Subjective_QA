@@ -1249,7 +1249,7 @@ if __name__ == '__main__':
                                                         task = task,
                 )
 
-                if args.sequential_transfer:
+                if args.sequential_transfer and re.search(r'(oracle|soft_target)', args.sequential_transfer_evaluation):
                     add_features = n_qa_type_labels + n_domain_labels
                     model.qa_head.fc_qa.in_features += add_features
                     model.qa_head.fc_qa.weight = nn.Parameter(torch.cat((model.qa_head.fc_qa.weight, torch.randn(add_features, n_qa_type_labels).T), 1))
