@@ -1696,7 +1696,7 @@ def train_all(
     n_iters = args['n_steps'] * args['n_epochs']
     n_examples = args['n_steps'] * batch_size
 
-    # make sure, we fine-tune for max. 3 epochs (last epoch is eval round to store model's output logits for aux tasks)
+    # make sure, we fine-tune for max. 3 epochs (last epoch is simply an additional eval round to store model's output logits for aux tasks)
     if args['training_regime'] == 'soft_targets':
       try:
           assert args['n_epochs'] == max_epochs
