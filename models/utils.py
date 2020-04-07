@@ -1798,9 +1798,6 @@ def train_all(
 
         loss_func = loss_funcs[i]
 
-        # make sure we fine-tune model on every task sequentially
-        model.train()
-
         if task == 'Sbj_Class':
             if args['batch_presentation'] == 'alternating':
                 assert not isinstance(train_dl_sbj, type(None)), 'If class. (q, a) in T_sbj, provide separate train dl for sbj. class.'
@@ -1817,6 +1814,9 @@ def train_all(
         val_f1s = []
 
         for j, epoch in enumerate(trange(args['n_epochs'],  desc="Epoch")):
+
+            # make sure we fine-tune model on every task sequentially
+            model.train()
             
             if task == 'QA':
                 args['task'] = task

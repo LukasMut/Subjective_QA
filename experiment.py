@@ -791,7 +791,7 @@ if __name__ == '__main__':
         model.to(device)
 
         hypers = {
-                  "lr_adam": 5e-5,
+                  "lr_adam": 3e-5 if args.sequential_transfer else 5e-5,
                   "warmup_steps": 0, 
                   "max_grad_norm": 1.0, #TODO: might it beneficial to modify max_grad_norm per task?
         }
