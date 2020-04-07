@@ -1779,7 +1779,7 @@ def train_all(
                                                                      torch.randn(add_features, args['n_qa_type_labels']).T.to(device)), 1))
 
         # initialize task-specific optimizers on the fly
-        optimizer = create_optimizer(model=model, task=task, eta=args['lr_adam'])
+        optimizer = create_optimizer(model=model, task=task, eta=5e-5 if task == 'QA' else args['lr_adam'])
 
         if i > 0:
             scheduler = get_linear_schedule_with_warmup(
