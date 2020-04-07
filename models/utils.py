@@ -1378,14 +1378,14 @@ def test(
 
               if output_all_hiddens or output_all_hiddens_cls:
                 for l, hiddens in enumerate(hiddens_all_layers):
-                    hiddens = to_cpu(hiddens, detach=True, to_numpy=True) # 2D if output [CLS] else 3D
+                    hiddens = to_cpu(hiddens, detach=True, to_numpy=True) # 2D if output [CLS] hiddens elif all hiddens 3D
                     for i, hidden in enumerate(hiddens):
-                      if output_all_hiddens: # 2D Matrix
+                      if output_all_hiddens: # 2D matrix
                         #NOTE: for now, we just want to store correct (answer span) predictions w.r.t answerable (!) questions
                         if compute_exact(b_true_answers[i], b_pred_answers[i]) and b_true_answers[i].strip() != '[CLS]':
                           feat_reps['Layer' + '_' + str(l + 1)].append(hidden[:b_input_lengths[i], :].tolist()) # remove PAD token vector representations
                           if l == 0:
-                            # store both true and predicted answer spans for respective word sequences once (NOT FOR EVERY LAYER)
+                            # store both true and predicted answer spans for respective word sequences only once (NOT FOR EVERY LAYER)
                             predicted_answers.append(b_pred_answers[i])
                             true_answers.append(b_true_answers[i])
                             true_start_pos.append(to_cpu(b_start_pos[i], to_numpy=True).tolist())
@@ -1654,7 +1654,7 @@ def test(
       return test_loss, test_acc, test_f1, results_per_ds
 
     elif task == 'QA' and output_all_hiddens:
-      # nested lists of string batches must be flattened via list comprehensions (not possible with np.array().flatten())
+      #nested lists of string batches must be flattened via list comprehensions (not possible with np.array().flatten())
       #NOTE: uncomment lines below, if you want to store correct and incorrect (answer span) predictions w.r.t. both answerable and unanswerable questions
       #predicted_answers = [pred_ans for b_pred_answers in predicted_answers for pred_ans in b_pred_answers]
       #true_answers = [true_ans for b_true_answers in true_answers for true_ans in b_true_answers]
@@ -1747,21 +1747,22 @@ def train_all(
   
     if args['batch_presentation'] == 'alternating':
         # create copy of data loaders, when using (q, a) instead of (q, c) sequence pairs for sbj classification
-        train_dl_copy = train_dl
-        val_dl_copy = val_dl
+        train_dl_copy = train_dl[:]
+        val_dl_copy = val_dl[:]
   
     sbj_logits_all = []
     domain_logits_all = []
 
     for i, task in enumerate(tqdm(tasks, desc="Task")):
-        
+
+        #############################################################################################################################
         ################################################ SEQUENTIAL TRANSFER ########################################################
         ############## Fine-tune model on every task sequentially (i.e., sequential transfer / soft-parameter sharing) ##############
         #### SOFT TARGETS: store model's auxiliary output logits for each mini-batch of input sequences after model convergence #####
         ###### ORACLE: concatenate true labels for auxiliary tasks with each contextual word embedding in any (q, c) sequence #######
         #############################################################################################################################
 
-        #TODO: figure out, whether this is the correct way to modify input_size and weights of a fc (output) layer on the fly
+        #TODO: figure out, whether this is the correct way to modify input_size and weights of a fully-connected (output) layer on the fly
         if task == 'QA':
             if args['training_regime'] == 'soft_targets':
                 add_features = sbj_logits_all[0].size(1)
@@ -1790,14 +1791,14 @@ def train_all(
         eval_round = False
         stop_training = False
 
-        print('------------------------------------')
-        print('-------- Current task: {} --------'.format(task))
-        print('------------------------------------')
+        print('====================================')
+        print('======== Current task: {} ========'.format(task))
+        print('====================================')
         print()
 
         loss_func = loss_funcs[i]
 
-        # make sure we fine-tune model on every task
+        # make sure we fine-tune model on every task sequentially
         model.train()
 
         if task == 'Sbj_Class':
@@ -1911,10 +1912,10 @@ def train_all(
                     current_batch_acc = round(100 * (correct_answers / nb_tr_examples), 3)
                     current_batch_f1 = round(100 * (batch_f1 / nb_tr_examples), 3)
 
-                    print("--------------------------------------------")
-                    print("----- Current batch {} exact-match: {} % -----".format(task, current_batch_acc))
-                    print("----- Current batch {} F1: {} % -----".format(task, current_batch_f1))
-                    print("--------------------------------------------")
+                    print("=================================================")
+                    print("===== Current batch {} exact-match: {} % =====".format(task, current_batch_acc))
+                    print("===== Current batch {} F1: {} % =====".format(task, current_batch_f1))
+                    print("=================================================")
                     print()
 
                     if step > (steps_until_eval // 2):
@@ -1933,9 +1934,9 @@ def train_all(
                             b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, b_sbj, _, _ = batch
 
                         if eval_round:
-                            # no gradient calculations in eval mode to speed up computation
+                            # no gradient calculations in eval mode to speed up computation (we don't want to update weights anyway)
                             with torch.no_grad():
-                                # perform subjectivity classification task
+                                # perform binary subjectivity classification task
                                 sbj_logits_a, sbj_logits_q = model(
                                                                    input_ids=b_input_ids,
                                                                    attention_masks=b_attn_masks,
@@ -1947,7 +1948,7 @@ def train_all(
                                 # store probability scores for each input sequence in mini-batch
                                 sbj_logits_all.append(torch.stack((torch.sigmoid(sbj_logits_a), torch.sigmoid(sbj_logits_q)), dim=1))
                         else:
-                            # perform subjectivity classification task
+                            # perform binary subjectivity classification task
                             sbj_logits_a, sbj_logits_q = model( 
                                                                input_ids=b_input_ids,
                                                                attention_masks=b_attn_masks,
@@ -1981,9 +1982,9 @@ def train_all(
                         b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, _, _, _, b_domains, _ = batch
 
                         if eval_round:
-                            # no gradient calculations in eval mode to speed up computation for storing model's predictions
+                            # no gradient calculations in eval mode to speed up computation for storing model's predictions (no weight updating)
                             with torch.no_grad():
-                                # perform context-domain classification task
+                                # perform multi-way context-domain classification task
                                 domain_logits = model(
                                                       input_ids=b_input_ids,
                                                       attention_masks=b_attn_masks,
@@ -1995,7 +1996,7 @@ def train_all(
                                 # to yield probability distribution over classes and store those probability scores for each input sequence in mini-batch
                                 domain_logits_all.append(F.softmax(domain_logits, dim=1))
                         else:
-                            # perform context-domain classification task
+                            # perform multi-way context-domain classification task
                             domain_logits = model(
                                                   input_ids=b_input_ids,
                                                   attention_masks=b_attn_masks,
@@ -2022,10 +2023,10 @@ def train_all(
                         current_batch_acc_aux = round(100 * (batch_acc_aux / nb_tr_steps), 3)
                         current_batch_f1_aux = round(100 * (batch_f1_aux / nb_tr_steps), 3)
 
-                        print("--------------------------------------------")
-                        print("----- Current batch {} acc: {} % -----".format(task, current_batch_acc_aux))
-                        print("----- Current batch {} F1: {} % -----".format(task, current_batch_f1_aux))
-                        print("--------------------------------------------")
+                        print("============================================")
+                        print("===== Current batch {} acc: {} % =====".format(task, current_batch_acc_aux))
+                        print("===== Current batch {} F1: {} % =====".format(task, current_batch_f1_aux))
+                        print("============================================")
                         print()
 
                         # we don't want to save F1 scores and exact-match accuracies at the very beginning of training
@@ -2042,13 +2043,13 @@ def train_all(
                                 running_tasks.pop(running_tasks.index(task))
 
                 if not eval_round:
-                    print("------------------------------------")
-                    print("----- Current {} loss: {} -----".format(task, abs(round(batch_loss.item(), 3))))
-                    print("------------------------------------")
+                    print("====================================")
+                    print("===== Current {} loss: {} =====".format(task, abs(round(batch_loss.item(), 3))))
+                    print("====================================")
                     print()
 
                     ## in any MTL setting, we exclusively want to store QA losses
-                    ## there's no need to store losses for auxiliary tasks since we want to observe effect of sequential transfer on main task
+                    ## there's no need to store losses for auxiliary tasks since we want to observe the effect of sequential transfer on main task
                     if task == 'QA':
                         tr_loss += batch_loss.item()
                         batch_losses.append(batch_loss.item())
@@ -2056,7 +2057,7 @@ def train_all(
                     # backpropagate error
                     batch_loss.backward()
                     
-                    # clip gradients if gradients become larger than predefined gradient norm
+                    # clip gradients if gradients become larger than predefined gradient norm (to avoid potential exploding gradient issues)
                     torch.nn.utils.clip_grad_norm_(model.parameters(), args["max_grad_norm"])
 
                     # take step down the valley w.r.t. current task
@@ -2112,25 +2113,25 @@ def train_all(
 
             if not eval_round:
                 tr_loss /= nb_tr_steps
-                print("------------------------------------")
-                print("---------- EPOCH {} ----------".format(epoch + 1))
-                print("----- Train loss: {} -----".format(round(tr_loss, 3)))
+                print("=====================================")
+                print("========== EPOCH {} ==========".format(epoch + 1))
+                print("===== Train loss: {} =====".format(round(tr_loss, 3)))
 
                 if args['task'] == 'QA':
                     train_exact_match = round(100 * (correct_answers / nb_tr_examples), 3)
                     train_f1 = round(100 * (batch_f1 / nb_tr_examples), 3)
-                    print("----- Train {} exact-match: {} % -----".format(args['task'], train_exact_match))
-                    print("----- Train {} F1: {} % -----".format(args['task'], train_f1))
+                    print("===== Train {} exact-match: {} % =====".format(args['task'], train_exact_match))
+                    print("===== Train {} F1: {} % =====".format(args['task'], train_f1))
 
                 elif args['task'] == 'Sbj_Classification':
-                    print("----- Train Sbj acc: {} % -----".format(batch_accs_sbj[-1]))
-                    print("----- Train Sbj F1: {} % -----".format(batch_f1s_sbj[-1]))
+                    print("===== Train Sbj acc: {} % =====".format(batch_accs_sbj[-1]))
+                    print("===== Train Sbj F1: {} % =====".format(batch_f1s_sbj[-1]))
 
                 elif args['task'] == 'Domain_Classification':
-                    print("----- Train Domain acc: {} % -----".format(batch_accs_domain[-1]))
-                    print("----- Train Domain F1: {} % -----".format(batch_f1s_domain[-1]))
+                    print("===== Train Domain acc: {} % =====".format(batch_accs_domain[-1]))
+                    print("===== Train Domain F1: {} % =====".format(batch_f1s_domain[-1]))
 
-                print("----------------------------------")
+                print("=====================================")
                 print()
         
                 if args['n_evals'] == 'one_per_epoch':
