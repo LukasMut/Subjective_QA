@@ -1770,13 +1770,13 @@ def train_all(
                     add_features += domain_logits_all[0].size(1)
 
             elif args['training_regime'] == 'oracle':
-                add_features = args['n_qa_labels'] + args['n_domains']
+                add_features = args['n_qa_type_labels'] + args['n_domains']
 
             with torch.no_grad():
                 model.qa_head.fc_qa.in_features += add_features
-                assert model.qa_head.fc_qa.out_features == args['n_qa_labels']
+                assert model.qa_head.fc_qa.out_features == args['n_qa_type_labels']
                 model.qa_head.fc_qa.weight = nn.Parameter(torch.cat((model.qa_head.fc_qa.weight,
-                                                                     torch.randn(add_features, args['n_qa_labels']).T.to(device)), 1))
+                                                                     torch.randn(add_features, args['n_qa_type_labels']).T.to(device)), 1))
 
         # initialize task-specific optimizers on the fly
         optimizer = create_optimizer(model=model, task=task, eta=args['lr_adam'])
