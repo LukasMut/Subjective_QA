@@ -1710,9 +1710,9 @@ def train_all(
     if args['freeze_bert']:
         model_name = args['pretrained_model']
         model = freeze_transformer_layers(model, model_name=model_name, unfreeze=False)
-        print("--------------------------------------------------")
-        print("------ Pre-trained BERT weights are frozen -------")
-        print("--------------------------------------------------")
+        print("=================================================")
+        print("====== Pre-trained BERT weights are frozen ======")
+        print("=================================================")
         print()
 
     # keep track of batch losses, accuracies and F1s for plotting
@@ -2169,9 +2169,9 @@ def train_all(
 
                     if epoch > 0 and early_stopping:
                         if val_losses[-1] > val_losses[-2] or epoch >= args['n_epochs'] - 2:
-                            print("------------------------------------------")
-                            print("----- Stopping training after {} steps -----".format(nb_tr_steps + len(train_dl) * epoch))
-                            print("------------------------------------------")
+                            print("===============================================")
+                            print("==== Stopping training after {} steps ====".format(nb_tr_steps + len(train_dl) * epoch))
+                            print("===============================================")
                             print()
 
                             val_losses_all_tasks.append(val_losses)
@@ -2182,17 +2182,17 @@ def train_all(
                             model.eval()
                             eval_round = True
                             seq_pair = '(q, a)' if args['batch_presentation'] == 'alternating' and task == 'Sbj_Class' else '(q, c)'
-                            print("----------------------------------------------------------------------------------------------------------------")
-                            print("----- Performing an extra evaluation epoch to store model's output logits for each {} input sequence -------".format(seq_pair))
-                            print("----------------------------------------------------------------------------------------------------------------")
+                            print("=================================================================================================================")
+                            print("======= Performing an extra evaluation epoch to store model's output logits for each {} input sequence =======".format(seq_pair))
+                            print("=================================================================================================================")
                             print()
                         else:
                             break
                 else:
                     if stop_training or epoch >= args['n_epochs'] - 2:
-                        print("------------------------------------------")
-                        print("----- Stopping training after {} steps -----".format(nb_tr_steps + len(train_dl) * epoch))
-                        print("------------------------------------------")
+                        print("===============================================")
+                        print("==== Stopping training after {} steps ====".format(nb_tr_steps + len(train_dl) * epoch))
+                        print("===============================================")
                         print()
 
                         val_losses_all_tasks.append(val_losses)
@@ -2203,16 +2203,16 @@ def train_all(
                             model.eval()
                             eval_round = True
                             seq_pair = '(q, a)' if args['batch_presentation'] == 'alternating' and task == 'Sbj_Class' else '(q, c)'
-                            print("----------------------------------------------------------------------------------------------------------------")
-                            print("----- Performing an extra evaluation epoch to store model's output logits for each {} input sequence -------".format(seq_pair))
-                            print("----------------------------------------------------------------------------------------------------------------")
+                            print("=================================================================================================================")
+                            print("======= Performing an extra evaluation epoch to store model's output logits for each {} input sequence =======".format(seq_pair))
+                            print("=================================================================================================================")
                             print()
                         else:
                             break
             else:
-                print("---------------------------------------------------------")
-                print("----- Evaluation epoch finished. Back to training. ------")
-                print("---------------------------------------------------------")
+                print("=========================================================")
+                print("====== Evaluation epoch finished. Back to training. ======")
+                print("=========================================================")
                 print()
                 break
 
