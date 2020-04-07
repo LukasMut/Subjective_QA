@@ -2138,6 +2138,7 @@ def train_all(
                 if args['n_evals'] == 'one_per_epoch':
                     if task == 'QA' and args['evaluation_strategy'] == 'no_aux_targets':
                         # save model's current weights for aux targets (we evaluate model without information about aux targets)
+                        current_main_weights = model.qa_head.fc_qa.weight[:, :768]
                         current_aux_weights = model.qa_head.fc_qa.weight[:, 768:]
                             
                     val_losses, val_accs, val_f1s, model = val(
@@ -2159,7 +2160,7 @@ def train_all(
                     if task == 'QA' and args['evaluation_strategy'] == 'no_aux_targets':
                         with torch.no_grad():
                             model.qa_head.fc_qa.in_features += add_features
-                            model.qa_head.fc_qa.weight = nn.Parameter(torch.cat((model.qa_head.fc_qa.weight, current_aux_weights.to(device)), 1))
+                            model.qa_head.fc_qa.weight = nn.Parameter(torch.cat((current_main_weights.to(device), current_aux_weights.to(device)), 1))
 
                     # we want to store train exact-match accuracies and F1 scores for each task
                     # as often as we evaluate model on validation set
