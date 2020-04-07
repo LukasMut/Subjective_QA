@@ -191,6 +191,9 @@ if __name__ == '__main__':
 
     model_name = 'DistilBERT' + '_' + encoding + '_' + highway + '_' + train_method + '_' + batch_presentation + '_' + training + '_' + dataset + '_' + eval_setup + '_' + task + '_' + qa_type_multi + '_' + mtl_setting + '_' + sampling_strategy + '_' + sequential_transfer
     model_name = model_name.lower()
+
+    if args.bert_weights == 'finetuned' or args.finetuning == 'SQuAD':
+        model_name += '_' + 'bert_frozen'
     
     if args.version == 'train':
         
