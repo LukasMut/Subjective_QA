@@ -442,7 +442,7 @@ def train(
 
                     else:
                       # compute cosine similarities between each hidden rep in h_a and h_c_mean
-                      cosine_sims = np.array([cosine_sim(h_c_mean, h) for h in h_a])
+                      cosine_sims = np.array([F.cosine_similarity(h_c_mean, h, dim=-1).item() for h in h_a])
                       
                       # get index of most dissimilar answer token
                       h_a_most_dissim_idx = np.argmin(cosine_sims)
