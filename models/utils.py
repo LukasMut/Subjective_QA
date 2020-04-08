@@ -412,11 +412,9 @@ def train(
               ####### IMPLEMENTATION OF COSINE-LOSS FOR MODEL'S HIDDEN REPS AT LAST LAYER WITH RESPECT TO ANSWER SPAN #######
               ###############################################################################################################
 
-              # all hidden representations must be extract for last transformer layer
+              # extract all hidden representations for each input sequence in batch from last transformer layer
               # hiddens = torch.tensor(batch_size, seq_len, hidden_size, requires_grad=True)
-              # loop over each hidden rep matrix in batch
               if compute_cosine_loss:
-                
                 start_logits, end_logits = outputs[0]
                 hiddens = outputs[1]
                 sep_id = 102 
