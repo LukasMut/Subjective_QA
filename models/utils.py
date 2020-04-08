@@ -708,7 +708,9 @@ def train(
                 batch_losses.append(batch_loss.item())
 
             if current_task == 'QA' and compute_cosine_loss:
-              (batch_loss + cosine_loss).backward() # backpropagate the error from both CrossEntropyLoss and CosineEmbeddingLoss
+              cosine_loss.backward(retain_graph=True)
+              batch_loss.backward()
+              #(batch_loss + cosine_loss).backward() # backpropagate the error from both CrossEntropyLoss and CosineEmbeddingLoss
             else:
               batch_loss.backward()
             
