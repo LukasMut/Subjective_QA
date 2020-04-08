@@ -387,7 +387,7 @@ def plot_seqs_projected_via_tsne(
                        tsne_embed_y[y_true == lab],
                        c = colors[lab],
                        marker = markers[lab],
-                       alpha = .6 if lab == 0 else .9,
+                       alpha = .5 if lab == 0 else .9,
                        label = classes[lab],
             )
         elif len(np.unique(y_true)) > 3:

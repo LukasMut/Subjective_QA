@@ -149,6 +149,7 @@ class LinearQAHead(nn.Module):
                 output_last_hiddens_cls:bool=False,
                 output_all_hiddens_cls:bool=False,
                 output_all_hiddens:bool=False,
+                output_last_hiddens:bool=False,
     ):
         sequence_output = distilbert_output[0] # last hidden-state is the first element of the output tuple
         sequence_output = self.qa_dropout(sequence_output)
@@ -203,6 +204,11 @@ class LinearQAHead(nn.Module):
             if output_last_hiddens_cls:
                 sequence_output = sequence_output[:, 0, :].squeeze(1)
                 return outputs, sequence_output
+
+            if output_last_hiddens:
+                bert_hidden_states = distilbert_output[1] # tuple of all hidden states (output of embeddings + output for each transformer layer)
+                bert_hidden_states = bert_hidden_states[-1] # extract hidden states from last transformer layer only
+                return outputs, bert_hidden_states
 
             if output_all_hiddens_cls:
                 bert_hidden_states = distilbert_output[1] # tuple of all hidden states (output of embeddings + output for each transformer layer)

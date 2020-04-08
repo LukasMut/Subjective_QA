@@ -5,6 +5,7 @@ __all__ = [
            'get_answers',
            'compute_exact_batch',
            'compute_f1_batch',
+           'cosine_sim',
            'create_optimizer',
            'to_cpu',
            'train',
@@ -25,6 +26,7 @@ import torch
 import transformers
 
 from collections import Counter, defaultdict
+from itertools import islice
 from sklearn.metrics import f1_score
 from tqdm import trange, tqdm
 from transformers import AdamW
@@ -196,6 +198,13 @@ def create_optimizer(
     )
     return optimizer
 
+def cosine_sim(x:torch.Tensor, y:torch.Tensor):
+    x = x.cpu().numpy()
+    y = y.cpu().numpy()
+    num = x @ y
+    denom = np.linalg.norm(x) * np.linalg.norm(y) # default is Frobenius norm (i.e., L2 norm)
+    return num / denom
+
 def train(
           model,
           tokenizer,
@@ -221,6 +230,7 @@ def train(
           multi_qa_type_class:bool=False,
           dataset_agnostic:bool=False,
           plot_task_distrib:bool=False,
+          compute_cosine_loss:bool=False,
 ):
     n_iters = args['n_steps'] * args['n_epochs']
     n_examples = args['n_steps'] * batch_size
@@ -248,6 +258,11 @@ def train(
     val_f1s = []
 
     if args['task'] == 'QA':
+
+      if compute_cosine_loss:
+        # define cosine embedding loss function to increase cosine similarity among all hidden representations w.r.t. correct answer span at last transformer layer
+        cosine_loss_func = nn.CosineEmbeddingLoss()
+
       # define loss function (Cross-Entropy is numerically more stable than LogSoftmax plus Negative-Log-Likelihood Loss)
       qa_loss_func = nn.CrossEntropyLoss()
       tasks = ['QA']
@@ -384,13 +399,89 @@ def train(
 
               b_input_ids, b_attn_masks, b_token_type_ids, b_input_lengths, b_start_pos, b_end_pos, _, _, _ = main_batch
 
-              start_logits, end_logits = model(
-                                               input_ids=b_input_ids,
-                                               attention_masks=b_attn_masks,
-                                               token_type_ids=b_token_type_ids,
-                                               input_lengths=b_input_lengths,
-                                               task=current_task,
-                                               )
+              outputs = model(
+                             input_ids=b_input_ids,
+                             attention_masks=b_attn_masks,
+                             token_type_ids=b_token_type_ids,
+                             input_lengths=b_input_lengths,
+                             task=current_task,
+                             output_last_hiddens=True if compute_cosine_loss else False,
+                             )
+
+              ###############################################################################################################
+              ####### IMPLEMENTATION OF COSINE-LOSS FOR MODEL'S HIDDEN REPS AT LAST LAYER WITH RESPECT TO ANSWER SPAN #######
+              ###############################################################################################################
+
+              # all hidden representations must be extract for last transformer layer
+              # hiddens = torch.tensor(batch_size, seq_len, hidden_size, requires_grad=True)
+              # loop over each hidden rep matrix in batch
+              if compute_cosine_loss:
+                
+                start_logits, end_logits = outputs[0]
+                hiddens = outputs[1]
+                sep_id = 102 
+                cosine_loss  = 0
+                count = 0
+                
+                for i, hidden in enumerate(hiddens):
+                    sep_idx = b_input_ids[i].cpu().numpy().tolist().index(sep_id)
+                    # remove [PAD] token vector representations
+                    hidden = hidden[:b_input_lengths[i], :] 
+                    # extract hidden reps for answer span tokens
+                    h_a = hidden[b_start_pos[i]:b_end_pos[i]+1, :]
+                    # extract hidden reps for context tokens (without ans span token reps) 
+                    h_c = torch.cat((hidden[sep_idx:b_start_pos[i], :], hidden[b_end_pos[i]+1:-1, :]), dim=0)
+                    # compute average hidden rep across context hidden reps
+                    h_c_mean = h_c.mean(0)
+
+                    if h_a.size(0) == 1:
+                      # we want h_a to be as dissimilar as possible from h_c_mean (hence, y = -1)
+                      y = torch.ones(1).neg()
+                      y = y.type_as(h_a)
+                      h_c_mean = h_c_mean.unsqueeze(0)
+                      cosine_loss += cosine_loss_func(h_c_mean, h_a, y)
+                      count += 1
+
+                    else:
+                      # compute cosine similarities between each hidden rep in h_a and h_c_mean
+                      cosine_sims = np.array([cosine_sim(h_c_mean, h) for h in h_a])
+                      
+                      # get index of most dissimilar answer token
+                      h_a_most_dissim_idx = np.argmin(cosine_sims)
+                      h_a_most_dissim = h_a[h_a_most_dissim_idx]
+                      
+                      # get hidden reps of all ans token hidden reps but the one that is most dissimilar to h_c_mean
+                      if h_a_most_dissim_idx == 0:
+                        h_a_rest = h_a[h_a_most_dissim_idx+1:, :]
+                      else:
+                        h_a_rest = torch.cat((h_a[:h_a_most_dissim_idx, :], h_a[h_a_most_dissim_idx+1:, :]), dim=0)
+                      
+                      # create tensor of as many h_a_most_dissim reps as there are tokens in the rest of the answer span
+                      h_a_most_dissim = torch.stack([h_a_most_dissim for _ in range(h_a_rest.size(0))])
+                      assert h_a_most_dissim.shape == h_a_rest.shape
+                      
+                      # we want hidden reps in h_a to be as similar as possible (hence, y = 1)
+                      y = torch.ones(h_a_most_dissim.size(0))
+                      y = y.type_as(h_a_most_dissim)
+                      
+                      # compute cosine embedding loss to optimize similarity of hidden reps within h_a
+                      cosine_loss += cosine_loss_func(h_a_most_dissim, h_a_rest, y)
+                      count += 1 
+
+                      # we want hidden reps in h_a to be as dissimilar as possible from h_c_mean (hence, y = -1)
+                      y = torch.ones(1).neg()
+                      y = y.type_as(h_c_mean)
+                      for h in h_a:
+                        # compute cosine embedding loss to optimize dissimilarity between every h in h_a and h_c_mean
+                        cosine_loss += cosine_loss_func(h_c_mean.unsqueeze(0), h.unsqueeze(0), y)
+                        count += 1
+
+                cosine_loss /= count  
+
+              ################################################################################################################
+              ################################################################################################################
+              else:
+                start_logits, end_logits = outputs
 
               # start and end loss must be computed separately and then averaged
               start_loss = qa_loss_func(start_logits, b_start_pos)
@@ -418,6 +509,8 @@ def train(
             
               correct_answers += compute_exact_batch(true_answers, pred_answers)
               batch_f1 += compute_f1_batch(true_answers, pred_answers)
+
+
 
               # keep track of train examples used for QA
               nb_tr_examples_qa = Counter(task_order[:step+1])[current_task] * batch_size
@@ -616,7 +709,10 @@ def train(
                 tr_loss += batch_loss.item()
                 batch_losses.append(batch_loss.item())
 
-            batch_loss.backward()
+            if current_task == 'QA' and compute_cosine_loss:
+              (batch_loss + cosine_loss).backward() # backpropagate the error from both CrossEntropyLoss and CosineEmbeddingLoss
+            else:
+              batch_loss.backward()
             
             # clip gradients if gradients become larger than predefined gradient norm
             torch.nn.utils.clip_grad_norm_(model.parameters(), args["max_grad_norm"])
@@ -1744,6 +1840,10 @@ def train_all(
     running_tasks = tasks[:]
   
     loss_funcs = [domain_loss_func, sbj_loss_func, qa_loss_func]
+
+    tasks.pop(1)
+    running_tasks.pop(1)
+    loss_funcs.pop(1)
   
     if args['batch_presentation'] == 'alternating':
         # create copy of data loaders, when using (q, a) instead of (q, c) sequence pairs for sbj classification

@@ -85,6 +85,8 @@ if __name__ == '__main__':
         help='If provided, feature representations of [CLS] token at each layer will be stored for each input sequence in test set.')
     parser.add_argument('--output_all_hiddens', action='store_true',
         help='If provided, hidden states for each layer at every timestep will be stored for each input sequence in test set. Inference must be performed on QA.')
+    parser.add_argument('--compute_cosine_loss', action='store_true',
+            help='If provided, compute cosine embedding loss to assess cosine similarity among hidden representations w.r.t. correct answer span at last transfomer layer.')
 
     args = parser.parse_args()
     
@@ -194,6 +196,9 @@ if __name__ == '__main__':
 
     if args.bert_weights == 'finetuned' or args.finetuning == 'SQuAD':
         model_name += '_' + 'bert_frozen'
+
+    if args.compute_cosine_loss:
+        model_name += '_' + 'cosine_loss'
     
     if args.version == 'train':
         
@@ -931,6 +936,7 @@ if __name__ == '__main__':
                                                                                             qa_type_weights=qa_type_weights,
                                                                                             domain_weights=domain_weights,
                                                                                             adversarial_simple=True if args.adversarial == 'simple' else False,
+                                                                                            compute_cosine_loss=args.compute_cosine_loss,
 
             )
 
