@@ -1871,9 +1871,9 @@ def train_all(
         #TODO: figure out, whether this is the correct way to modify input_size and weights of a fully-connected (output) layer on the fly
         if task == 'QA':
             if args['training_regime'] == 'soft_targets':
-                add_features = sbj_logits_all[0].size(1)
-                if len(domain_logits_all) > 0:
-                    add_features += domain_logits_all[0].size(1)
+                add_features = domain_logits_all[0].size(1)
+                if len(sbj_logits_all) > 0:
+                    add_features += sbj_logits_all[0].size(1)
 
             elif args['training_regime'] == 'oracle':
                 add_features = args['n_qa_type_labels'] + args['n_domains']
