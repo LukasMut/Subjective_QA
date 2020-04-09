@@ -409,6 +409,9 @@ if __name__ == '__main__':
 
             # create train and dev examples from SQuAD train set only
             squad_examples_train, squad_examples_dev = split_into_train_and_dev(squad_examples_train)
+
+            # split development set into dev and test sets (use first half as dev set)
+            squad_examples_dev = squad_examples_dev[:len(squad_examples_dev)//2]
             
             
             squad_features_train = convert_examples_to_features(
@@ -1133,38 +1136,8 @@ if __name__ == '__main__':
         
     # we always test on SubjQA (TODO: evaluate model on both entire test data set and individual review domains)
     elif args.version == 'test':
-        
-            subjqa_data_test_df, hidden_domain_idx_test = get_data(
-                                                                   source='/SubjQA/',
-                                                                   split='/test',
-                                                                   domain='all',
-            )
-            
-            subjqa_data_test = convert_df_to_dict(
-                                                  subjqa_data_test_df,
-                                                  hidden_domain_indexes=hidden_domain_idx_test,
-                                                  split='test',
-            )
-            
-            # convert dictionaries into instances of preprocessed question-answer-review examples    
-            subjqa_examples_test = create_examples(
-                                                   subjqa_data_test,
-                                                   source='SubjQA',
-                                                   is_training=True,
-            )
-            
-            subjqa_features_test = convert_examples_to_features(
-                                                                subjqa_examples_test, 
-                                                                bert_tokenizer,
-                                                                max_seq_length=max_seq_length,
-                                                                doc_stride=doc_stride,
-                                                                max_query_length=max_query_length,
-                                                                is_training=True,
-                                                                domain_to_idx=domain_to_idx,
-                                                                dataset_to_idx=dataset_to_idx,
-            )
 
-            if args.detailed_analysis_sbj_class or (args.multi_qa_type_class and args.sbj_classification) or (args.dataset_agnostic and (args.output_last_hiddens_cls or args.output_all_hiddens_cls)):
+            if args.finetuning == 'SQUAD':
 
                 squad_data_train = get_data(
                                             source='/SQuAD/',
@@ -1172,19 +1145,18 @@ if __name__ == '__main__':
                                             )
                 
                 squad_examples_train = create_examples(
-                                           squad_data_train,
-                                           source='SQuAD',
-                                           is_training=True,
-                                           multi_qa_type_class=True if args.multi_qa_type_class else False,
-                                           )
+                                                       squad_data_train,
+                                                       source='SQuAD',
+                                                       is_training=True,
+                                                       multi_qa_type_class=True if args.multi_qa_type_class else False,
+                                                       )
                 
                 _, squad_examples_dev = split_into_train_and_dev(squad_examples_train)
 
-                if (args.multi_qa_type_class and args.sbj_classification) or (args.dataset_agnostic and (args.output_last_hiddens_cls or args.output_all_hiddens_cls)):
-                    squad_examples_dev = squad_examples_dev[len(squad_examples_dev)//2:]
+                squad_examples_test = squad_examples_dev[len(squad_examples_dev)//2:]
 
-                squad_features_dev = convert_examples_to_features(
-                                                                 squad_examples_dev, 
+                squad_features_test = convert_examples_to_features(
+                                                                 squad_examples_test, 
                                                                  bert_tokenizer,
                                                                  max_seq_length=max_seq_length,
                                                                  doc_stride=doc_stride,
@@ -1194,26 +1166,93 @@ if __name__ == '__main__':
                                                                  dataset_to_idx=dataset_to_idx,
                                                                  )
 
-                subjqa_features_test.extend(squad_features_dev)
+                squad_tensor_dataset_test = create_tensor_dataset(squad_features_test)
 
-                # make sure that examples from SQuAD are not just at the end of the dataset (i.e., last mini-batches)
-                np.random.shuffle(subjqa_features_test)
+                tensor_dataset_test = squad_tensor_dataset_test
 
-            if (args.sbj_classification and args.batches == 'alternating') or (args.multi_qa_type_class and args.sbj_classification and args.batches == 'alternating'):
-                subjqa_tensor_dataset_test = create_tensor_dataset(
-                                                                   subjqa_features_test,
-                                                                   aux_sbj_batch=True,
-                                                                   multi_qa_type_class=args.multi_qa_type_class,
-                                                                   )
             else:
-                subjqa_tensor_dataset_test = create_tensor_dataset(
-                                                                   subjqa_features_test,
-                                                                   aux_sbj_batch=False,
-                                                                   multi_qa_type_class=args.multi_qa_type_class,
-                                                                   )
+        
+                subjqa_data_test_df, hidden_domain_idx_test = get_data(
+                                                                       source='/SubjQA/',
+                                                                       split='/test',
+                                                                       domain='all',
+                )
+                
+                subjqa_data_test = convert_df_to_dict(
+                                                      subjqa_data_test_df,
+                                                      hidden_domain_indexes=hidden_domain_idx_test,
+                                                      split='test',
+                )
+                
+                # convert dictionaries into instances of preprocessed question-answer-review examples    
+                subjqa_examples_test = create_examples(
+                                                       subjqa_data_test,
+                                                       source='SubjQA',
+                                                       is_training=True,
+                )
+                
+                subjqa_features_test = convert_examples_to_features(
+                                                                    subjqa_examples_test, 
+                                                                    bert_tokenizer,
+                                                                    max_seq_length=max_seq_length,
+                                                                    doc_stride=doc_stride,
+                                                                    max_query_length=max_query_length,
+                                                                    is_training=True,
+                                                                    domain_to_idx=domain_to_idx,
+                                                                    dataset_to_idx=dataset_to_idx,
+                )
+
+                if args.detailed_analysis_sbj_class or (args.multi_qa_type_class and args.sbj_classification) or (args.dataset_agnostic and (args.output_last_hiddens_cls or args.output_all_hiddens_cls)):
+
+                    squad_data_train = get_data(
+                                                source='/SQuAD/',
+                                                split='train',
+                                                )
+                    
+                    squad_examples_train = create_examples(
+                                               squad_data_train,
+                                               source='SQuAD',
+                                               is_training=True,
+                                               multi_qa_type_class=True if args.multi_qa_type_class else False,
+                                               )
+                    
+                    _, squad_examples_dev = split_into_train_and_dev(squad_examples_train)
+
+                    if (args.multi_qa_type_class and args.sbj_classification) or (args.dataset_agnostic and (args.output_last_hiddens_cls or args.output_all_hiddens_cls)):
+                        squad_examples_dev = squad_examples_dev[len(squad_examples_dev)//2:]
+
+                    squad_features_dev = convert_examples_to_features(
+                                                                     squad_examples_dev, 
+                                                                     bert_tokenizer,
+                                                                     max_seq_length=max_seq_length,
+                                                                     doc_stride=doc_stride,
+                                                                     max_query_length=max_query_length,
+                                                                     is_training=True,
+                                                                     domain_to_idx=domain_to_idx,
+                                                                     dataset_to_idx=dataset_to_idx,
+                                                                     )
+
+                    subjqa_features_test.extend(squad_features_dev)
+
+                    # make sure that examples from SQuAD are not just at the end of the dataset (i.e., last mini-batches)
+                    np.random.shuffle(subjqa_features_test)
+
+                if (args.sbj_classification and args.batches == 'alternating') or (args.multi_qa_type_class and args.sbj_classification and args.batches == 'alternating'):
+                    subjqa_tensor_dataset_test = create_tensor_dataset(
+                                                                       subjqa_features_test,
+                                                                       aux_sbj_batch=True,
+                                                                       multi_qa_type_class=args.multi_qa_type_class,
+                                                                       )
+                else:
+                    subjqa_tensor_dataset_test = create_tensor_dataset(
+                                                                       subjqa_features_test,
+                                                                       aux_sbj_batch=False,
+                                                                       multi_qa_type_class=args.multi_qa_type_class,
+                                                                       )
+                tensor_dataset_test = subjqa_tensor_dataset_test
 
             test_dl = BatchGenerator(
-                                    dataset=subjqa_tensor_dataset_test,
+                                    dataset=tensor_dataset_test,
                                     batch_size=batch_size,
                                     sort_batch=sort_batch,
                                     )

@@ -710,9 +710,11 @@ def train(
                 batch_losses.append(batch_loss.item())
 
             if current_task == 'QA' and compute_cosine_loss:
+              # first, backpropagate the cosine similarity loss
               cosine_loss.backward(retain_graph=True)
+              # second, backpropagate the cross-entropy loss
               batch_loss.backward()
-              #(batch_loss + cosine_loss).backward() # backpropagate the error from both CrossEntropyLoss and CosineEmbeddingLoss
+              #(batch_loss + cosine_loss).backward() #NOTE: this works worse than simply backpropagating the errors sequentially
             else:
               batch_loss.backward()
             
@@ -1480,7 +1482,8 @@ def test(
                     for i, hidden in enumerate(hiddens):
                       if output_all_hiddens: # 2D matrix
                         #NOTE: for now, we just want to store correct (answer span) predictions w.r.t answerable (!) questions
-                        if compute_exact(b_true_answers[i], b_pred_answers[i]) and b_true_answers[i].strip() != '[CLS]':
+                        #if compute_exact(b_true_answers[i], b_pred_answers[i]) and b_true_answers[i].strip() != '[CLS]':
+                        if b_true_answers[i].strip() != '[CLS]':
                           feat_reps['Layer' + '_' + str(l + 1)].append(hidden[:b_input_lengths[i], :].tolist()) # remove PAD token vector representations
                           if l == 0:
                             # store both true and predicted answer spans for respective word sequences only once (NOT FOR EVERY LAYER)
