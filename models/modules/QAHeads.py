@@ -486,6 +486,7 @@ class RecurrentQAHead(nn.Module):
                 output_last_hiddens_cls:bool=False,
                 output_all_hiddens_cls:bool=False,
                 output_all_hiddens:bool=False,
+                output_last_hiddens:bool=False,
     ):
         sequence_output = distilbert_output[0] # last hidden-state is the first element of the output tuple
         sequence_output = self.qa_dropout(sequence_output)

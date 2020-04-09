@@ -140,7 +140,8 @@ if __name__ == '__main__':
     
     elif args.hidden_reps == 'per_token':
         # plot random sentence for both correct and incorrect (answer span) predictions 
-        predictions = ['correct_answerable', 'correct_unanswerable',  'wrong']
+        #predictions = ['correct_answerable', 'correct_unanswerable',  'wrong']
+        predictions = ['correct_answerable', 'wrong', 'correct_answerable', 'wrong', 'correct_answerable', 'wrong']
         classes = ['context', 'question', 'answer']
         labels = np.arange(len(classes))
         class_to_idx = {c: l for c, l in zip(classes, labels)}
@@ -155,11 +156,15 @@ if __name__ == '__main__':
             
             feat_reps_per_layer, token_labels, rnd_sent = get_random_sent_feat_reps(test_results, pred)
             
+            model_name += '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred + '_' + str(k)
+
+            """
             if k == 0:
                 model_name += '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred
             else:
                 model_name = model_name_copy + '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred
                 break
+            """
             
             print("================================================================")
             print("=========== Started plotting: {} prediction =============".format(pred))
