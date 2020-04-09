@@ -968,6 +968,8 @@ def val(
                                              aux_targets=b_aux_hard_targets,
                       )
                   elif evaluation_strategy == 'soft_targets':
+
+                      """
                       # perform subjectivity classification task
                       sbj_logits_a, sbj_logits_q = model( 
                                                          input_ids=b_input_ids,
@@ -979,6 +981,7 @@ def val(
                               
                       # pass model's raw (sbj) output logits through sigmoid function to yield probability scores
                       sbj_probas = torch.stack((torch.sigmoid(sbj_logits_a), torch.sigmoid(sbj_logits_q)), dim=1)
+                      """
 
                       # perform context-domain classification task
                       domain_logits = model(
@@ -992,7 +995,8 @@ def val(
                       soft_domains = F.softmax(domain_logits, dim=1)
 
                       # create mini-batch of soft targets for both auxiliary tasks
-                      b_aux_soft_targets = torch.cat((sbj_probas, soft_domains), dim=1)
+                      #b_aux_soft_targets = torch.cat((sbj_probas, soft_domains), dim=1)
+                      b_aux_soft_targets = soft_domains
 
                       # perform QA task with soft targets from both auxiliary tasks as additional information about (q, c) sequence pair
                       ans_logits_val = model(
@@ -1971,9 +1975,12 @@ def train_all(
                                                          )
 
                     elif args['training_regime'] == 'soft_targets':
-                        b_sbj_scores = sbj_logits_all[step]
                         b_soft_domains = domain_logits_all[step]
-                        b_aux_soft_targets = torch.cat((b_sbj_scores, b_soft_domains), dim=1)
+                        if 'Sbj_Class' in tasks:
+                            b_sbj_scores = sbj_logits_all[step]
+                            b_aux_soft_targets = torch.cat((b_sbj_scores, b_soft_domains), dim=1)
+                        else:
+                            b_aux_soft_targets = b_soft_domains
 
                         # perform QA task with soft targets from both auxiliary tasks as additional information about any (q, c) sequence pair
                         start_logits, end_logits = model(

@@ -376,7 +376,7 @@ def plot_seqs_projected_via_tsne(
         legend_fontsize = 12
         classes = list(class_to_idx.keys())
         colors = ['royalblue', 'red', 'darkorange', 'indigo', 'hotpink', 'green']
-        #colors = ['royalblue', 'red', 'darkorange', 'cyan', 'hotpink', 'green']
+        #colors = ['royalblue', 'red', 'darkorange', 'cyan', 'hotpink', 'green'] #uncoment line when using dark background
         markers = ['o', 'd', '*', '+', '^', 'p']
 
         assert len(classes) == len(colors)
@@ -435,7 +435,8 @@ def plot_seqs_projected_via_tsne(
         #ax.set_title('Model fine-tuned on' + ' ' + dataset + ':' + ' ' + layer, fontsize=title_fontsize)
         plt.tight_layout()
         #plt.savefig('./plots/feat_reps/layer_wise/' + task + '/' + model_name + '_' + n_layer.lower() + '_' + 'dark' + '.png')
-        plt.savefig('./plots/feat_reps/layer_wise/' + task + '/' + model_name + '_' + n_layer.lower() + '.png')
+        #plt.savefig('./plots/feat_reps/layer_wise/' + task + '/' + model_name + '_' + n_layer.lower() + '.png')
+        plt.savefig('./plots/feat_reps/layer_wise/' + task + '/' + 'bert_stl_finetuned_subjqa' + '/' + model_name + '_' + n_layer.lower() + '.png')
     else:
         ax.set_title('Model fine-tuned on' + ' ' + dataset, fontsize=title_fontsize)
         plt.tight_layout()

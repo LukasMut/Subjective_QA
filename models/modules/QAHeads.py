@@ -505,22 +505,34 @@ class RecurrentQAHead(nn.Module):
         
         if task == 'QA':
 
-            logits = self.fc_qa(sequence_output)
+           if isinstance(aux_targets, torch.Tensor):
+                
+                def concat_embeds_logits(seq_out:torch.Tensor, aux_targets:torch.Tensor):
+                    seqs_cat_logits = []
+                    assert seq_out.size(0) == aux_targets.size(0)
+                    for i, seq in enumerate(seq_out):
+                        seq_cat_logits = [torch.cat((seq[t], aux_targets[i])).detach().cpu().numpy().tolist() for t, _ in enumerate(seq)]
+                        seqs_cat_logits.append(seq_cat_logits)
+                    return torch.tensor(seqs_cat_logits, requires_grad=True).to(device)
 
+                sequence_output = concat_embeds_logits(sequence_output, aux_targets) 
+
+            logits = self.fc_qa(sequence_output)
             start_logits, end_logits = logits.split(1, dim=-1)
             start_logits = start_logits.squeeze(-1)
             end_logits = end_logits.squeeze(-1)
 
-            outputs = (start_logits, end_logits,) #+ distilbert_output[1:]
+            outputs = (start_logits, end_logits,) # + distilbert_output[1:]
 
             """
             if (start_positions is not None) and (end_positions is not None):
+
                 # If we are on multi-GPU, split add a dimension
                 if len(start_positions.size()) > 1:
                     start_positions = start_positions.squeeze(-1)
                 if len(end_positions.size()) > 1:
                     end_positions = end_positions.squeeze(-1)
-                
+
                 # sometimes the start/end positions are outside our model inputs, we ignore these terms
                 ignored_index = start_logits.size(1)
                 start_positions.clamp_(0, ignored_index)
@@ -533,8 +545,38 @@ class RecurrentQAHead(nn.Module):
                 outputs = (total_loss,) + outputs
             """
 
-            return outputs  #, (loss), start_logits, end_logits, (hidden_states), (attentions)
+            if output_last_hiddens_cls:
+                bert_hidden_states = distilbert_output[1] # tuple of all hidden states (output of embeddings + output for each transformer layer)
+                bert_hidden_states = bert_hidden_states[-1]
+                sequence_output = bert_hidden_states[:, 0, :].squeeze(1)
+                return outputs, sequence_output
 
+            if output_last_hiddens:
+                bert_hidden_states = distilbert_output[1] # tuple of all hidden states (output of embeddings + output for each transformer layer)
+                bert_hidden_states = bert_hidden_states[-1] # extract hidden states from last transformer layer only
+                return outputs, bert_hidden_states
+
+            if output_all_hiddens_cls:
+                bert_hidden_states = distilbert_output[1] # tuple of all hidden states (output of embeddings + output for each transformer layer)
+                bert_hidden_states = bert_hidden_states[1:] # extract hidden states from each of the 6 transformer layers
+                bert_hidden_states_cls = tuple(hidden[:, 0, :].squeeze(1) for hidden in bert_hidden_states) 
+                return outputs, bert_hidden_states_cls
+
+            if output_all_hiddens:
+                assert isinstance(input_lengths, torch.Tensor)
+                bert_hidden_states = distilbert_output[1] # tuple of all hidden states (output of embeddings + output for each transformer layer)
+                bert_hidden_states = bert_hidden_states[1:] # extract hidden states from all transformer layers
+
+                """
+                def remove_pad_token_hiddens(input_lengths:torch.Tensor, hidden_states:tuple):
+                    n_layers = len(hidden_states)
+                    return tuple([to_cpu(hidden_states[l], detach=True, to_numpy=True)[i, :seq_len, :].tolist() for i, seq_len in enumerate(input_lengths)] for l in range(n_layers))
+                bert_hidden_states = remove_pad_token_hiddens(input_lengths, bert_hidden_states)
+                """
+                
+                return outputs, bert_hidden_states
+
+            return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)
 
         else:
             if task == 'Sbj_Class':
