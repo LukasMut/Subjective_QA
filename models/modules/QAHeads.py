@@ -365,6 +365,7 @@ class RecurrentQAHead(nn.Module):
                  n_qa_type_labels=None,
                  adversarial:bool=False,
                  dataset_agnostic:bool=False,
+                 review_agnostic:bool=False,
                  task:str='QA',
     ):
         super(RecurrentQAHead, self).__init__()
@@ -381,6 +382,8 @@ class RecurrentQAHead(nn.Module):
         self.task = task
         self.n_qa_type_labels = n_qa_type_labels
         self.dataset_agnostic = dataset_agnostic
+        self.review_agnostic = review_agnostic
+
 
         self.rnn_encoder = BiLSTM(max_seq_length, in_size=self.in_size, n_layers=self.n_recurrent_layers) if self.rnn_version == 'LSTM' else BiGRU(max_seq_length, in_size=self.in_size, n_layers=self.n_recurrent_layers)
         
@@ -535,7 +538,7 @@ class RecurrentQAHead(nn.Module):
         else:
             if task == 'Sbj_Class':
                 if hasattr(self, 'adversarial'):
-                    if self.dataset_agnostic:
+                    if self.dataset_agnostic or self.review_agnostic:
                         sequence_output = sequence_output[:, -1, :]
                     else:
                          # reverse gradients to learn qa-type invariant features

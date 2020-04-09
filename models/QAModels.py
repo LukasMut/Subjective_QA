@@ -79,6 +79,7 @@ class DistilBertForQA(DistilBertPreTrainedModel):
                                         n_qa_type_labels=self.n_qa_type_labels,
                                         adversarial=self.adversarial,
                                         dataset_agnostic=self.dataset_agnostic,
+                                        review_agnostic=self.review_agnostic,
                                         task=self.task
                                         )
         self.init_weights()
