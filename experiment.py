@@ -97,8 +97,7 @@ if __name__ == '__main__':
     # move model and tensors to GPU, if GPU is available (device must be defined)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    if device == "cuda":
-        # if we are on GPU, set cuda random seeds
+    if torch.cuda.is_available():
         torch.cuda.manual_seed_all(42)
 
     #NOTE: BERT cannot deal with sequences, where T > 512
