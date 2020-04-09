@@ -1532,7 +1532,7 @@ def test(
                   b_ds = to_cpu(b_ds, to_numpy=True).tolist()
                   b_domains = to_cpu(b_domains, to_numpy=True).tolist()
 
-                  domin_labels.append(b_domains)
+                  domain_labels.append(b_domains)
                   sbj_labels.append(b_sbj_q)
                   ds_labels.append(b_ds)
 
