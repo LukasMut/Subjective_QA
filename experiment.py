@@ -1281,7 +1281,7 @@ if __name__ == '__main__':
                                                                     detailed_analysis_sbj_class = True,
                                                                     )
 
-            elif task == 'QA' and (args.output_last_hiddens_cls or args.output_all_hiddens_cls):
+            elif (task == 'QA' or args.sequential_transfer) and (args.output_last_hiddens_cls or args.output_all_hiddens_cls):
                  test_loss, test_acc, test_f1, domain_labels, sbj_labels, feat_reps = test(
                                                                                             model = model,
                                                                                             tokenizer = bert_tokenizer,

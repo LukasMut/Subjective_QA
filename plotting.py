@@ -350,6 +350,7 @@ def plot_seqs_projected_via_tsne(
                                  n_layer:str=None,
                                  plot_qa:bool=False,
                                  sent_pair:list=None,
+                                 support_labels=None,
 ):
     plt.figure(figsize=(16,10), dpi=300) #NOTE: the higher the dpi the better the resolution of the plot
     ax = plt.subplot(111)
@@ -370,7 +371,14 @@ def plot_seqs_projected_via_tsne(
     
     # specify both labels for legend and colors for data points
     if len(np.unique(y_true)) > 3 and not plot_qa:
+        legend_fontsize = 12
         classes = list(class_to_idx.keys())
+        colors = ['royalblue', 'red', 'darkorange', 'indigo', 'hotpink', 'green']
+        markers = ['o', 'd', '*', '+', '^', 'p']
+
+        assert len(classes) == len(colors)
+        assert isinstance(support_labels, np.ndarray), 'Both context-domain and subjectivity labels must be provided'
+        assert support_labels.shape == y_true.shape, 'Shapes of context-domain and subjectivity labels vectors must be the same'
     else:
         if plot_qa:
             classes = list(class_to_idx.keys())
@@ -391,12 +399,15 @@ def plot_seqs_projected_via_tsne(
                        label = classes[lab],
             )
         elif len(np.unique(y_true)) > 3:
-            ax.scatter(
-                       tsne_embed_x[y_true == lab],
-                       tsne_embed_y[y_true == lab],
-                       alpha = .6,
-                       label = cat,
-            )
+          for j, sbj_lab in enumerate(np.unique(support_labels)):
+              ax.scatter(
+                         tsne_embed_x[np.add(y_true, support_labels) == np.add(lab, sbj_lab)],
+                         tsne_embed_y[np.add(y_true, support_labels) == np.add(lab, sbj_lab)],
+                         marker = markers[lab],
+                         color = colors[lab],
+                         alpha = .9 if sbj_lab == 1 else .3, # display subjective questions with higher color intensity 
+                         label = cat.capitalize() + ' ' + '(sbj)' if sbj_lab == 1 else cat.capitalize() + ' ' + '(obj)',
+              )
         else:   
             ax.scatter(
                        tsne_embed_x[y_true == lab],
@@ -418,7 +429,7 @@ def plot_seqs_projected_via_tsne(
     if layer_wise:
         layer = n_layer.split('_')
         layer = ' '.join(layer).capitalize()
-        ax.set_title('Model fine-tuned on' + ' ' + dataset + ':' + ' ' + layer, fontsize=title_fontsize)
+        #ax.set_title('Model fine-tuned on' + ' ' + dataset + ':' + ' ' + layer, fontsize=title_fontsize)
         plt.tight_layout()
         plt.savefig('./plots/feat_reps/layer_wise/' + task + '/' + model_name + '_' + n_layer.lower() + '.png')
     else:
@@ -442,6 +453,7 @@ def plot_feat_reps_per_layer(
                              combined_ds:bool=False,
                              plot_qa:bool=False,
                              sent_pair:list=None,
+                             support_labels=None,
 ):
     for layer, feat_reps in feat_reps_per_layer.items():
         # initiliase PCA
@@ -468,6 +480,7 @@ def plot_feat_reps_per_layer(
                                      n_layer=layer,
                                      plot_qa=plot_qa,
                                      sent_pair=sent_pair,
+                                     support_labels=support_labels,
                                      )
 #################################################################        
 ##### OBTAIN FEAT REPS ON TOKEN LEVEL FOR RANDOM SENTENCE #######

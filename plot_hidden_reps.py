@@ -23,7 +23,7 @@ from sklearn.utils.multiclass import unique_labels
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--hidden_reps', type=str, default='per_class',
-            help='If "per_class", plot hidden representations per class; if "per_token" pick random sent and plot it in latent space.')
+            help='If "per_class", plot hidden reps per class; if "across_classes" plot hidden reps per domain class conditioned on sbj class; if "per_token" pick random sent and plot it in latent space.')
     parser.add_argument('--task', type=str, default='QA',
             help='If QA, plot hidden reps of QA model; if "sbj_class", plot hidden reps of sbj. classification model.')
     args = parser.parse_args()
@@ -38,6 +38,8 @@ if __name__ == '__main__':
     elif args.task == 'QA':
         if args.hidden_reps == 'per_class':
             subsubdir = '/qa_ds_agnostic/'  #'/qa_review_agnostic/'
+        elif args.hidden_reps == 'across_classes':
+            subsubdir = '/qa_sequential_transfer/'
         else:
             subsubdir = '/qa_per_token/'
         task = subsubdir.lstrip('/').rstrip('/')
@@ -68,34 +70,43 @@ if __name__ == '__main__':
                 print()
     
     # define which results are to be inspected
-    test_results = test_results_qc if args.task == 'QA' else test_results_qa
-    model_name = model_name_qc if args.task == 'QA' else model_name_qa
+    test_results = test_results_qc if args.task == 'QA' and task != 'qa_sequential_transfer' else test_results_qa
+    model_name = model_name_qc if args.task == 'QA' and task != 'qa_sequential_transfer' else model_name_qa
     
     ################################################################################################################
     ################ plot model's hidden states per transformer layer for each class in test set ###################
     ################################################################################################################
     
-    if args.hidden_reps == 'per_class':
+    if args.hidden_reps in ['per_class', 'across_classes']:
         # split data
         if task == 'multi_sbj':
+            combined_ds = True
             y_pred = np.array(test_results['predictions'])
             y_true = np.array(test_results['true_labels'])
-            combined_ds = True
+            classes = ['subjqa_obj', 'subjqa_sbj', 'squad'] 
 
         elif task == 'qa_ds_agnostic':
             combined_ds = True
             y_true = np.array(test_results['sbj_labels'])
+            classes = ['subjqa_obj', 'subjqa_sbj', 'squad'] 
 
         elif task == 'qa_review_agnostic':
             combined_ds = False
             y_true = np.array(test_results['sbj_labels'])
+            classes = ['subjqa_obj', 'subjqa_sbj', 'squad'] 
+
+        elif task == 'qa_sequential_transfer':
+            combined_ds = False
+            y_true = np.array(test_results['predictions']) #np.array(test_results['domain_labels'])
+            sbj_labels =np.array(test_results['true_labels']) #np.array(test_results['sbj_labels'])
+            classes = ['books', 'tripadvisor', 'grocery', 'electronics', 'movies', 'restaurants']
         
         # convert hidden reps into NumPy matrices
         feat_reps_per_layer = {l: np.array(h) for l, h in test_results['feat_reps'].items()}
         
         # define vars
         labels = np.unique(y_true)
-        classes = ['subjqa_obj', 'subjqa_sbj', 'squad'] 
+        
         class_to_idx = {c: l for c, l in zip(classes, labels)}
         
         # set hyperparams
@@ -108,14 +119,15 @@ if __name__ == '__main__':
         print("==========================================")
         print()
         plot_feat_reps_per_layer(
-                         y_true=y_true,
-                         feat_reps_per_layer=feat_reps_per_layer,
-                         class_to_idx=class_to_idx,
-                         retained_variance=retained_variance,
-                         rnd_state=rnd_state,
-                         model_name=model_name,
-                         task=task,
-                         combined_ds=combined_ds,
+                                 y_true=y_true,
+                                 feat_reps_per_layer=feat_reps_per_layer,
+                                 class_to_idx=class_to_idx,
+                                 retained_variance=retained_variance,
+                                 rnd_state=rnd_state,
+                                 model_name=model_name,
+                                 task=task,
+                                 combined_ds=combined_ds,
+                                 support_labels=sbj_labels if task == 'qa_sequential_transfer' else None,
         )
         print("==========================================")
         print("=========== Finished plotting =============")
