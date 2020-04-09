@@ -505,7 +505,7 @@ class RecurrentQAHead(nn.Module):
         
         if task == 'QA':
 
-           if isinstance(aux_targets, torch.Tensor):
+            if isinstance(aux_targets, torch.Tensor):
                 
                 def concat_embeds_logits(seq_out:torch.Tensor, aux_targets:torch.Tensor):
                     seqs_cat_logits = []
