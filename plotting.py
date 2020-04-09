@@ -494,6 +494,7 @@ def plot_feat_reps_per_layer(
 def get_random_sent_feat_reps(
                               test_results:dict,
                               prediction:str,
+                              rnd_seed:int,
 ):
     # unpack test results
     pred_answers = test_results['predicted_answers']
@@ -520,7 +521,9 @@ def get_random_sent_feat_reps(
         # indices for wrong predictions
         indices = np.array([i for i, pred_ans in enumerate(pred_answers)
                             if not compute_exact(true_answers[i], pred_ans) and true_answers[i].strip() != '[CLS]'])
-    
+
+    # set random seed to reproduce plots
+    np.random.seed(rnd_seed)
     # get random idx
     rnd_sent_idx = np.random.choice(indices)
     # get random sent according to random idx

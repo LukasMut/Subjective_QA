@@ -196,7 +196,7 @@ if __name__ == '__main__':
     model_name = 'DistilBERT' + '_' + encoding + '_' + highway + '_' + train_method + '_' + batch_presentation + '_' + training + '_' + dataset + '_' + eval_setup + '_' + task + '_' + qa_type_multi + '_' + mtl_setting + '_' + sampling_strategy + '_' + sequential_transfer
     model_name = model_name.lower()
 
-    if args.bert_weights == 'finetuned' or args.finetuning == 'SQuAD':
+    if args.bert_weights == 'finetuned':
         model_name += '_' + 'bert_frozen'
 
     if args.compute_cosine_loss:
@@ -1156,15 +1156,15 @@ if __name__ == '__main__':
                 squad_examples_test = squad_examples_dev[len(squad_examples_dev)//2:]
 
                 squad_features_test = convert_examples_to_features(
-                                                                 squad_examples_test, 
-                                                                 bert_tokenizer,
-                                                                 max_seq_length=max_seq_length,
-                                                                 doc_stride=doc_stride,
-                                                                 max_query_length=max_query_length,
-                                                                 is_training=True,
-                                                                 domain_to_idx=domain_to_idx,
-                                                                 dataset_to_idx=dataset_to_idx,
-                                                                 )
+                                                                    squad_examples_test, 
+                                                                    bert_tokenizer,
+                                                                    max_seq_length=max_seq_length,
+                                                                    doc_stride=doc_stride,
+                                                                    max_query_length=max_query_length,
+                                                                    is_training=True,
+                                                                    domain_to_idx=domain_to_idx,
+                                                                    dataset_to_idx=dataset_to_idx,
+                                                                    )
 
                 squad_tensor_dataset_test = create_tensor_dataset(squad_features_test)
 
@@ -1297,7 +1297,7 @@ if __name__ == '__main__':
                 )
 
                 if args.sequential_transfer and re.search(r'(oracle|soft_target)', args.sequential_transfer_evaluation):
-                    add_features = n_qa_type_labels + n_domain_labels
+                    add_features = n_domain_labels #n_qa_type_labels + n_domain_labels
                     model.qa_head.fc_qa.in_features += add_features
                     model.qa_head.fc_qa.weight = nn.Parameter(torch.cat((model.qa_head.fc_qa.weight, torch.randn(add_features, n_qa_type_labels).T), 1))
                 

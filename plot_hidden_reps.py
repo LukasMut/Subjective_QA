@@ -46,7 +46,7 @@ if __name__ == '__main__':
         
     # create PATH
     cwd = '.'
-    PATH = cwd + folder + subdir + subsubdir
+    PATH = cwd + folder + subdir + subsubdir + '/bert_stl_finetuned_subjqa/'
     # we only want to capture .json files
     files = [file for file in os.listdir(PATH) if file.endswith('.json')]
     
@@ -141,7 +141,7 @@ if __name__ == '__main__':
     elif args.hidden_reps == 'per_token':
         # plot random sentence for both correct and incorrect (answer span) predictions 
         #predictions = ['correct_answerable', 'correct_unanswerable',  'wrong']
-        predictions = ['correct_answerable', 'wrong', 'correct_answerable', 'wrong', 'correct_answerable', 'wrong']
+        predictions = ['correct_answerable', 'wrong_answerable', 'correct_answerable', 'wrong_answerable', 'correct_answerable', 'wrong_answerable']
         classes = ['context', 'question', 'answer']
         labels = np.arange(len(classes))
         class_to_idx = {c: l for c, l in zip(classes, labels)}
@@ -152,9 +152,13 @@ if __name__ == '__main__':
         rnd_state = 42
         model_name_copy = model_name[:]
         
+        rnd_seed = 42
         for k, pred in enumerate(predictions):
+
+            if k > 0 and k % 2 == 0:
+                rnd_seed += 1
             
-            feat_reps_per_layer, token_labels, rnd_sent = get_random_sent_feat_reps(test_results, pred)
+            feat_reps_per_layer, token_labels, rnd_sent = get_random_sent_feat_reps(test_results, pred, rnd_seed)
             
             model_name += '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred + '_' + str(k)
 
@@ -165,7 +169,7 @@ if __name__ == '__main__':
                 model_name = model_name_copy + '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred
                 break
             """
-            
+
             print("================================================================")
             print("=========== Started plotting: {} prediction =============".format(pred))
             print("================================================================")
