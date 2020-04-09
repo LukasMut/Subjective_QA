@@ -352,6 +352,8 @@ def plot_seqs_projected_via_tsne(
                                  sent_pair:list=None,
                                  support_labels=None,
 ):
+    #NOTE: uncomment line below if you want to use a dark background for plots
+    #plt.style.use('dark_background')
     plt.figure(figsize=(16,10), dpi=300) #NOTE: the higher the dpi the better the resolution of the plot
     ax = plt.subplot(111)
     
@@ -374,6 +376,7 @@ def plot_seqs_projected_via_tsne(
         legend_fontsize = 12
         classes = list(class_to_idx.keys())
         colors = ['royalblue', 'red', 'darkorange', 'indigo', 'hotpink', 'green']
+        #colors = ['royalblue', 'red', 'darkorange', 'cyan', 'hotpink', 'green']
         markers = ['o', 'd', '*', '+', '^', 'p']
 
         assert len(classes) == len(colors)
@@ -431,6 +434,7 @@ def plot_seqs_projected_via_tsne(
         layer = ' '.join(layer).capitalize()
         #ax.set_title('Model fine-tuned on' + ' ' + dataset + ':' + ' ' + layer, fontsize=title_fontsize)
         plt.tight_layout()
+        #plt.savefig('./plots/feat_reps/layer_wise/' + task + '/' + model_name + '_' + n_layer.lower() + '_' + 'dark' + '.png')
         plt.savefig('./plots/feat_reps/layer_wise/' + task + '/' + model_name + '_' + n_layer.lower() + '.png')
     else:
         ax.set_title('Model fine-tuned on' + ' ' + dataset, fontsize=title_fontsize)

@@ -702,8 +702,9 @@ def train(
             # in any MTL setting, we exclusively want to store QA losses (there's no need to store losses for auxiliary tasks since we want to observe effect on main task)
             if isinstance(n_aux_tasks, int):
               if current_task == 'QA':
-                tr_loss += batch_loss.item()
-                batch_losses.append(batch_loss.item())
+                batch_loss_total = batch_loss.item() + cosine_loss.item() if compute_cosine_loss else batch_loss.item()
+                tr_loss += batch_loss_total
+                batch_losses.append(batch_loss_total)
             else:
                 tr_loss += batch_loss.item()
                 batch_losses.append(batch_loss.item())
@@ -1839,13 +1840,14 @@ def train_all(
 
     tasks = ['Domain_Class', 'Sbj_Class', 'QA']
     running_tasks = tasks[:]
-  
     loss_funcs = [domain_loss_func, sbj_loss_func, qa_loss_func]
 
+    ##### NO SUBJECTIVITY CLASSIFICATION FOR NOW #######
     tasks.pop(1)
     running_tasks.pop(1)
     loss_funcs.pop(1)
-  
+    ###################################################
+
     if args['batch_presentation'] == 'alternating':
         # create copy of data loaders, when using (q, a) instead of (q, c) sequence pairs for sbj classification
         train_dl_copy = train_dl
