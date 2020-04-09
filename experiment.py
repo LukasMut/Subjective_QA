@@ -97,11 +97,13 @@ if __name__ == '__main__':
     # move model and tensors to GPU, if GPU is available (device must be defined)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    if torch.cuda.is_available():
+    try:
         torch.cuda.manual_seed_all(42)
+    except:
+        pass
 
     #NOTE: BERT cannot deal with sequences, where T > 512
-    #TODO: figure out, whether should stick to 384 (default for fine-tuning BERT on SQuAD) or move up to 512 (due to the fact that reviews in SubjQA are longer than paragraphs in SQuAD)
+    #TODO: figure out, whether we should stick to 384 (default for fine-tuning BERT on SQuAD) or move up to 512 (due to the fact that reviews in SubjQA are longer than paragraphs in SQuAD)
    
     ################################################################   
     ####################### HYPERPARAMETERS ########################

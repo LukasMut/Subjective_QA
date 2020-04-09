@@ -42,8 +42,10 @@ torch.manual_seed(42)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-if torch.cuda.is_available():
+try:
   torch.cuda.manual_seed_all(42)
+except:
+  pass
 
 ## NOTE: use this function in case we want to use a unidirectional LSTM (or GRU) instead of a BiLSTM ##
 ##       BERT feature representation sequences have to be reversed (special [CLS] token corresponds to semantic representation of sentence) ##
