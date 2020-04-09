@@ -172,6 +172,7 @@ if __name__ == '__main__':
         sequential_transfer = 'sequential_transfer'
         sequential_transfer += '_' + args.sequential_transfer_training
         sequential_transfer += '_' + args.sequential_transfer_evaluation
+        sequential_transfer += '_' + 'domain_only'
     else:
         sequential_transfer = ''
 
