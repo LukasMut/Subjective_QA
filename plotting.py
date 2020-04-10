@@ -517,7 +517,7 @@ def get_random_sent_feat_reps(
         indices = np.array([i for i, pred_ans in enumerate(pred_answers)
                             if compute_exact(true_answers[i], pred_ans) and true_answers[i].strip() == '[CLS]'])
         
-    elif prediction == 'wrong':
+    elif prediction == 'wrong_answerable':
         # indices for wrong predictions
         indices = np.array([i for i, pred_ans in enumerate(pred_answers)
                             if not compute_exact(true_answers[i], pred_ans) and true_answers[i].strip() != '[CLS]'])

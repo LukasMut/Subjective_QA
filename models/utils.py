@@ -1853,10 +1853,10 @@ def train_all(
     running_tasks = tasks[:]
     loss_funcs = [domain_loss_func, sbj_loss_func, qa_loss_func]
 
-    ##### NO SUBJECTIVITY CLASSIFICATION FOR NOW #######
-    tasks.pop(1)
-    running_tasks.pop(1)
-    loss_funcs.pop(1)
+    ##### NO DOMAIN CLASSIFICATION FOR NOW #######
+    tasks.pop(0)
+    running_tasks.pop(0)
+    loss_funcs.pop(0)
     ###################################################
 
     if args['batch_presentation'] == 'alternating':

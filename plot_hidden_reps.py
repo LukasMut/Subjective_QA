@@ -140,7 +140,7 @@ if __name__ == '__main__':
     
     elif args.hidden_reps == 'per_token':
         # plot random sentence for both correct and incorrect (answer span) predictions 
-        #predictions = ['correct_answerable', 'correct_unanswerable',  'wrong']
+        #predictions = ['correct_answerable', 'correct_unanswerable',  'wrong_answerable']
         predictions = ['correct_answerable', 'wrong_answerable', 'correct_answerable', 'wrong_answerable', 'correct_answerable', 'wrong_answerable']
         classes = ['context', 'question', 'answer']
         labels = np.arange(len(classes))
