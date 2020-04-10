@@ -172,7 +172,7 @@ if __name__ == '__main__':
         sequential_transfer = 'sequential_transfer'
         sequential_transfer += '_' + args.sequential_transfer_training
         sequential_transfer += '_' + args.sequential_transfer_evaluation
-        sequential_transfer += '_' + 'domain_only'
+        sequential_transfer += '_' + 'sbj_only'
     else:
         sequential_transfer = ''
 
@@ -1297,7 +1297,7 @@ if __name__ == '__main__':
                 )
 
                 if args.sequential_transfer and re.search(r'(oracle|soft_target)', args.sequential_transfer_evaluation):
-                    add_features = n_domain_labels #n_qa_type_labels + n_domain_labels
+                    add_features = n_qa_type_labels #+ n_domain_labels
                     model.qa_head.fc_qa.in_features += add_features
                     model.qa_head.fc_qa.weight = nn.Parameter(torch.cat((model.qa_head.fc_qa.weight, torch.randn(add_features, n_qa_type_labels).T), 1))
                 

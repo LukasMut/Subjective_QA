@@ -969,7 +969,6 @@ def val(
                       )
                   elif evaluation_strategy == 'soft_targets':
 
-                      """
                       # perform subjectivity classification task
                       sbj_logits_a, sbj_logits_q = model( 
                                                          input_ids=b_input_ids,
@@ -981,8 +980,8 @@ def val(
                               
                       # pass model's raw (sbj) output logits through sigmoid function to yield probability scores
                       sbj_probas = torch.stack((torch.sigmoid(sbj_logits_a), torch.sigmoid(sbj_logits_q)), dim=1)
+                      
                       """
-
                       # perform context-domain classification task
                       domain_logits = model(
                                             input_ids=b_input_ids,
@@ -993,10 +992,11 @@ def val(
                                             )
                       # pass model's raw (context-domain) output logits through softmax function to yield probability distribution over domain classes 
                       soft_domains = F.softmax(domain_logits, dim=1)
+                      """
 
                       # create mini-batch of soft targets for both auxiliary tasks
                       #b_aux_soft_targets = torch.cat((sbj_probas, soft_domains), dim=1)
-                      b_aux_soft_targets = soft_domains
+                      b_aux_soft_targets = sbj_probas
 
                       # perform QA task with soft targets from both auxiliary tasks as additional information about (q, c) sequence pair
                       ans_logits_val = model(
@@ -1333,7 +1333,6 @@ def test(
 
                   elif inference_strategy == 'soft_targets':
                       
-                      """
                       # perform subjectivity classification task
                       sbj_logits_a, sbj_logits_q = model( 
                                                          input_ids=b_input_ids,
@@ -1345,8 +1344,8 @@ def test(
                         
                       # pass model's raw (sbj) output logits through sigmoid function to yield probability scores
                       sbj_probas = torch.stack((torch.sigmoid(sbj_logits_a), torch.sigmoid(sbj_logits_q)), dim=1)
-                      """
 
+                      """
                       # perform context-domain classification task
                       domain_logits = model(
                                             input_ids=b_input_ids,
@@ -1358,10 +1357,11 @@ def test(
 
                       # pass model's raw (context-domain) output logits through softmax function to yield probability distribution over domain classes 
                       soft_domains = F.softmax(domain_logits, dim=1)
+                      """
 
                       # create mini-batch of soft targets for both auxiliary tasks
                       #b_aux_soft_targets = torch.cat((sbj_probas, soft_domains), dim=1)
-                      b_aux_soft_targets = soft_domains
+                      b_aux_soft_targets = sbj_probas
 
                       # perform QA task with soft targets from both auxiliary tasks as additional information about question-context sequence pair
                       outputs = model(
@@ -1879,9 +1879,9 @@ def train_all(
         #TODO: figure out, whether this is the correct way to modify input_size and weights of a fully-connected (output) layer on the fly
         if task == 'QA':
             if args['training_regime'] == 'soft_targets':
-                add_features = domain_logits_all[0].size(1)
-                if len(sbj_logits_all) > 0:
-                    add_features += sbj_logits_all[0].size(1)
+                add_features = sbj_logits_all[0].size(1)
+                if len(domain_logits_all) > 0:
+                    add_features += domain_logits_all[0].size(1)
 
             elif args['training_regime'] == 'oracle':
                 add_features = args['n_qa_type_labels'] + args['n_domains']
@@ -1979,12 +1979,12 @@ def train_all(
                                                          )
 
                     elif args['training_regime'] == 'soft_targets':
-                        b_soft_domains = domain_logits_all[step]
-                        if 'Sbj_Class' in tasks:
-                            b_sbj_scores = sbj_logits_all[step]
+                        b_sbj_scores = sbj_logits_all[step]
+                        if 'Domain_Class' in tasks:
+                            b_soft_domains = domain_logits_all[step]    
                             b_aux_soft_targets = torch.cat((b_sbj_scores, b_soft_domains), dim=1)
                         else:
-                            b_aux_soft_targets = b_soft_domains
+                            b_aux_soft_targets = b_sbj_scores
 
                         # perform QA task with soft targets from both auxiliary tasks as additional information about any (q, c) sequence pair
                         start_logits, end_logits = model(
