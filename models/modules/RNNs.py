@@ -85,7 +85,7 @@ class BiGRU(nn.Module):
         
         super(BiGRU, self).__init__()
         self.in_size = in_size
-        self.hidden_size = in_size // 2# if hidden_size = in_size // 2 -> in_size for classification head is in_size due to bidir
+        self.hidden_size = in_size // 2 # if hidden_size = in_size // 2 -> in_size for classification head is in_size due to bidir
         self.n_layers = n_layers
         self.dropout = dropout
         self.max_seq_length = max_seq_length
