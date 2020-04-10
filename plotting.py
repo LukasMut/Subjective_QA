@@ -436,7 +436,7 @@ def plot_seqs_projected_via_tsne(
         plt.tight_layout()
         #plt.savefig('./plots/feat_reps/layer_wise/' + task + '/' + model_name + '_' + n_layer.lower() + '_' + 'dark' + '.png')
         #plt.savefig('./plots/feat_reps/layer_wise/' + task + '/' + model_name + '_' + n_layer.lower() + '.png')
-        plt.savefig('./plots/feat_reps/layer_wise/' + task + '/' + 'bert_stl_finetuned_subjqa' + '/' + model_name + '_' + n_layer.lower() + '.png')
+        plt.savefig('./plots/feat_reps/layer_wise/' + task + '/' + 'bert_stl_finetuned_squad' + '/' + model_name + '_' + n_layer.lower() + '.png')
     else:
         ax.set_title('Model fine-tuned on' + ' ' + dataset, fontsize=title_fontsize)
         plt.tight_layout()

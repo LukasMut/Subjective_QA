@@ -46,7 +46,7 @@ if __name__ == '__main__':
         
     # create PATH
     cwd = '.'
-    PATH = cwd + folder + subdir + subsubdir + '/bert_stl_finetuned_subjqa/'
+    PATH = cwd + folder + subdir + subsubdir + '/bert_stl_finetuned_squad/'
     # we only want to capture .json files
     files = [file for file in os.listdir(PATH) if file.endswith('.json')]
     
@@ -150,9 +150,9 @@ if __name__ == '__main__':
         combined_ds = False
         retained_variance = .99
         rnd_state = 42
+        rnd_seed = 42
         model_name_copy = model_name[:]
         
-        rnd_seed = 42
         for k, pred in enumerate(predictions):
 
             if k > 0 and k % 2 == 0:
@@ -160,7 +160,7 @@ if __name__ == '__main__':
             
             feat_reps_per_layer, token_labels, rnd_sent = get_random_sent_feat_reps(test_results, pred, rnd_seed)
             
-            model_name += '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred + '_' + str(k)
+            model_name = model_name_copy + '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred + '_' + str(k)
 
             """
             if k == 0:
