@@ -1715,12 +1715,12 @@ def test(
             print()
 
             #NOTE: uncomment code block below, if you want to store correct and incorrect (answer span) predictions w.r.t. both answerable and unanswerable questions
-            """
+            
             if task == 'QA' and output_all_hiddens:
-              # it seems as if we cannot load all hidden representations into memory (lets load 20 * batch_size matrices for now)
-              if n == 20:
+              # it seems as if we cannot load all hidden representations into memory (lets load (n_steps // 2) * batch_size * n_layers * tensors of shape [seq_len, hidden_size] for now)
+              if n == n_steps // 2:
                 break
-            """
+            
             
     test_loss /= nb_test_steps
 
