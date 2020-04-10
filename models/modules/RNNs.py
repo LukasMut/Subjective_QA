@@ -25,7 +25,7 @@ class BiLSTM(nn.Module):
         
         super(BiLSTM, self).__init__()
         self.in_size = in_size
-        self.hidden_size = in_size  # if hidden_size = in_size // 2 -> in_size for classification head is in_size due to bidir
+        self.hidden_size = in_size // 2  # if hidden_size = in_size // 2 -> in_size for classification head is in_size due to bidir
         self.n_layers = n_layers
         self.dropout = dropout
         self.max_seq_length = max_seq_length
@@ -54,9 +54,11 @@ class BiLSTM(nn.Module):
         packed = nn.utils.rnn.pack_padded_sequence(bert_outputs, seq_lengths, batch_first=True)
         packed_out, hidden = self.lstm(packed, hidden)
         out, _ = nn.utils.rnn.pad_packed_sequence(packed_out, batch_first=True, total_length=self.max_seq_length)
+        """
         if self.bidir:
           # sum outputs of forward and backward LSTMs
           out = out[:, :, :self.hidden_size] + out[:, :, self.hidden_size:]
+        """
         return out, hidden
     
     def init_hidden(
@@ -83,7 +85,7 @@ class BiGRU(nn.Module):
         
         super(BiGRU, self).__init__()
         self.in_size = in_size
-        self.hidden_size = in_size # if hidden_size = in_size // 2 -> in_size for classification head is in_size due to bidir
+        self.hidden_size = in_size // 2# if hidden_size = in_size // 2 -> in_size for classification head is in_size due to bidir
         self.n_layers = n_layers
         self.dropout = dropout
         self.max_seq_length = max_seq_length
@@ -113,9 +115,11 @@ class BiGRU(nn.Module):
         packed = nn.utils.rnn.pack_padded_sequence(bert_outputs, seq_lengths, batch_first=True)
         packed_out, hidden = self.gru(packed, hidden)
         out, _ = nn.utils.rnn.pad_packed_sequence(packed_out, batch_first=True, total_length=self.max_seq_length)
+        """
         if self.bidir:
-          # sum outputs of forward and backward LSTMs
+          # sum outputs of forward and backward GRUs
           out = out[:, :, :self.hidden_size] + out[:, :, self.hidden_size:]
+        """
         return out, hidden
     
     def init_hidden(
