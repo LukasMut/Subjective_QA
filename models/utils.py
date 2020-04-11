@@ -287,6 +287,8 @@ def train(
               ds_loss_func = nn.BCEWithLogitsLoss(weight=ds_weights.to(device))
               batch_accs_ds, batch_f1s_ds = [], []
               tasks.append('Dataset_Class')
+              # FOR NOW, let's just perform ds_agnostic model
+              tasks.pop(tasks.index('Sbj_Class'))
         
           elif n_aux_tasks == 2 and not dataset_agnostic:
               assert isinstance(domain_weights, torch.Tensor), 'Tensor of class weights for different domains is not provided'

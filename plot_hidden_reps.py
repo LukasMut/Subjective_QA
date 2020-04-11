@@ -73,6 +73,11 @@ if __name__ == '__main__':
     test_results = test_results_qc if args.task == 'QA' and task != 'qa_sequential_transfer' else test_results_qa
     model_name = model_name_qc if args.task == 'QA' and task != 'qa_sequential_transfer' else model_name_qa
     
+    print("==============================================")
+    print("======= Test exact-match acc: {} =======".format(test_results['test_acc']))
+    print("======= Test F1: {} =======".format(test_results['test_f1']))
+    print("==============================================")
+    print()
     ################################################################################################################
     ################ plot model's hidden states per transformer layer for each class in test set ###################
     ################################################################################################################

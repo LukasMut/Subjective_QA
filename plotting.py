@@ -376,7 +376,8 @@ def plot_seqs_projected_via_tsne(
         legend_fontsize = 12
         classes = list(class_to_idx.keys())
         colors = ['royalblue', 'red', 'darkorange', 'indigo', 'hotpink', 'green']
-        #colors = ['royalblue', 'red', 'darkorange', 'cyan', 'hotpink', 'green'] #uncoment line when using dark background
+        #NOTE: uncomment line below when using dark background
+        #colors = ['royalblue', 'red', 'darkorange', 'cyan', 'hotpink', 'green'] 
         markers = ['o', 'd', '*', '+', '^', 'p']
 
         assert len(classes) == len(colors)
