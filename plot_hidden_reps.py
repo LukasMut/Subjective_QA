@@ -46,7 +46,7 @@ if __name__ == '__main__':
         
     # create PATH
     cwd = '.'
-    PATH = cwd + folder + subdir + subsubdir + '/bert_stl_finetuned_squad/'
+    PATH = cwd + folder + subdir + subsubdir + '/bert_stl_finetuned_subjqa/'
     # we only want to capture .json files
     files = [file for file in os.listdir(PATH) if file.endswith('.json')]
     

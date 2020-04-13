@@ -118,7 +118,8 @@ if __name__ == '__main__':
     # create list of all review / paragraph domains in dataset(s)
     domains = ['books', 'tripadvisor', 'grocery', 'electronics', 'movies', 'restaurants', 'wikipedia']
     
-    domains = domains[:-1] if args.finetuning == 'SubjQA' else domains
+    #NOTE: exploit all domains for now
+    #domains = domains[:-1] if args.finetuning == 'SubjQA' else domains
    
     qa_types = ['subjqa_obj', 'subjqa_sbj', 'squad_obj'] if args.finetuning == 'combined' and args.multi_qa_type_class else ['obj', 'sbj']
     datasets = ['SQuAD', 'SubjQA']
