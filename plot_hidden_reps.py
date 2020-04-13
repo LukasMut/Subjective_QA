@@ -46,7 +46,7 @@ if __name__ == '__main__':
         
     # create PATH
     cwd = '.'
-    PATH = cwd + folder + subdir + subsubdir + '/bert_stl_finetuned_subjqa/'
+    PATH = cwd + folder + subdir + subsubdir + '/bert_stl_finetuned_squad/'
     # we only want to capture .json files
     files = [file for file in os.listdir(PATH) if file.endswith('.json')]
     
@@ -162,10 +162,6 @@ if __name__ == '__main__':
 
             if k > 0 and k % 2 == 0:
                 rnd_seed += 1
-
-            #NOTE: for now, we just want to inspect erroneous predictions
-            if re.search(r'correct', pred):
-                continue
             
             feat_reps_per_layer, token_labels, rnd_sent = get_random_sent_feat_reps(test_results, pred, rnd_seed)
             
@@ -178,8 +174,7 @@ if __name__ == '__main__':
                 model_name = model_name_copy + '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred
                 break
             """
-
-            """
+            
             print("================================================================")
             print("=========== Started plotting: {} prediction =============".format(pred))
             print("================================================================")
@@ -200,4 +195,3 @@ if __name__ == '__main__':
             print("=========== Finished plotting: {} prediction =============".format(pred))
             print("================================================================")
             print()
-            """
