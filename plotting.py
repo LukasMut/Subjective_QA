@@ -511,7 +511,7 @@ def get_random_sent_feat_reps(
     if prediction == 'correct_answerable':
         # indices for correct predictions
         indices = np.array([i for i, pred_ans in enumerate(pred_answers)
-                            if compute_exact(true_answers[i], pred_ans) and true_answers[i].strip() != '[CLS]'])
+                            if compute_exact(true_answers[i], pred_ans) and true_answers[i].strip() != '[CLS]' and len(true_answers[i].strip().split()) > 1])
 
     elif prediction == 'correct_unanswerable':
         # indices for correct predictions for an unanswerable question
@@ -521,7 +521,7 @@ def get_random_sent_feat_reps(
     elif prediction == 'wrong_answerable':
         # indices for wrong predictions
         indices = np.array([i for i, pred_ans in enumerate(pred_answers)
-                            if not compute_exact(true_answers[i], pred_ans) and true_answers[i].strip() != '[CLS]'])
+                            if not compute_exact(true_answers[i], pred_ans) and true_answers[i].strip() != '[CLS]' and len(true_answers[i].strip().split()) > 1])
 
     # set random seed to reproduce plots
     np.random.seed(rnd_seed)
@@ -545,9 +545,16 @@ def get_random_sent_feat_reps(
     a_indices = np.arange(true_start_pos[rnd_sent_idx], true_end_pos[rnd_sent_idx] + 1)
     
     print("=============================================================")
-    print("===== Answer: {} =====".format(' '.join(rnd_sent[a_indices[0]:a_indices[-1]+1])))
+    print("===== True answer: {} =====".format(' '.join(rnd_sent[a_indices[0]:a_indices[-1]+1])))
     print("=============================================================")
     print()
+
+    if re.search(r'wrong', prediction):
+      print("=============================================================")
+      print("===== Predicted answer: {} =====".format(pred_answers[rnd_sent_idx]))
+      print("=============================================================")
+      print()
+
     
     # create list of special token indices
     special_tok_indices = [cls_tok_id, sep_idx, len(rnd_sent)-1]
