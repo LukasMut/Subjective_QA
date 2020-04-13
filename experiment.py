@@ -1137,7 +1137,7 @@ if __name__ == '__main__':
     # we always test on SubjQA (TODO: evaluate model on both entire test data set and individual review domains)
     elif args.version == 'test':
 
-            if args.finetuning == 'SQuAD' or dataset_agnostic:
+            if args.finetuning == 'SQuAD' or args.dataset_agnostic:
 
                 squad_data_train = get_data(
                                             source='/SQuAD/',
