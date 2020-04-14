@@ -67,6 +67,27 @@ def f1(probas:torch.Tensor, y_true:torch.Tensor, task:str, avg:str='macro'):
 def compute_acc_per_ds(results_per_ds:dict):
   return {ds: {q_type: 100 * (score['correct'] / score['freq']) for q_type, score in q_types.items()} for ds, q_types in results_per_ds.items()}
 
+def compute_acc_per_q_word(results_per_q_word:dict):
+  return {q_word: 100 * (val['correct'] / val['freq']) for q_word, val in results_per_q_word.items()}
+
+def compute_batch_score_per_q_word(
+                               results_per_q_prefix:dict,
+                               b_sent_pairs:list,
+                               b_true_answers:list,
+                               b_pred_answers:list,
+                               q_words:list,
+                               ):
+  for i, sent_pair in enumerate(b_sent_pairs):
+      q_word = sent_pair.split()[1].strip().lower()
+      if q_word in q_words:
+        try:
+          results_per_q_prefix[q_word]['freq'] += 1
+        except KeyError:
+          results_per_q_prefix[q_word]['freq'] = 1
+          results_per_q_prefix[q_word]['correct'] = 0
+        results_per_q_prefix[q_word]['correct'] += compute_exact(b_true_answers[i], b_pred_answers[i])
+  return results_per_q_prefix
+
 def get_detailed_scores(
                         probas:torch.Tensor,
                         y_true:torch.Tensor,
@@ -1204,6 +1225,7 @@ def test(
         sequential_transfer:bool=False,
         inference_strategy:str=None,
         detailed_analysis_sbj_class:bool=False,
+        detailed_results_q_words:bool=False,
         multi_qa_type_class:bool=False,
         output_last_hiddens_cls:bool=False,
         output_all_hiddens_cls:bool=False,
@@ -1252,6 +1274,11 @@ def test(
         assert task == 'QA', 'Model must perform QA, if we want to store hidden representations for every token in a word sequence at each layer'
         predicted_answers, true_answers, true_start_pos, true_end_pos, sent_pairs = [], [], [], [], []
         feat_reps = defaultdict(list)
+
+    elif detailed_results_q_words:
+        assert task == 'QA', 'Model must perform QA, if we want to compute exact-match scores per interrogative word'
+        q_words = ['how', 'what', 'is', 'where', 'does', 'do']
+        results_per_q_word = defaultdict(dict)
 
     ###################################################
 
@@ -1516,6 +1543,24 @@ def test(
                         feat_reps['Layer' + '_' + str(l + 1)].append(hidden.tolist())
 
 
+              if detailed_results_q_words:
+                b_sent_pairs = get_answers(
+                                           tokenizer=tokenizer,
+                                           b_input_ids=b_input_ids,
+                                           start_logs=torch.zeros(batch_size).type_as(b_start_pos).to(device),
+                                           end_logs=torch.tensor([seq_len - 1 for seq_len in b_input_lengths]).type_as(b_end_pos).to(device),
+                                           predictions=False,
+                                           )
+
+                results_per_q_word = compute_batch_score_per_q_word(
+                                                                    results_per_q_word,
+                                                                    b_sent_pairs,
+                                                                    b_true_answers,
+                                                                    b_pred_answers,
+                                                                    q_words,
+                                                                    )
+
+
               ##################################################
               #### MODEL'S PREDICTED ANSWERS & TRUE ANSWERS ####
               ##################################################
@@ -1763,6 +1808,10 @@ def test(
     if detailed_analysis_sbj_class:
       results_per_ds = compute_acc_per_ds(results_per_ds)
       return test_loss, test_acc, test_f1, results_per_ds
+
+    elif task == 'QA' and detailed_results_q_words:
+      results_per_q_word = compute_acc_per_q_word(results_per_q_word)
+      return test_loss, test_acc, test_f1, results_per_q_word
 
     elif task == 'QA' and output_all_hiddens:
       #nested lists of string batches must be flattened via list comprehensions (not possible with np.array().flatten())
