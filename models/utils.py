@@ -71,22 +71,22 @@ def compute_acc_per_q_word(results_per_q_word:dict):
   return {q_word: 100 * (val['correct'] / val['freq']) for q_word, val in results_per_q_word.items()}
 
 def compute_batch_score_per_q_word(
-                               results_per_q_prefix:dict,
-                               b_sent_pairs:list,
-                               b_true_answers:list,
-                               b_pred_answers:list,
-                               q_words:list,
-                               ):
+                                   results_per_q_word:dict,
+                                   b_sent_pairs:list,
+                                   b_true_answers:list,
+                                   b_pred_answers:list,
+                                   q_words:list,
+                                   ):
   for i, sent_pair in enumerate(b_sent_pairs):
       q_word = sent_pair.split()[1].strip().lower()
       if q_word in q_words:
         try:
-          results_per_q_prefix[q_word]['freq'] += 1
+          results_per_q_word[q_word]['freq'] += 1
         except KeyError:
-          results_per_q_prefix[q_word]['freq'] = 1
-          results_per_q_prefix[q_word]['correct'] = 0
-        results_per_q_prefix[q_word]['correct'] += compute_exact(b_true_answers[i], b_pred_answers[i])
-  return results_per_q_prefix
+          results_per_q_word[q_word]['freq'] = 1
+          results_per_q_word[q_word]['correct'] = 0
+        results_per_q_word[q_word]['correct'] += compute_exact(b_true_answers[i], b_pred_answers[i])
+  return results_per_q_word
 
 def get_detailed_scores(
                         probas:torch.Tensor,

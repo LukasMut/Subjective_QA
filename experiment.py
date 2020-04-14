@@ -79,6 +79,8 @@ if __name__ == '__main__':
             help='If provided, test DistilBERT model previously pre-trained on SQuAD on SubjQA (no prior task-specific fine-tuning); only possible in test version.')
     parser.add_argument('--detailed_analysis_sbj_class', action='store_true',
             help='If provided, compute detailed analysis of subjectivity classification test results w.r.t datasets.')
+    parser.add_argument('--detailed_results_q_words', action='store_true',
+            help='If provided, compute exact-match accuracies per (top k) interrogative word across all questions in the test set.')    
     parser.add_argument('--output_last_hiddens_cls', action='store_true',
             help='If provided, feature representations of [CLS] token at last layer will be stored for each input sequence in test set.')
     parser.add_argument('--output_all_hiddens_cls', action='store_true',
@@ -1320,6 +1322,21 @@ if __name__ == '__main__':
                                                                     inference_strategy = args.sequential_transfer_evaluation,
                                                                     detailed_analysis_sbj_class = True,
                                                                     )
+            elif task == 'QA' and args.detailed_results_q_words:
+                test_loss, test_acc, test_f1, results_per_q_word = test(
+                                                                        model = model,
+                                                                        tokenizer = bert_tokenizer,
+                                                                        test_dl = test_dl,
+                                                                        batch_size = batch_size,
+                                                                        not_finetuned = args.not_finetuned,
+                                                                        task = 'QA' if task == 'all' else task,
+                                                                        n_domains = n_domain_labels,
+                                                                        input_sequence = 'question_answer' if args.batches == 'alternating' else 'question_context',
+                                                                        sequential_transfer = args.sequential_transfer,
+                                                                        inference_strategy = args.sequential_transfer_evaluation,
+                                                                        detailed_results_q_words = True,
+                                                                        )
+
 
             elif (task == 'QA' or args.sequential_transfer) and (args.output_last_hiddens_cls or args.output_all_hiddens_cls):
                  test_loss, test_acc, test_f1, domain_labels, sbj_labels, feat_reps = test(
@@ -1390,6 +1407,9 @@ if __name__ == '__main__':
 
             if args.detailed_analysis_sbj_class:
                 test_results['test_results_per_ds'] = results_per_ds
+
+            elif task == 'QA' and args.detailed_results_q_words:
+                test_results['test_results_q_word'] = results_per_q_word
 
             elif task == 'QA' and (args.output_last_hiddens_cls or args.output_all_hiddens_cls):
                 test_results['domain_labels'] = domain_labels
