@@ -1230,7 +1230,7 @@ def test(
         output_last_hiddens_cls:bool=False,
         output_all_hiddens_cls:bool=False,
         output_all_hiddens:bool=False,
-
+        output_all_hiddens_cls_q_words:bool=False,
 ):
     n_steps = len(test_dl)
     n_examples = n_steps * batch_size
@@ -1275,12 +1275,19 @@ def test(
         predicted_answers, true_answers, true_start_pos, true_end_pos, sent_pairs = [], [], [], [], []
         feat_reps = defaultdict(list)
 
+    elif output_all_hiddens_cls_q_words:
+        assert task == 'QA', 'Model must perform QA, if we want to extract hidden reps per top k interrogative word'
+        q_words = ['how', 'what', 'is', 'where', 'does', 'do']
+        q_word_labels = []
+        feat_reps = defaultdict(list)
+
     elif detailed_results_q_words:
-        assert task == 'QA', 'Model must perform QA, if we want to compute exact-match scores per interrogative word'
+        assert task == 'QA', 'Model must perform QA, if we want to compute exact-match scores per top k interrogative word'
         q_words = ['how', 'what', 'is', 'where', 'does', 'do']
         results_per_q_word = defaultdict(dict)
 
     ###################################################
+
 
     ######### DETAILED ANALYSIS ###########
 
@@ -1356,7 +1363,7 @@ def test(
                                    task='QA',
                                    aux_targets=b_aux_hard_targets,
                                    output_last_hiddens_cls=output_last_hiddens_cls,
-                                   output_all_hiddens_cls=output_all_hiddens_cls,
+                                   output_all_hiddens_cls=True if output_all_hiddens_cls or output_all_hiddens_cls_q_words else False,
                                    output_all_hiddens=output_all_hiddens,
                     )
 
@@ -1401,7 +1408,7 @@ def test(
                                       task='QA',
                                       aux_targets=b_aux_soft_targets,
                                       output_last_hiddens_cls=output_last_hiddens_cls,
-                                      output_all_hiddens_cls=output_all_hiddens_cls,
+                                      output_all_hiddens_cls=True if output_all_hiddens_cls or output_all_hiddens_cls_q_words else False,
                                       output_all_hiddens=output_all_hiddens,
                                       )
 
@@ -1426,7 +1433,7 @@ def test(
                                      input_lengths=b_input_lengths,
                                      task='QA',
                                      output_last_hiddens_cls=output_last_hiddens_cls,
-                                     output_all_hiddens_cls=output_all_hiddens_cls,
+                                     output_all_hiddens_cls=True if output_all_hiddens_cls or output_all_hiddens_cls_q_words else False,
                                      output_all_hiddens=output_all_hiddens,
                                      )
                   else:
@@ -1439,9 +1446,10 @@ def test(
                                      input_lengths=b_input_lengths,
                                      task='QA',
                                      output_last_hiddens_cls=output_last_hiddens_cls,
-                                     output_all_hiddens_cls=output_all_hiddens_cls,
+                                     output_all_hiddens_cls=True if output_all_hiddens_cls or output_all_hiddens_cls_q_words else False,
                                      output_all_hiddens=output_all_hiddens,
                                      )
+
               #####################################################################################
               ############## STORE MODEL'S HIDDEN REPRESENTATIONS FOR VISUALISATION ############### 
               #####################################################################################
@@ -1454,7 +1462,7 @@ def test(
                 for cls_last_hidden in cls_last_hiddens:
                   feat_reps.append(cls_last_hidden)
               
-              elif output_all_hiddens or output_all_hiddens_cls:
+              elif output_all_hiddens or output_all_hiddens_cls or output_all_hiddens_cls_q_words:
                 start_logits_test, end_logits_test = outputs[0]
                 hiddens_all_layers = outputs[1]
 
@@ -1513,10 +1521,15 @@ def test(
               ############## STORE MODEL'S HIDDEN REPRESENTATIONS FOR VISUALISATION ############### 
               ####################################################################################
 
-              if output_all_hiddens or output_all_hiddens_cls:
+              if output_all_hiddens or output_all_hiddens_cls or output_all_hiddens_cls_q_words:
                 for l, hiddens in enumerate(hiddens_all_layers):
                     hiddens = to_cpu(hiddens, detach=True, to_numpy=True) # 2D if output [CLS] hiddens elif all hiddens 3D
                     for i, hidden in enumerate(hiddens):
+
+                      ######################################################################################
+                      #### STORE HIDDEN REPRESENTATIONS OF EVERY NON-[PAD] TOKEN FOR EACH WORD SEQUENCE ####
+                      ######################################################################################
+                      
                       if output_all_hiddens: # 2D matrix
                         #NOTE: for now, we just want to store correct (answer span) predictions w.r.t answerable (!) questions
                         #if compute_exact(b_true_answers[i], b_pred_answers[i]) and b_true_answers[i].strip() != '[CLS]':
@@ -1538,6 +1551,31 @@ def test(
                                                      )
 
                             sent_pairs.append(b_sent_pairs[i])
+
+                      #####################################################################################################################
+                      #### STORE HIDDEN REPRESENTATIONS OF [CLS] FOR EACH INPUT SEQ STARTING WITH ONE OF THE TOP K INTERROGATIVE WORDS ####
+                      #####################################################################################################################
+
+                      elif output_all_hiddens_cls_q_words: # 1D vector
+                      
+                          b_sent_pairs = get_answers(
+                                                     tokenizer=tokenizer,
+                                                     b_input_ids=b_input_ids,
+                                                     start_logs=torch.zeros(batch_size).type_as(b_start_pos).to(device),
+                                                     end_logs=torch.tensor([seq_len - 1 for seq_len in b_input_lengths]).type_as(b_end_pos).to(device),
+                                                     predictions=False,
+                                                     )
+
+                          q_word = b_sent_pairs[i].split()[1].strip().lower()
+                          if q_word in q_words:
+                            feat_reps['Layer' + '_' + str(l + 1)].append(hidden.tolist())
+                            # we need to save label for question word only once
+                            if l == 0:
+                              q_word_labels.append(q_words.index(q_word))
+
+                      ########################################################################################
+                      #### STORE HIDDEN REPRESENTATIONS OF [CLS] FOR EVERY INPUT SEQUENCE IN THE TEST SET ####
+                      ########################################################################################
 
                       else: # 1D vector
                         feat_reps['Layer' + '_' + str(l + 1)].append(hidden.tolist())
@@ -1822,6 +1860,9 @@ def test(
       true_start_pos = np.array(true_start_pos).flatten().tolist()
       true_end_pos = np.array(true_end_pos).flatten().tolist()
       return test_loss, test_acc, test_f1, predicted_answers, true_answers, true_start_pos, true_end_pos, sent_pairs, feat_reps
+
+    elif task == 'QA' and output_all_hiddens_cls_q_words:
+      return test_loss, test_acc, test_f1, q_word_labels, feat_reps
 
     elif task == 'QA' and (output_last_hiddens_cls or output_all_hiddens_cls):
       domain_labels = np.array(domain_labels).flatten().tolist()

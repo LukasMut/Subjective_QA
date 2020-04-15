@@ -82,11 +82,13 @@ if __name__ == '__main__':
     parser.add_argument('--detailed_results_q_words', action='store_true',
             help='If provided, compute exact-match accuracies per (top k) interrogative word across all questions in the test set.')    
     parser.add_argument('--output_last_hiddens_cls', action='store_true',
-            help='If provided, feature representations of [CLS] token at last layer will be stored for each input sequence in test set.')
+            help='If provided, feature representations of [CLS] token at last layer will be stored for each input sequence in the test set.')
     parser.add_argument('--output_all_hiddens_cls', action='store_true',
-        help='If provided, feature representations of [CLS] token at each layer will be stored for each input sequence in test set.')
+        help='If provided, feature representations of [CLS] token at each layer will be stored for each input sequence in the test set.')
+    parser.add_argument('--output_all_hiddens_cls_q_words', action='store_true',
+        help='If provided, feature representations of [CLS] token at each layer will be stored for each input sequence in the test set that starts with one of the top k interrogative words.')
     parser.add_argument('--output_all_hiddens', action='store_true',
-        help='If provided, hidden states for each layer at every timestep will be stored for each input sequence in test set. Inference must be performed on QA.')
+        help='If provided, hidden states for each layer at every timestep will be stored for each input sequence in the test set. Inference must be performed on QA.')
     parser.add_argument('--compute_cosine_loss', action='store_true',
             help='If provided, compute cosine embedding loss to assess cosine similarity among hidden representations w.r.t. correct answer span at last transfomer layer.')
 
@@ -1337,6 +1339,21 @@ if __name__ == '__main__':
                                                                         detailed_results_q_words = True,
                                                                         )
 
+            elif task == 'QA' and args.output_all_hiddens_cls_q_words:
+                test_loss, test_acc, test_f1, q_word_labels, feat_reps = test(
+                                                                            model = model,
+                                                                            tokenizer = bert_tokenizer,
+                                                                            test_dl = test_dl,
+                                                                            batch_size = batch_size,
+                                                                            not_finetuned = args.not_finetuned,
+                                                                            task = 'QA' if task == 'all' else task,
+                                                                            n_domains = n_domain_labels,
+                                                                            input_sequence = 'question_answer' if args.batches == 'alternating' else 'question_context',
+                                                                            sequential_transfer = args.sequential_transfer,
+                                                                            inference_strategy = args.sequential_transfer_evaluation,
+                                                                            output_all_hiddens_cls_q_words = args.output_all_hiddens_cls_q_words,
+                                                                            )
+
 
             elif (task == 'QA' or args.sequential_transfer) and (args.output_last_hiddens_cls or args.output_all_hiddens_cls):
                  test_loss, test_acc, test_f1, domain_labels, sbj_labels, feat_reps = test(
@@ -1414,6 +1431,10 @@ if __name__ == '__main__':
             elif task == 'QA' and (args.output_last_hiddens_cls or args.output_all_hiddens_cls):
                 test_results['domain_labels'] = domain_labels
                 test_results['sbj_labels'] = sbj_labels
+                test_results['feat_reps'] = feat_reps
+
+            elif task == 'QA' and args.output_all_hiddens_cls_q_words:
+                test_results['q_word_labels'] = q_word_labels
                 test_results['feat_reps'] = feat_reps
 
             elif task == 'QA' and args.output_all_hiddens:
