@@ -455,6 +455,7 @@ def train(
                     h_c = torch.cat((hidden[sep_idx:b_start_pos[i], :], hidden[b_end_pos[i]+1:-1, :]), dim=0)
                     # compute average hidden rep across context hidden reps
                     h_c_mean = torch.zeros(h_c.size(1)) #h_c.mean(0)
+                    # h_c_mean = toch.randn_like(h_c_mean)
 
                     if h_a.size(0) == 1:
                       # we want h_a to be as dissimilar as possible from h_c_mean (hence, y = -1)
