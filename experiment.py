@@ -1139,6 +1139,7 @@ if __name__ == '__main__':
     # we always test on SubjQA (TODO: evaluate model on both entire test data set and individual review domains)
     elif args.version == 'test':
 
+            """
             if args.finetuning == 'SQuAD':
 
                 squad_data_train = get_data(
@@ -1173,37 +1174,39 @@ if __name__ == '__main__':
                 tensor_dataset_test = squad_tensor_dataset_test
 
             else:
+            """
         
-                subjqa_data_test_df, hidden_domain_idx_test = get_data(
-                                                                       source='/SubjQA/',
-                                                                       split='/test',
-                                                                       domain='all',
-                )
-                
-                subjqa_data_test = convert_df_to_dict(
-                                                      subjqa_data_test_df,
-                                                      hidden_domain_indexes=hidden_domain_idx_test,
-                                                      split='test',
-                )
-                
-                # convert dictionaries into instances of preprocessed question-answer-review examples    
-                subjqa_examples_test = create_examples(
-                                                       subjqa_data_test,
-                                                       source='SubjQA',
-                                                       is_training=True,
-                )
-                
-                subjqa_features_test = convert_examples_to_features(
-                                                                    subjqa_examples_test, 
-                                                                    bert_tokenizer,
-                                                                    max_seq_length=max_seq_length,
-                                                                    doc_stride=doc_stride,
-                                                                    max_query_length=max_query_length,
-                                                                    is_training=True,
-                                                                    domain_to_idx=domain_to_idx,
-                                                                    dataset_to_idx=dataset_to_idx,
-                )
+            subjqa_data_test_df, hidden_domain_idx_test = get_data(
+                                                                   source='/SubjQA/',
+                                                                   split='/test',
+                                                                   domain='all',
+            )
+            
+            subjqa_data_test = convert_df_to_dict(
+                                                  subjqa_data_test_df,
+                                                  hidden_domain_indexes=hidden_domain_idx_test,
+                                                  split='test',
+            )
+            
+            # convert dictionaries into instances of preprocessed question-answer-review examples    
+            subjqa_examples_test = create_examples(
+                                                   subjqa_data_test,
+                                                   source='SubjQA',
+                                                   is_training=True,
+            )
+            
+            subjqa_features_test = convert_examples_to_features(
+                                                                subjqa_examples_test, 
+                                                                bert_tokenizer,
+                                                                max_seq_length=max_seq_length,
+                                                                doc_stride=doc_stride,
+                                                                max_query_length=max_query_length,
+                                                                is_training=True,
+                                                                domain_to_idx=domain_to_idx,
+                                                                dataset_to_idx=dataset_to_idx,
+            )
 
+            """
                 if args.detailed_analysis_sbj_class or (args.multi_qa_type_class and args.sbj_classification) or (args.dataset_agnostic and (args.output_last_hiddens_cls or args.output_all_hiddens_cls)):
 
                     squad_data_train = get_data(
@@ -1251,7 +1254,8 @@ if __name__ == '__main__':
                                                                        aux_sbj_batch=False,
                                                                        multi_qa_type_class=args.multi_qa_type_class,
                                                                        )
-                tensor_dataset_test = subjqa_tensor_dataset_test
+            """                                                          
+            tensor_dataset_test = subjqa_tensor_dataset_test
 
             test_dl = BatchGenerator(
                                     dataset=tensor_dataset_test,
@@ -1275,13 +1279,14 @@ if __name__ == '__main__':
                 # set model to device
                 model.to(device)
 
-            #elif args.not_finetuned and args.sbj_classification:
-            #    # test (simple) BERT-QA-model fine-tuned on SQuAD without (prior) task-specific fine-tuning on SubjQA
-            #    model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-cased')
-            #    model_name = 'distilbert_pretrained_seqclass_no_fine_tuning'
-            #    # set model to device
-            #    model.to(device)
-            
+            """
+            elif args.not_finetuned and args.sbj_classification:
+                 # test (simple) BERT-QA-model fine-tuned on SQuAD without (prior) task-specific fine-tuning on SubjQA
+                 model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-cased')
+                 model_name = 'distilbert_pretrained_seqclass_no_fine_tuning'
+                 # set model to device
+                 model.to(device)
+            """
             else:
                 model = DistilBertForQA.from_pretrained(
                                                         pretrained_weights,
