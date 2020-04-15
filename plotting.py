@@ -31,6 +31,19 @@ from sklearn.utils.multiclass import unique_labels
 
 from tqdm import trange, tqdm
 
+
+def euclidean_dist(u:np.ndarray, v:np.ndarray): return np.linalg.norm(u-v)
+
+def avg_diameter_dist(samples:np.ndarray):
+    N = samples.shape[0]
+    avg_dist = 0
+    for i, u in enumerate(samples):
+        for j, v in enumerate(samples):
+            if i != j:
+                avg_dist += euclidean_dist(u, v)
+    avg_dist /= (N * (N - 1))
+    return avg_dist
+
 def get_results(
                 task:str,
                 version:str,
