@@ -454,7 +454,7 @@ def train(
                     # extract hidden reps for context tokens (without ans span token reps) 
                     h_c = torch.cat((hidden[sep_idx:b_start_pos[i], :], hidden[b_end_pos[i]+1:-1, :]), dim=0)
                     # compute average hidden rep across context hidden reps
-                    h_c_mean = torch.zeros(hidden.size(1)) #torch.rand(hidden.size(1)) #h_c.mean(0)
+                    h_c_mean = torch.zeros(hidden.size(1)).type_as(hidden) #torch.rand(hidden.size(1)) #h_c.mean(0)
 
                     if h_a.size(0) == 1:
                       # we want h_a to be as dissimilar as possible from h_c_mean (hence, y = -1)
