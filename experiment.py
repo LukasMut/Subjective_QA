@@ -1249,12 +1249,13 @@ if __name__ == '__main__':
                                                                        multi_qa_type_class=args.multi_qa_type_class,
                                                                        )
                 else:
-                    subjqa_tensor_dataset_test = create_tensor_dataset(
-                                                                       subjqa_features_test,
-                                                                       aux_sbj_batch=False,
-                                                                       multi_qa_type_class=args.multi_qa_type_class,
-                                                                       )
-            """                                                          
+                    """
+            subjqa_tensor_dataset_test = create_tensor_dataset(
+                                                               subjqa_features_test,
+                                                               aux_sbj_batch=False,
+                                                               multi_qa_type_class=args.multi_qa_type_class,
+                                                                )
+                                                                      
             tensor_dataset_test = subjqa_tensor_dataset_test
 
             test_dl = BatchGenerator(
