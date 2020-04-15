@@ -1280,14 +1280,13 @@ if __name__ == '__main__':
                 # set model to device
                 model.to(device)
 
-            """
-            elif args.not_finetuned and args.sbj_classification:
-                 # test (simple) BERT-QA-model fine-tuned on SQuAD without (prior) task-specific fine-tuning on SubjQA
-                 model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-cased')
-                 model_name = 'distilbert_pretrained_seqclass_no_fine_tuning'
-                 # set model to device
-                 model.to(device)
-            """
+            #elif args.not_finetuned and args.sbj_classification:
+            #    # test (simple) BERT-QA-model fine-tuned on SQuAD without (prior) task-specific fine-tuning on SubjQA
+            #    model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-cased')
+            #    model_name = 'distilbert_pretrained_seqclass_no_fine_tuning'
+            #    # set model to device
+            #    model.to(device)
+            
             else:
                 model = DistilBertForQA.from_pretrained(
                                                         pretrained_weights,
