@@ -8,6 +8,7 @@ import numpy as np
 
 from collections import defaultdict, Counter
 from eval_squad import compute_exact
+from scipy.spatial.distance import mahalanobis
 from sklearn.decomposition import PCA
 
 
@@ -45,7 +46,10 @@ def cosine_sim(x:np.ndarray, y:np.ndarray):
     denom = np.linalg.norm(x) * np.linalg.norm(y) # default is Frobenius norm (i.e., L2 norm)
     return num / denom
 
-def compute_ans_distances(a_hiddens:np.ndarray, metric:str):
+def compute_ans_distances(
+                          a_hiddens:np.ndarray,
+                          metric:str,
+                          a_inv_cov=None):
     a_mean_dist = 0
     count = 0
     for i, a_i in enumerate(a_hiddens):
@@ -57,6 +61,9 @@ def compute_ans_distances(a_hiddens:np.ndarray, metric:str):
                     a_mean_dist += cosine_sim(a_i, a_j)
                 elif metric == 'euclid':
                     a_mean_dist += euclidean_dist(a_i, a_j)
+                elif metric == 'mahalanobis':
+                    assert isinstance(a_inv_cov, np.ndarray), 'To compute {} distance, inverse cov matrix must be provided'.format(metric.capitalize())
+                    a_mean_dist += mahalanobis(a_i, a_j, a_inv_cov)
                 count += 1
     a_mean_dist /= count
     return a_mean_dist
@@ -75,9 +82,11 @@ def evaluate_estimations(
     true_preds, pred_indices = [], []
     
     for i, pred_ans in enumerate(pred_answers):
+        pred_ans = pred_ans.strip()
+        true_ans = true_answers[i].strip()
         #NOTE: we exclusively want to make predictions for answer spans that contain more than 1 token
-        if len(true_answers[i].strip().split()) > 1:
-            if compute_exact(true_answers[i], pred_ans):
+        if len(true_ans.split()) > 1:
+            if compute_exact(true_ans, pred_ans):
                 true_preds.append(1)
             else:
                 true_preds.append(0)
@@ -99,7 +108,7 @@ def evaluate_estimations(
                                                       metric=metric,
                                                       dim=dim,
                                                       )
-    est_accs = {'Layer' + '_' + str(l): (est_preds == true_preds).mean() * 100 for l, est_preds in enumerate(est_preds_all_layers)}
+    est_accs = {'Layer' + '_' + str(l + 1): (est_preds == true_preds).mean() * 100 for l, est_preds in enumerate(est_preds_all_layers)}
     return est_accs
 
 def estimate_preds_wrt_hiddens(
@@ -113,8 +122,8 @@ def estimate_preds_wrt_hiddens(
                                rnd_state:int=42,
 ):  
     if dim == 'low':
-        #assert metric == 'euclid', 'Computing the cosine similarity between (word) vectors in low-dimensional (vector) space is not particularly useful. Thus, we must calculate the euclidean distance instead.'
-        pca = PCA(n_components=.95, svd_solver='auto', random_state=rnd_state) # initialise PCA
+        assert metric == 'euclid', 'Computing the cosine similarity between (word) vectors in low-dimensional (vector) space is not particularly useful. Thus, we must calculate the euclidean distance instead.'
+        pca = PCA(n_components=.99, svd_solver='auto', random_state=rnd_state) # initialise PCA
 
     est_preds_top_layers = []
     for l, hiddens_all_sent_pairs in feat_reps.items():
@@ -154,6 +163,15 @@ def estimate_preds_wrt_hiddens(
 
                     if a_mean_dist < np.min(euclid_dists_a_and_c):
                         est_preds_current_layer[k] += 1
+
+                elif metric == 'mahalanobis':
+                    a_inv_cov = np.linalg.inv(np.cov(a_hiddens.T))
+                    mahalanob_dists_a_and_c = np.array([mahalanobis(c_hidden, a_mean_rep, a_inv_cov) for c_hidden in c_hiddens])
+                    c_closest_idx = np.argmin(mahalanob_dists_a_and_c)
+                    a_mean_dist = compute_ans_distances(a_hiddens, metric, a_inv_cov=a_inv_cov)
+
+                    if a_mean_dist < np.min(mahalanob_dists_a_and_c):
+                        est_preds_current_layer[k] += 1
                 k += 1
 
         est_preds_top_layers.append(est_preds_current_layer)
@@ -167,8 +185,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     # define variables
     source = args.source
-    metrics = ['cosine', 'euclid']
-    dims = ['high', 'low']
+    metrics = ['cosine', 'euclid', 'mahalanobis']
+    dims = ['high'] #['high', 'low']
     # get feat reps
     test_results, model_name = get_hidden_reps(source=source)
     # estimate model predictions w.r.t. hidden reps in latent space (per transformer layer)
