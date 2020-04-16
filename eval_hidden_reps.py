@@ -165,7 +165,10 @@ def estimate_preds_wrt_hiddens(
                         est_preds_current_layer[k] += 1
 
                 elif metric == 'mahalanobis':
-                    a_inv_cov = np.linalg.inv(np.cov(a_hiddens.T))
+                    try:
+                        a_inv_cov = np.linalg.inv(np.cov(a_hiddens.T))
+                    except:
+                        a_inv_cov = np.cov(a_hiddens.T)
                     mahalanob_dists_a_and_c = np.array([mahalanobis(u=c_hidden, v=a_mean_rep, VI=a_inv_cov) for c_hidden in c_hiddens])
                     c_closest_idx = np.argmin(mahalanob_dists_a_and_c) # dissimilarity measure ==> argmin
                     a_mean_dist = compute_ans_distances(a_hiddens, metric, a_inv_cov=a_inv_cov)
