@@ -32,7 +32,7 @@ def compute_ans_distances(a_hiddens:np.ndarray, metric:str):
     a_mean_dist /= count
     return a_mean_dist
 
-def evaluate_estimations(test_results:dict, metric:str='cosine'):
+def evaluate_estimations(test_results:dict, metric:str='cosine', dimensionality:str='high'):
     
     pred_answers = test_results['predicted_answers']
     true_answers = test_results['true_answers']
@@ -51,19 +51,23 @@ def evaluate_estimations(test_results:dict, metric:str='cosine'):
                 true_preds.append(0)
             ans_to_pred_indices.append(i)
             
-    true_preds = np.array(true_predictions)
-    est_preds = estimate_preds_based_on_distances(feat_reps, metric, true_start_pos, true_end_pos, sent_pairs, ans_to_pred_indices)
+    true_preds = np.array(true_preds)
+    est_preds = estimate_preds_based_on_distances(feat_reps, true_start_pos, true_end_pos, sent_pairs, ans_to_pred_indices, metric, dimensionality)
     est_accs = {'Layer' + '_' + str(l): (est_pred == true_preds).mean() * 100 for l, est_pred in enumerate(est_preds)}
     return est_accs
 
 def estimate_preds_based_on_distances(
                                       feat_reps_per_layer:dict,
-                                      metric:str,
                                       true_start_pos:list,
                                       true_end_pos:list,
                                       sent_pairs:list,
                                       ans_to_pred_indices:list,
-):
+                                      metric:str,
+                                      dimensionality:str,
+):  
+    if dimensionality == 'low':
+        # initialize PCA
+        pca = PCA(n_components=.99, svd_solver='full', random_state=42)
     preds_top_three_layers = []
     for l, hiddens_all_sent_pairs in feat_reps_per_layer.items():
         N = len(ans_to_pred_indices)
@@ -71,6 +75,8 @@ def estimate_preds_based_on_distances(
         for i, hiddens in enumerate(hiddens_all_sent_pairs):
             if i in ans_indices:
                 if int(l.lstrip('Layer_')) > 3:
+                    if dimensionality == 'low':
+                        hiddens = pca.fit_transform(hiddens)
                     sent = sent_pairs[i].split()
                     sep_idx = sent.index('[SEP]')
                     a_indices = np.arange(true_start_pos[i], true_end_pos[i]+1)
