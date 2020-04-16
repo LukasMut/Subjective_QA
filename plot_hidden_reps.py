@@ -24,9 +24,9 @@ from sklearn.utils.multiclass import unique_labels
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--hidden_reps', type=str, default='per_class',
-            help='If "per_class", plot hidden reps per class; if "across_classes" plot hidden reps per domain class conditioned on sbj class; if "per_token" pick random sent and plot it in latent space.')
+            help='If "per_class", plot hidden reps per class; if "across_classes" plot hidden reps per domain conditioned on qa_type; if "per_token" choose random sent and plot each tok in latent space.')
     parser.add_argument('--task', type=str, default='QA',
-            help='If QA, plot hidden reps of QA model; if "sbj_class", plot hidden reps of sbj. classification model.')
+            help='If QA, plot hidden reps of QA model; if "sbj_class", plot hidden reps of sbj. class. model.')
     parser.add_argument('--visualization', type=str, default='tokens',
             help='Must be one of {"question_words", "context_domains", "question_types", "tokens"}.')
     args = parser.parse_args()
