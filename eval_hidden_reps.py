@@ -6,7 +6,7 @@ import re
 
 import numpy as np
 
-from collections import defaultdict
+from collections import defaultdict, Counter
 from eval_squad import compute_exact
 from sklearn.decomposition import PCA
 
@@ -63,8 +63,8 @@ def compute_ans_distances(a_hiddens:np.ndarray, metric:str):
 
 def evaluate_estimations(
                          test_results:dict,
-                         metric:str='cosine',
-                         dim:str='high',
+                         metric:str,
+                         dim:str,
 ):
     pred_answers = test_results['predicted_answers']
     true_answers = test_results['true_answers']
@@ -82,14 +82,24 @@ def evaluate_estimations(
             else:
                 true_preds.append(0)
             pred_indices.append(i)
-            
+    
+    assert len(true_preds) == len(pred_indices)
     true_preds = np.array(true_preds)
     print()
     print(len(true_preds))
+    print(Counter(true_preds))
     print()
     # estimate model predictions w.r.t. hidden reps
-    est_preds = estimate_preds_wrt_hiddens(feat_reps, true_start_pos, true_end_pos, sent_pairs, pred_indices, metric, dim)
-    est_accs = {'Layer' + '_' + str(l): (est_pred == true_preds).mean() * 100 for l, est_pred in enumerate(est_preds)}
+    est_preds_all_layers = estimate_preds_wrt_hiddens(
+                                                      feat_reps=feat_reps,
+                                                      true_start_pos=true_start_pos,
+                                                      true_end_pos=true_end_pos,
+                                                      sent_pairs=sent_pairs,
+                                                      pred_indices=pred_indices,
+                                                      metric=metric,
+                                                      dim=dim,
+                                                      )
+    est_accs = {'Layer' + '_' + str(l): (est_preds == true_preds).mean() * 100 for l, est_preds in enumerate(est_preds_all_layers)}
     return est_accs
 
 def estimate_preds_wrt_hiddens(
@@ -104,19 +114,18 @@ def estimate_preds_wrt_hiddens(
 ):  
     if dim == 'low':
         #assert metric == 'euclid', 'Computing the cosine similarity between (word) vectors in low-dimensional (vector) space is not particularly useful. Thus, we must calculate the euclidean distance instead.'
-        pca = PCA(n_components=.95, svd_solver='full', random_state=rnd_state) # initialise PCA
+        pca = PCA(n_components=.95, svd_solver='auto', random_state=rnd_state) # initialise PCA
 
     est_preds_top_layers = []
     for l, hiddens_all_sent_pairs in feat_reps.items():
         #if int(l.lstrip('Layer_')) > 3:
         N = len(pred_indices)
         est_preds_current_layer = np.zeros(N)
-        k = 0 # k = idx for ans spans for which we want to estimate preds based on hidden reps
+        k = 0 # k = idx w.r.t. ans spans for which we want to estimate preds based on hidden reps
 
         for i, hiddens in enumerate(hiddens_all_sent_pairs):
             if i in pred_indices:
                 hiddens = np.array(hiddens)
-
                 if dim == 'low':
                     # transform feat reps into low-dim space with PCA
                     hiddens = pca.fit_transform(hiddens)
@@ -134,18 +143,17 @@ def estimate_preds_wrt_hiddens(
                     c_most_sim = c_hiddens[c_most_sim_idx]
                     a_mean_cos = compute_ans_distances(a_hiddens, metric)
 
-                    if a_mean_cos > cos_sims_a_and_c[c_most_sim_idx]:
+                    if a_mean_cos > np.max(cos_sims_a_and_c):
                         est_preds_current_layer[k] += 1
 
                 elif metric == 'euclid':
                     euclid_dists_a_and_c = np.array([euclidean_dist(c_hidden, a_mean_rep) for c_hidden in c_hiddens])
-                    c_closest_idx = np.argmin(cos_sims_a_and_c)
+                    c_closest_idx = np.argmin(euclid_dists_a_and_c)
                     c_closest = c_hiddens[c_closest_idx]
                     a_mean_dist = compute_ans_distances(a_hiddens, metric)
 
-                    if a_mean_dist < euclid_dists_a_and_c[c_closest_idx]:
+                    if a_mean_dist < np.min(euclid_dists_a_and_c):
                         est_preds_current_layer[k] += 1
-
                 k += 1
 
         est_preds_top_layers.append(est_preds_current_layer)
