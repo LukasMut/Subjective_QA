@@ -88,19 +88,19 @@ def evaluate_estimations(
     print(len(true_preds))
     print()
     # estimate model predictions w.r.t. hidden reps
-    est_preds = estimate_preds_based_on_hiddens(feat_reps, true_start_pos, true_end_pos, sent_pairs, pred_indices, metric, dimensionality)
+    est_preds = estimate_preds_wrt_hiddens(feat_reps, true_start_pos, true_end_pos, sent_pairs, pred_indices, metric, dimensionality)
     est_accs = {'Layer' + '_' + str(l): (est_pred == true_preds).mean() * 100 for l, est_pred in enumerate(est_preds)}
     return est_accs
 
-def estimate_preds_based_on_hiddens(
-                                    feat_reps:dict,
-                                    true_start_pos:list,
-                                    true_end_pos:list,
-                                    sent_pairs:list,
-                                    pred_indices:list,
-                                    metric:str,
-                                    dimensionality:str,
-                                    rnd_state:int=42,
+def estimate_preds_wrt_hiddens(
+                               feat_reps:dict,
+                               true_start_pos:list,
+                               true_end_pos:list,
+                               sent_pairs:list,
+                               pred_indices:list,
+                               metric:str,
+                               dimensionality:str,
+                               rnd_state:int=42,
 ):  
     if dimensionality == 'low':
         #assert metric == 'euclid', 'Computing the cosine similarity between (word) vectors in low-dimensional (vector) space is not particularly useful. Thus, we must calculate the euclidean distance instead.'
