@@ -159,8 +159,10 @@ if __name__ == '__main__':
     ################################################################################################################
     
     elif args.hidden_reps == 'per_token':
-
-        print(evaluate_estimations(test_results, 'cosine'))
+        metrics = ['cosine', 'euclid']
+        dims = ['high', 'low']
+        est_per_metric = {metric: {dim: evaluate_estimations(test_results, 'cosine', dim) for dim in dims} for metric in metrics}
+        print(est_per_metric)
 
         """
         # plot random sentence for both correct and incorrect (answer span) predictions 
