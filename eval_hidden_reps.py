@@ -49,7 +49,7 @@ def cosine_sim(u:np.ndarray, v:np.ndarray):
 def compute_ans_distances(
                           a_hiddens:np.ndarray,
                           metric:str,
-                          a_inv_cov=None):
+                          inv_cov=None):
     a_mean_dist = 0
     count = 0
     for i, a_i in enumerate(a_hiddens):
@@ -62,8 +62,8 @@ def compute_ans_distances(
                 elif metric == 'euclid':
                     a_mean_dist += euclidean_dist(u=a_i, v=a_j)
                 elif metric == 'mahalanobis':
-                    assert isinstance(a_inv_cov, np.ndarray), 'To compute {} distance, inverse cov matrix must be provided'.format(metric.capitalize())
-                    a_mean_dist += mahalanobis(u=a_i, v=a_j, VI=a_inv_cov)
+                    assert isinstance(inv_cov, np.ndarray), 'To compute {} distance between 1-D arrays, (inverse) cov matrix must be provided'.format(metric.capitalize())
+                    a_mean_dist += mahalanobis(u=a_i, v=a_j, VI=inv_cov)
                 count += 1
     a_mean_dist /= count
     return a_mean_dist
@@ -88,9 +88,11 @@ def evaluate_estimations(
         if len(true_ans.split()) > 1:
             if compute_exact(true_ans, pred_ans):
                 true_preds.append(1)
+                pred_indices.append(i)
             else:
-                true_preds.append(0)
-            pred_indices.append(i)
+                pass
+                #true_preds.append(0)
+            #pred_indices.append(i)
     
     assert len(true_preds) == len(pred_indices)
     true_preds = np.array(true_preds)
@@ -135,8 +137,8 @@ def estimate_preds_wrt_hiddens(
         for i, hiddens in enumerate(hiddens_all_sent_pairs):
             if i in pred_indices:
                 hiddens = np.array(hiddens)
+                # transform feat reps into low-dim space with PCA (only useful for computing Euclidean distances)
                 if dim == 'low':
-                    # transform feat reps into low-dim space with PCA
                     hiddens = pca.fit_transform(hiddens)
 
                 sent = sent_pairs[i].split()
@@ -147,33 +149,53 @@ def estimate_preds_wrt_hiddens(
                 a_mean_rep = np.mean(a_hiddens, axis=0)
 
                 if metric == 'cosine':
-                    cos_sims_a_and_c = np.array([cosine_sim(u=c_hidden, v=a_mean_rep) for c_hidden in c_hiddens])
+                    cos_sims_a_and_c = np.array([cosine_sim(u=a_mean_rep, v=c_hidden) for c_hidden in c_hiddens])
                     c_most_sim_idx = np.argmax(cos_sims_a_and_c) # similarity measure ==> argmax
                     c_most_sim = c_hiddens[c_most_sim_idx]
+                    c_most_sim_mean_cos = np.mean([cosine_sim(u=c_most_sim, v=a_hidden) for a_hidden in a_hiddens])
                     a_mean_cos = compute_ans_distances(a_hiddens, metric)
 
-                    if a_mean_cos > np.max(cos_sims_a_and_c):
+                    if a_mean_cos > c_most_sim_mean_cos: #np.max(cos_sims_a_and_c):
                         est_preds_current_layer[k] += 1
 
                 elif metric == 'euclid':
-                    euclid_dists_a_and_c = np.array([euclidean_dist(u=c_hidden, v=a_mean_rep) for c_hidden in c_hiddens])
+                    euclid_dists_a_and_c = np.array([euclidean_dist(u=a_mean_rep, v=c_hidden) for c_hidden in c_hiddens])
                     c_closest_idx = np.argmin(euclid_dists_a_and_c) # dissimilarity measure ==> argmin
                     c_closest = c_hiddens[c_closest_idx]
+                    c_closest_mean_dist = np.mean([euclidean_dist(u=c_closest, v=a_hidden) for a_hidden in a_hiddens])
                     a_mean_dist = compute_ans_distances(a_hiddens, metric)
 
-                    if a_mean_dist < np.min(euclid_dists_a_and_c):
+                    if a_mean_dist < c_closest_mean_dist: #np.min(euclid_dists_a_and_c):
                         est_preds_current_layer[k] += 1
 
                 elif metric == 'mahalanobis':
-                    try:
-                        a_inv_cov = np.linalg.inv(np.cov(a_hiddens.T))
-                    except:
-                        a_inv_cov = np.cov(a_hiddens.T)
-                    mahalanob_dists_a_and_c = np.array([mahalanobis(u=c_hidden, v=a_mean_rep, VI=a_inv_cov) for c_hidden in c_hiddens])
-                    c_closest_idx = np.argmin(mahalanob_dists_a_and_c) # dissimilarity measure ==> argmin
-                    a_mean_dist = compute_ans_distances(a_hiddens, metric, a_inv_cov=a_inv_cov)
+                    # calculate mean and std of hidden rep matrix without [CLS], [SEP], and question (only answer and context feat reps needed)
+                    hiddens = hiddens[sep_idx+1:-1, :]
+                    hiddens_mu = hiddens.mean(0)
+                    hiddens_sigma = hiddens.std(0)
+                    
+                    #NOTE: standardize features (i.e., yield zero mean AND unit variance) to avoid singular covariance matrix (singular mat is not invertible)
+                    a_hiddens -= hiddens_mu # mean-centering
+                    a_hiddens /= hiddens_sigma # normalization
 
-                    if a_mean_dist < np.min(mahalanob_dists_a_and_c):
+                    c_hiddens -= hiddens_mu # mean-centering
+                    c_hiddens /= hiddens_sigma # normalization
+
+                    hiddens -= hiddens_mu # mean-centering
+                    hiddens /= hiddens_sigma # normalization
+
+                    try:
+                        inv_cov = np.linalg.inv(np.cov(hiddens.T)) #a_hiddens.T
+                    except:
+                        inv_cov = np.cov(hiddens.T) #a_hiddens.T
+
+                    mahalanob_dists_a_and_c = np.array([mahalanobis(u=a_mean_rep, v=c_hidden, VI=inv_cov) for c_hidden in c_hiddens])
+                    c_closest_idx = np.argmin(mahalanob_dists_a_and_c) # dissimilarity measure ==> argmin
+                    c_closest = c_hiddens[c_closest_idx]
+                    c_closest_mean_dist = np.mean([mahalanobis(u=c_closest, v=a_hidden, VI=inv_cov) for a_hidden in a_hiddens])
+                    a_mean_dist = compute_ans_distances(a_hiddens, metric, inv_cov=inv_cov)
+
+                    if a_mean_dist < c_closest_mean_dist: #np.min(mahalanob_dists_a_and_c)
                         est_preds_current_layer[k] += 1
                 k += 1
 
