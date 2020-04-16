@@ -87,33 +87,38 @@ def evaluate_estimations(
     print()
     print(len(true_preds))
     print()
-    est_preds = estimate_preds_based_on_distances(feat_reps, true_start_pos, true_end_pos, sent_pairs, pred_indices, metric, dimensionality)
+    # estimate model predictions w.r.t. hidden reps
+    est_preds = estimate_preds_based_on_hiddens(feat_reps, true_start_pos, true_end_pos, sent_pairs, pred_indices, metric, dimensionality)
     est_accs = {'Layer' + '_' + str(l): (est_pred == true_preds).mean() * 100 for l, est_pred in enumerate(est_preds)}
     return est_accs
 
-def estimate_preds_based_on_distances(
-                                      feat_reps:dict,
-                                      true_start_pos:list,
-                                      true_end_pos:list,
-                                      sent_pairs:list,
-                                      pred_indices:list,
-                                      metric:str,
-                                      dimensionality:str,
+def estimate_preds_based_on_hiddens(
+                                    feat_reps:dict,
+                                    true_start_pos:list,
+                                    true_end_pos:list,
+                                    sent_pairs:list,
+                                    pred_indices:list,
+                                    metric:str,
+                                    dimensionality:str,
+                                    rnd_state:int=42,
 ):  
     if dimensionality == 'low':
         #assert metric == 'euclid', 'Computing the cosine similarity between (word) vectors in low-dimensional (vector) space is not particularly useful. Thus, we must calculate the euclidean distance instead.'
-        pca = PCA(n_components=.99, svd_solver='full', random_state=42) # init PCA
+        pca = PCA(n_components=.95, svd_solver='full', random_state=rnd_state) # init PCA
 
-    preds_top_three_layers = []
+    est_preds_top_layers = []
     for l, hiddens_all_sent_pairs in feat_reps.items():
         #if int(l.lstrip('Layer_')) > 3:
         N = len(pred_indices)
-        preds_current_layer = np.zeros(N)
+        est_preds_current_layer = np.zeros(N)
+        k = 0 # k = idx for ans spans for which we want to estimate preds based on hidden reps
+
         for i, hiddens in enumerate(hiddens_all_sent_pairs):
             if i in pred_indices:
                 hiddens = np.array(hiddens)
 
                 if dimensionality == 'low':
+                    # transform feat reps into low-dim space with PCA
                     hiddens = pca.fit_transform(hiddens)
 
                 sent = sent_pairs[i].split()
@@ -130,7 +135,7 @@ def estimate_preds_based_on_distances(
                     a_mean_cos = compute_ans_distances(a_hiddens, metric)
 
                     if a_mean_cos > cos_sims_a_and_c[c_most_sim_idx]:
-                        preds_current_layer[i] += 1
+                        est_preds_current_layer[k] += 1
 
                 elif metric == 'euclid':
                     euclid_dists_a_and_c = np.array([euclidean_dist(c_hidden, a_mean_rep) for c_hidden in c_hiddens])
@@ -139,23 +144,26 @@ def estimate_preds_based_on_distances(
                     a_mean_dist = compute_ans_distances(a_hiddens, metric)
 
                     if a_mean_dist < euclid_dists_a_and_c[c_closest_idx]:
-                        preds_current_layer[i] += 1
+                        est_preds_current_layer[k] += 1
 
-        preds_top_three_layers.append(preds_current_layer)
-    return preds_top_three_layers
+                k += 1
+
+        est_preds_top_layers.append(est_preds_current_layer)
+    return est_preds_top_layers
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--source', type=str, default='SubjQA',
-            help='Make estimations based on hidden reps obtained from fine-tuning (and evaluating) on *source*.')
+        help='Make estimations based on hidden reps obtained from fine-tuning (and evaluating) on *source*.')
     args = parser.parse_args()
     # define variables
     source = args.source
     metrics = ['cosine', 'euclid']
     dims = ['high', 'low']
-
+    # get feat reps
     test_results, model_name = get_hidden_reps(source=source)
+    # estimate model predictions w.r.t. hidden reps in latent space (per transformer layer)
     est_per_metric = {metric: {dim: evaluate_estimations(test_results, metric, dim) for dim in dims} for metric in metrics}
     print()
     print(est_per_metric)
