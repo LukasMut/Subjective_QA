@@ -10,7 +10,6 @@ import os
 import random
 import re
 
-from hidden_reps_evaluation import evaluate_estimations
 from mpl_toolkits.mplot3d import Axes3D
 from plotting import *
 from sklearn.decomposition import PCA
@@ -18,6 +17,7 @@ from sklearn.manifold import TSNE
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.utils.multiclass import unique_labels
 
+#set random seeds to reproduce results
 #np.random.seed(42)
 #random.seed(42)
     
@@ -27,8 +27,8 @@ if __name__ == '__main__':
             help='If "per_class", plot hidden reps per class; if "across_classes" plot hidden reps per domain class conditioned on sbj class; if "per_token" pick random sent and plot it in latent space.')
     parser.add_argument('--task', type=str, default='QA',
             help='If QA, plot hidden reps of QA model; if "sbj_class", plot hidden reps of sbj. classification model.')
-    parser.add_argument('--visualization', type=str, default='question_words',
-            help='Must be one of {"question_words", "context_domains", "question_types", "tokens".')
+    parser.add_argument('--visualization', type=str, default='tokens',
+            help='Must be one of {"question_words", "context_domains", "question_types", "tokens"}.')
     args = parser.parse_args()
  
     # set folder and subdirectory
@@ -48,8 +48,11 @@ if __name__ == '__main__':
                 subsubdir = '/qa_ds_agnostic/' 
 
         elif args.hidden_reps == 'across_classes':
+            assert args.visualization == 'context_domains'
             subsubdir = '/qa_sequential_transfer/'
+
         else:
+            assert args.visualization == 'tokens'
             subsubdir = '/qa_per_token/'
 
         task = subsubdir.lstrip('/').rstrip('/').lower()
@@ -57,7 +60,7 @@ if __name__ == '__main__':
     # create PATH
     cwd = '.'
     PATH = cwd + folder + subdir + subsubdir + '/bert_stl_finetuned_subjqa/' if task == 'qa_per_token' else cwd + folder + subdir + subsubdir
-    # we only want to capture .json files
+    # we exclusively want to capture .json files
     files = [file for file in os.listdir(PATH) if file.endswith('.json')]
     
     # load files
@@ -88,6 +91,7 @@ if __name__ == '__main__':
     print("======= Test F1: {} =======".format(test_results['test_f1']))
     print("==============================================")
     print()
+
     ################################################################################################################
     ################ plot model's hidden states per transformer layer for each class in test set ###################
     ################################################################################################################
@@ -121,10 +125,10 @@ if __name__ == '__main__':
             y_true = np.array(test_results['q_word_labels'])
             classes = ['how', 'what', 'is', 'where', 'does', 'do']
         
-        # convert hidden reps into NumPy matrices
+        # convert hidden reps into NumPy arrays
         feat_reps_per_layer = {l: np.array(h) for l, h in test_results['feat_reps'].items()}
         
-        # define vars
+        # define variables
         labels = np.unique(y_true)
         
         class_to_idx = {c: l for c, l in zip(classes, labels)}
@@ -159,13 +163,7 @@ if __name__ == '__main__':
     ################################################################################################################
     
     elif args.hidden_reps == 'per_token':
-        metrics = ['cosine', 'euclid']
-        dims = ['high', 'low']
-        est_per_metric = {metric: {dim: evaluate_estimations(test_results, 'cosine', dim) for dim in dims} for metric in metrics}
-        print(est_per_metric)
-
-        """
-        # plot random sentence for both correct and incorrect (answer span) predictions 
+        #plot random sentence for both correct and incorrect (answer span) predictions 
         #predictions = ['correct_answerable', 'correct_unanswerable',  'wrong_answerable']
         predictions = ['correct_answerable', 'wrong_answerable', 'correct_answerable', 'wrong_answerable', 'correct_answerable', 'wrong_answerable']
         classes = ['context', 'question', 'answer']
@@ -188,14 +186,13 @@ if __name__ == '__main__':
             
             model_name = model_name_copy + '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred + '_' + str(k)
 
-            
-            #if k == 0:
-            #    model_name += '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred
-            #else:
-            #    model_name = model_name_copy + '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred
-            #    break
-            
-            
+            """
+            if k == 0:
+                model_name += '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred
+            else:
+                model_name = model_name_copy + '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred
+                break
+            """
             print("================================================================")
             print("=========== Started plotting: {} prediction =============".format(pred))
             print("================================================================")
@@ -216,4 +213,3 @@ if __name__ == '__main__':
             print("=========== Finished plotting: {} prediction =============".format(pred))
             print("================================================================")
             print()
-        """

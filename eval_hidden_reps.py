@@ -1,13 +1,42 @@
-__all__ = ['evaluate_estimations']
-
+import argparse
 import json
-import os 
+import os
+import random
+import re 
 
 import numpy as np
 
 from collections import defaultdict
 from eval_squad import compute_exact
+from sklearn.decomposition import PCA
 
+
+def get_hidden_reps(source:str='SubjQA'):
+    # set folder and subdirectories
+    folder = '/results_test/'
+    subdir = '/feat_reps/'
+    subsubdir = '/qa_per_token/'
+    task = subsubdir.lstrip('/').rstrip('/').lower()
+
+    # create PATH
+    cwd = '.'
+    PATH = cwd + folder + subdir + subsubdir
+    PATH += '/bert_stl_finetuned_subjqa/' if source == 'SubjQA' else '/bert_stl_finetuned_squad/'
+
+    # we want to exclusively capture .json files
+    files = [file for file in os.listdir(PATH) if file.endswith('.json')]
+    f = files.pop()
+
+    # load file
+    with open(PATH + f) as json_file:
+        test_results = json.load(json_file)
+        model_name = 'hidden_rep_distances' + '_' + task
+        print("===============================================================")
+        print("======= File loaded: {} =======".format(model_name))
+        print("===============================================================")
+        print()
+
+    return test_results, model_name
 
 def euclidean_dist(u:np.ndarray, v:np.ndarray): return np.linalg.norm(u-v) # default is L2 norm
 
@@ -21,19 +50,22 @@ def compute_ans_distances(a_hiddens:np.ndarray, metric:str):
     count = 0
     for i, a_i in enumerate(a_hiddens):
         for j, a_j in enumerate(a_hiddens):
-            #NOTE: we don't want to compute cosine sim of a vector with itself (cos_sim = 1),
-            #AND it's redundant to compute cosine sim twice for some pair of vectors
+            #NOTE: we don't want to compute cosine sim of a vector with itself (i.e., cos_sim = 1),
+            #AND it's redundant to compute cosine sim (or Euclid dist) twice for some pair of vectors (i.e., cos_sim(u, v) == cos_sim(v, u))
             if i != j and j > i:
                 if metric == 'cosine':
                     a_mean_dist += cosine_sim(a_i, a_j)
-            elif metric == 'euclid':
+                elif metric == 'euclid':
                     a_mean_dist += euclidean_dist(a_i, a_j)
-            count += 1
+                count += 1
     a_mean_dist /= count
     return a_mean_dist
 
-def evaluate_estimations(test_results:dict, metric:str='cosine', dimensionality:str='high'):
-    
+def evaluate_estimations(
+                         test_results:dict,
+                         metric:str='cosine',
+                         dimensionality:str='high',
+):
     pred_answers = test_results['predicted_answers']
     true_answers = test_results['true_answers']
     true_start_pos = test_results['true_start_pos']
@@ -52,6 +84,9 @@ def evaluate_estimations(test_results:dict, metric:str='cosine', dimensionality:
             pred_indices.append(i)
             
     true_preds = np.array(true_preds)
+    print()
+    print(len(true_preds))
+    print()
     est_preds = estimate_preds_based_on_distances(feat_reps, true_start_pos, true_end_pos, sent_pairs, pred_indices, metric, dimensionality)
     est_accs = {'Layer' + '_' + str(l): (est_pred == true_preds).mean() * 100 for l, est_pred in enumerate(est_preds)}
     return est_accs
@@ -67,7 +102,8 @@ def estimate_preds_based_on_distances(
 ):  
     if dimensionality == 'low':
         #assert metric == 'euclid', 'Computing the cosine similarity between (word) vectors in low-dimensional (vector) space is not particularly useful. Thus, we must calculate the euclidean distance instead.'
-        pca = PCA(n_components=.99, svd_solver='full', random_state=42) # initialise PCA
+        pca = PCA(n_components=.99, svd_solver='full', random_state=42) # init PCA
+
     preds_top_three_layers = []
     for l, hiddens_all_sent_pairs in feat_reps.items():
         #if int(l.lstrip('Layer_')) > 3:
@@ -106,4 +142,24 @@ def estimate_preds_based_on_distances(
                         preds_current_layer[i] += 1
 
         preds_top_three_layers.append(preds_current_layer)
-    return preds_top_three_layers    
+    return preds_top_three_layers
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--source', type=str, default='SubjQA',
+            help='Make estimations based on hidden reps obtained from fine-tuning (and evaluating) on *source*.')
+    args = parser.parse_args()
+    # define variables
+    source = args.source
+    metrics = ['cosine', 'euclid']
+    dims = ['high', 'low']
+
+    test_results, model_name = get_hidden_reps(source=source)
+    est_per_metric = {metric: {dim: evaluate_estimations(test_results, metric, dim) for dim in dims} for metric in metrics}
+    print()
+    print(est_per_metric)
+    print()
+    # save results
+    with open('./results_hidden_reps/' + '/' + source.lower() + '/' + model_name + '.json', 'w') as json_file:
+        json.dump(est_per_metric, json_file)
