@@ -64,7 +64,7 @@ def compute_ans_distances(a_hiddens:np.ndarray, metric:str):
 def evaluate_estimations(
                          test_results:dict,
                          metric:str='cosine',
-                         dimensionality:str='high',
+                         dim:str='high',
 ):
     pred_answers = test_results['predicted_answers']
     true_answers = test_results['true_answers']
@@ -88,7 +88,7 @@ def evaluate_estimations(
     print(len(true_preds))
     print()
     # estimate model predictions w.r.t. hidden reps
-    est_preds = estimate_preds_wrt_hiddens(feat_reps, true_start_pos, true_end_pos, sent_pairs, pred_indices, metric, dimensionality)
+    est_preds = estimate_preds_wrt_hiddens(feat_reps, true_start_pos, true_end_pos, sent_pairs, pred_indices, metric, dim)
     est_accs = {'Layer' + '_' + str(l): (est_pred == true_preds).mean() * 100 for l, est_pred in enumerate(est_preds)}
     return est_accs
 
@@ -99,10 +99,10 @@ def estimate_preds_wrt_hiddens(
                                sent_pairs:list,
                                pred_indices:list,
                                metric:str,
-                               dimensionality:str,
+                               dim:str,
                                rnd_state:int=42,
 ):  
-    if dimensionality == 'low':
+    if dim == 'low':
         #assert metric == 'euclid', 'Computing the cosine similarity between (word) vectors in low-dimensional (vector) space is not particularly useful. Thus, we must calculate the euclidean distance instead.'
         pca = PCA(n_components=.95, svd_solver='full', random_state=rnd_state) # initialise PCA
 
@@ -117,7 +117,7 @@ def estimate_preds_wrt_hiddens(
             if i in pred_indices:
                 hiddens = np.array(hiddens)
 
-                if dimensionality == 'low':
+                if dim == 'low':
                     # transform feat reps into low-dim space with PCA
                     hiddens = pca.fit_transform(hiddens)
 
