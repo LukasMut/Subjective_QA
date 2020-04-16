@@ -155,7 +155,7 @@ def estimate_preds_wrt_hiddens(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--source', type=str, default='SubjQA',
-        help='Make estimations based on hidden reps obtained from fine-tuning (and evaluating) on *source*.')
+        help='Estimate model predictions (i.e., correct or erroneous) w.r.t. hidden reps obtained from fine-tuning (and evaluating) on *source*.')
     args = parser.parse_args()
     # define variables
     source = args.source
