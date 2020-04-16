@@ -148,7 +148,7 @@ def estimate_preds_wrt_hiddens(
 
                 if metric == 'cosine':
                     cos_sims_a_and_c = np.array([cosine_sim(u=c_hidden, v=a_mean_rep) for c_hidden in c_hiddens])
-                    c_most_sim_idx = np.argmax(cos_sims_a_and_c)
+                    c_most_sim_idx = np.argmax(cos_sims_a_and_c) # similarity measure ==> argmax
                     c_most_sim = c_hiddens[c_most_sim_idx]
                     a_mean_cos = compute_ans_distances(a_hiddens, metric)
 
@@ -157,7 +157,7 @@ def estimate_preds_wrt_hiddens(
 
                 elif metric == 'euclid':
                     euclid_dists_a_and_c = np.array([euclidean_dist(u=c_hidden, v=a_mean_rep) for c_hidden in c_hiddens])
-                    c_closest_idx = np.argmin(euclid_dists_a_and_c)
+                    c_closest_idx = np.argmin(euclid_dists_a_and_c) # dissimilarity measure ==> argmin
                     c_closest = c_hiddens[c_closest_idx]
                     a_mean_dist = compute_ans_distances(a_hiddens, metric)
 
@@ -167,7 +167,7 @@ def estimate_preds_wrt_hiddens(
                 elif metric == 'mahalanobis':
                     a_inv_cov = np.linalg.inv(np.cov(a_hiddens.T))
                     mahalanob_dists_a_and_c = np.array([mahalanobis(u=c_hidden, v=a_mean_rep, VI=a_inv_cov) for c_hidden in c_hiddens])
-                    c_closest_idx = np.argmin(mahalanob_dists_a_and_c)
+                    c_closest_idx = np.argmin(mahalanob_dists_a_and_c) # dissimilarity measure ==> argmin
                     a_mean_dist = compute_ans_distances(a_hiddens, metric, a_inv_cov=a_inv_cov)
 
                     if a_mean_dist < np.min(mahalanob_dists_a_and_c):
