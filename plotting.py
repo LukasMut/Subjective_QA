@@ -34,6 +34,11 @@ from tqdm import trange, tqdm
 
 def euclidean_dist(u:np.ndarray, v:np.ndarray): return np.linalg.norm(u-v)
 
+def cosine_sim(x:np.ndarray, y:np.ndarray):
+    num = x @ y
+    denom = np.linalg.norm(x) * np.linalg.norm(y) # default is Frobenius norm (i.e., L2 norm)
+    return num / denom
+
 def avg_diameter_dist(samples:np.ndarray):
     N = samples.shape[0]
     avg_dist = 0
@@ -394,8 +399,8 @@ def plot_seqs_projected_via_tsne(
         markers = ['o', 'd', '*', '+', '^', 'p']
 
         assert len(classes) == len(colors)
-        assert isinstance(support_labels, np.ndarray), 'Both context-domain and subjectivity labels must be provided'
-        assert support_labels.shape == y_true.shape, 'Shapes of context-domain and subjectivity labels vectors must be the same'
+        #assert isinstance(support_labels, np.ndarray), 'Both context-domain and subjectivity labels must be provided'
+        #assert support_labels.shape == y_true.shape, 'Shapes of context-domain and subjectivity labels vectors must be the same'
     else:
         if plot_qa:
             classes = list(class_to_idx.keys())
@@ -415,7 +420,7 @@ def plot_seqs_projected_via_tsne(
                        alpha = .5 if lab == 0 else .9,
                        label = classes[lab],
             )
-        elif len(np.unique(y_true)) > 3:
+        elif len(np.unique(y_true)) > 3 and isinstance(support_labels, np.ndarray):
           for j, sbj_lab in enumerate(np.unique(support_labels)):
               ax.scatter(
                          tsne_embed_x[np.add(y_true, support_labels) == np.add(lab, sbj_lab)],
@@ -449,8 +454,8 @@ def plot_seqs_projected_via_tsne(
         #ax.set_title('Model fine-tuned on' + ' ' + dataset + ':' + ' ' + layer, fontsize=title_fontsize)
         plt.tight_layout()
         #plt.savefig('./plots/feat_reps/layer_wise/' + task + '/' + model_name + '_' + n_layer.lower() + '_' + 'dark' + '.png')
-        #plt.savefig('./plots/feat_reps/layer_wise/' + task + '/' + model_name + '_' + n_layer.lower() + '.png')
-        plt.savefig('./plots/feat_reps/layer_wise/' + task + '/' + 'bert_stl_finetuned_squad' + '/' + model_name + '_' + n_layer.lower() + '.png')
+        plt.savefig('./plots/feat_reps/layer_wise/' + task + '/' + model_name + '_' + n_layer.lower() + '.png')
+        #plt.savefig('./plots/feat_reps/layer_wise/' + task + '/' + 'bert_stl_finetuned_squad' + '/' + model_name + '_' + n_layer.lower() + '.png')
     else:
         ax.set_title('Model fine-tuned on' + ' ' + dataset, fontsize=title_fontsize)
         plt.tight_layout()
@@ -476,6 +481,7 @@ def plot_feat_reps_per_layer(
 ):
     for layer, feat_reps in feat_reps_per_layer.items():
         # initiliase PCA
+        #pca = PCA(n_components=2, svd_solver='auto', random_state=rnd_state)
         pca = PCA(n_components=retained_variance, svd_solver='full', random_state=rnd_state)
         # project feat reps onto n principial components
         transformed_feats = pca.fit_transform(feat_reps)

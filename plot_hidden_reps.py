@@ -10,6 +10,7 @@ import os
 import random
 import re
 
+from hidden_reps_evaluation import evaluate_estimations
 from mpl_toolkits.mplot3d import Axes3D
 from plotting import *
 from sklearn.decomposition import PCA
@@ -26,6 +27,8 @@ if __name__ == '__main__':
             help='If "per_class", plot hidden reps per class; if "across_classes" plot hidden reps per domain class conditioned on sbj class; if "per_token" pick random sent and plot it in latent space.')
     parser.add_argument('--task', type=str, default='QA',
             help='If QA, plot hidden reps of QA model; if "sbj_class", plot hidden reps of sbj. classification model.')
+    parser.add_argument('--visualization', type=str, default='question_words',
+            help='Must be one of {"question_words", "context_domains", "question_types", "tokens".')
     args = parser.parse_args()
  
     # set folder and subdirectory
@@ -35,18 +38,25 @@ if __name__ == '__main__':
     if args.task == 'sbj_class':
         subsubdir = '/sbj_class_multi/'
         task = 'multi_sbj'
+
     elif args.task == 'QA':
         if args.hidden_reps == 'per_class':
-            subsubdir = '/qa_ds_agnostic/'  #'/qa_review_agnostic/'
+
+            if args.visualization == 'question_words':
+                subsubdir = '/qa_per_q_word/'
+            elif args.visualization == 'question_types':
+                subsubdir = '/qa_ds_agnostic/' 
+
         elif args.hidden_reps == 'across_classes':
             subsubdir = '/qa_sequential_transfer/'
         else:
             subsubdir = '/qa_per_token/'
-        task = subsubdir.lstrip('/').rstrip('/')
+
+        task = subsubdir.lstrip('/').rstrip('/').lower()
         
     # create PATH
     cwd = '.'
-    PATH = cwd + folder + subdir + subsubdir + '/bert_stl_finetuned_squad/'
+    PATH = cwd + folder + subdir + subsubdir + '/bert_stl_finetuned_subjqa/' if task == 'qa_per_token' else cwd + folder + subdir + subsubdir
     # we only want to capture .json files
     files = [file for file in os.listdir(PATH) if file.endswith('.json')]
     
@@ -105,6 +115,11 @@ if __name__ == '__main__':
             y_true = np.array(test_results['predictions']) #np.array(test_results['domain_labels'])
             sbj_labels =np.array(test_results['true_labels']) #np.array(test_results['sbj_labels'])
             classes = ['books', 'tripadvisor', 'grocery', 'electronics', 'movies', 'restaurants']
+
+        elif task == 'qa_per_q_word':
+            combined_ds = False
+            y_true = np.array(test_results['q_word_labels'])
+            classes = ['how', 'what', 'is', 'where', 'does', 'do']
         
         # convert hidden reps into NumPy matrices
         feat_reps_per_layer = {l: np.array(h) for l, h in test_results['feat_reps'].items()}
@@ -144,6 +159,10 @@ if __name__ == '__main__':
     ################################################################################################################
     
     elif args.hidden_reps == 'per_token':
+
+        print(evaluate_estimations(test_results, 'cosine'))
+
+        """
         # plot random sentence for both correct and incorrect (answer span) predictions 
         #predictions = ['correct_answerable', 'correct_unanswerable',  'wrong_answerable']
         predictions = ['correct_answerable', 'wrong_answerable', 'correct_answerable', 'wrong_answerable', 'correct_answerable', 'wrong_answerable']
@@ -167,13 +186,13 @@ if __name__ == '__main__':
             
             model_name = model_name_copy + '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred + '_' + str(k)
 
-            """
-            if k == 0:
-                model_name += '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred
-            else:
-                model_name = model_name_copy + '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred
-                break
-            """
+            
+            #if k == 0:
+            #    model_name += '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred
+            #else:
+            #    model_name = model_name_copy + '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred
+            #    break
+            
             
             print("================================================================")
             print("=========== Started plotting: {} prediction =============".format(pred))
@@ -195,3 +214,4 @@ if __name__ == '__main__':
             print("=========== Finished plotting: {} prediction =============".format(pred))
             print("================================================================")
             print()
+        """
