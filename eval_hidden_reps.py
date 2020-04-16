@@ -104,7 +104,7 @@ def estimate_preds_wrt_hiddens(
 ):  
     if dimensionality == 'low':
         #assert metric == 'euclid', 'Computing the cosine similarity between (word) vectors in low-dimensional (vector) space is not particularly useful. Thus, we must calculate the euclidean distance instead.'
-        pca = PCA(n_components=.95, svd_solver='full', random_state=rnd_state) # init PCA
+        pca = PCA(n_components=.95, svd_solver='full', random_state=rnd_state) # initialise PCA
 
     est_preds_top_layers = []
     for l, hiddens_all_sent_pairs in feat_reps.items():
