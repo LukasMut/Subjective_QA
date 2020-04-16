@@ -41,9 +41,9 @@ def get_hidden_reps(source:str='SubjQA'):
 
 def euclidean_dist(u:np.ndarray, v:np.ndarray): return np.linalg.norm(u-v) # default is L2 norm
 
-def cosine_sim(x:np.ndarray, y:np.ndarray):
-    num = x @ y
-    denom = np.linalg.norm(x) * np.linalg.norm(y) # default is Frobenius norm (i.e., L2 norm)
+def cosine_sim(u:np.ndarray, v:np.ndarray):
+    num = u @ v
+    denom = np.linalg.norm(u) * np.linalg.norm(v) # default is Frobenius norm (i.e., L2 norm)
     return num / denom
 
 def compute_ans_distances(
@@ -58,12 +58,12 @@ def compute_ans_distances(
             #AND it's redundant to compute cosine sim (or Euclid dist) twice for some pair of vectors (i.e., cos_sim(u, v) == cos_sim(v, u))
             if i != j and j > i:
                 if metric == 'cosine':
-                    a_mean_dist += cosine_sim(a_i, a_j)
+                    a_mean_dist += cosine_sim(u=a_i, v=a_j)
                 elif metric == 'euclid':
-                    a_mean_dist += euclidean_dist(a_i, a_j)
+                    a_mean_dist += euclidean_dist(u=a_i, v=a_j)
                 elif metric == 'mahalanobis':
                     assert isinstance(a_inv_cov, np.ndarray), 'To compute {} distance, inverse cov matrix must be provided'.format(metric.capitalize())
-                    a_mean_dist += mahalanobis(a_i, a_j, a_inv_cov)
+                    a_mean_dist += mahalanobis(u=a_i, v=a_j, VI=a_inv_cov)
                 count += 1
     a_mean_dist /= count
     return a_mean_dist
@@ -147,7 +147,7 @@ def estimate_preds_wrt_hiddens(
                 a_mean_rep = np.mean(a_hiddens, axis=0)
 
                 if metric == 'cosine':
-                    cos_sims_a_and_c = np.array([cosine_sim(c_hidden, a_mean_rep) for c_hidden in c_hiddens])
+                    cos_sims_a_and_c = np.array([cosine_sim(u=c_hidden, v=a_mean_rep) for c_hidden in c_hiddens])
                     c_most_sim_idx = np.argmax(cos_sims_a_and_c)
                     c_most_sim = c_hiddens[c_most_sim_idx]
                     a_mean_cos = compute_ans_distances(a_hiddens, metric)
@@ -156,7 +156,7 @@ def estimate_preds_wrt_hiddens(
                         est_preds_current_layer[k] += 1
 
                 elif metric == 'euclid':
-                    euclid_dists_a_and_c = np.array([euclidean_dist(c_hidden, a_mean_rep) for c_hidden in c_hiddens])
+                    euclid_dists_a_and_c = np.array([euclidean_dist(u=c_hidden, v=a_mean_rep) for c_hidden in c_hiddens])
                     c_closest_idx = np.argmin(euclid_dists_a_and_c)
                     c_closest = c_hiddens[c_closest_idx]
                     a_mean_dist = compute_ans_distances(a_hiddens, metric)
@@ -166,7 +166,7 @@ def estimate_preds_wrt_hiddens(
 
                 elif metric == 'mahalanobis':
                     a_inv_cov = np.linalg.inv(np.cov(a_hiddens.T))
-                    mahalanob_dists_a_and_c = np.array([mahalanobis(c_hidden, a_mean_rep, a_inv_cov) for c_hidden in c_hiddens])
+                    mahalanob_dists_a_and_c = np.array([mahalanobis(u=c_hidden, v=a_mean_rep, VI=a_inv_cov) for c_hidden in c_hiddens])
                     c_closest_idx = np.argmin(mahalanob_dists_a_and_c)
                     a_mean_dist = compute_ans_distances(a_hiddens, metric, a_inv_cov=a_inv_cov)
 
