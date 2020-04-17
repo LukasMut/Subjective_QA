@@ -93,15 +93,15 @@ def evaluate_estimations(
     for i, pred_ans in enumerate(pred_answers):
         pred_ans = pred_ans.strip()
         true_ans = true_answers[i].strip()
-        #NOTE: for now we exclusively want to make predictions for answer spans that contain more than 1 token
-        if len(true_ans.split()) > 1:
-            if compute_exact(true_ans, pred_ans):
-                true_preds.append(1)
-                #pred_indices.append(i)
-            else:
-                #pass
-                true_preds.append(0)
-            pred_indices.append(i)
+        #NOTE: for now we exclusively want to estimate model predictions w.r.t. answer spans that contain > 1 token
+        #if len(true_ans.split()) > 1:
+        if compute_exact(true_ans, pred_ans):
+            true_preds.append(1)
+            #pred_indices.append(i)
+        else:
+            #pass
+            true_preds.append(0)
+        pred_indices.append(i)
     
     assert len(true_preds) == len(pred_indices)
     true_preds = np.array(true_preds)
@@ -157,6 +157,7 @@ def estimate_preds_wrt_hiddens(
                     sent = sent_pairs[i].split()
                     sep_idx = sent.index('[SEP]')
                     hiddens = np.array(hiddens)
+                    q_hiddens = hiddens[1:sep_idx, :]
                     
                     if normalization or dim == 'low':
                         # calculate mean and std of hidden rep matrix w.r.t. answer and context feat reps only
@@ -178,17 +179,24 @@ def estimate_preds_wrt_hiddens(
                         a_indices = np.arange(true_start_pos[i], true_end_pos[i]+1)
                         c_hiddens = np.vstack((hiddens[sep_idx+1:a_indices[0], :], hiddens[a_indices[-1]+1:-1, :]))
 
+
                     a_hiddens = hiddens[a_indices, :]    
-                    a_mean_rep = np.mean(a_hiddens, axis=0)
+                    a_mean_rep = a_hiddens.mean(0)
 
                     if metric == 'cosine':
 
                         if a_hiddens.shape[0] == 1:
-                            c_mean_rep = np.mean(c_hiddens, axis=0)
-                            mean_cos_sim_c = np.mean([cosine_sim(u=c_mean_rep, v=c_hidden) for c_hidden in c_hiddens])
+                            if normalization:
+                                q_hiddens -= hiddens_mu
+                                q_hiddens /= hiddens_sigma
+
+                            q_mean_rep = q_hiddens.mean(0)
+                            c_mean_rep = c_hiddens.mean(0)
+
+                            cos_sim_a_q = cosine_sim(u=q_mean_rep, v=a_mean_rep)
                             cos_sim_a_c = cosine_sim(u=c_mean_rep, v=a_mean_rep)
 
-                            if mean_cos_sim_c > cos_sim_a_c:
+                            if cos_sim_a_q > cos_sim_a_c:
                                 est_preds_current_layer[k] += 1
                         else:
                             cos_sims_a_and_c = np.array([cosine_sim(u=a_mean_rep, v=c_hidden) for c_hidden in c_hiddens])
@@ -203,11 +211,17 @@ def estimate_preds_wrt_hiddens(
                     elif metric == 'euclid':
 
                         if a_hiddens.shape[0] == 1:
-                            c_mean_rep = np.mean(c_hiddens, axis=0)
-                            mean_dist_c = np.mean([euclidean_dist(u=c_mean_rep, v=c_hidden) for c_hidden in c_hiddens])
+                            if normalization:
+                                q_hiddens -= hiddens_mu
+                                q_hiddens /= hiddens_sigma
+
+                            q_mean_rep = q_hiddens.mean(0)
+                            c_mean_rep = c_hiddens.mean(0)
+
+                            dist_a_q = euclidean_dist(u=q_mean_rep, v=a_mean_rep)
                             dist_a_c = euclidean_dist(u=c_mean_rep, v=a_mean_rep)
 
-                            if mean_dist_c < dist_a_c:
+                            if dist_a_q < dist_a_c:
                                 est_preds_current_layer[k] += 1
 
                         else:
@@ -249,10 +263,10 @@ def estimate_preds_wrt_hiddens(
             est_preds_top_layers.append(est_preds_current_layer)
     est_preds_top_layers = np.stack(est_preds_top_layers, axis=1)
 
-    ####################################################################################################################################################
-    #### ALTERNATIVE 1: IF MODE ACROSS ESTIMATIONS W.R.T. TOP THREE LAYERS YIELDS CORRECT PRED WE ASSUME A CORRECT PRED BY THE MODEL ELSE INCORRECT ####
-    ######## ALTERNATIVE 2: IF ALL ESTIMATIONS W.R.T. TOP THREE LAYERS YIELD CORRECT PRED WE ASSUME A CORRECT PRED BY THE MODEL ELSE INCORRECT #########
-    ####################################################################################################################################################
+    #############################################################################################################################################
+    #### ALTERNATIVE 1: IF MODE ACROSS ESTIMATIONS W.R.T. TOP THREE LAYERS YIELDS CORRECT PRED WE ASSUME A CORRECT MODEL PRED ELSE INCORRECT ####
+    ######## ALTERNATIVE 2: IF ALL ESTIMATIONS W.R.T. TOP THREE LAYERS YIELD CORRECT PRED WE ASSUME A CORRECT MODEL PRED ELSE INCORRECT #########
+    #############################################################################################################################################
 
     #est_preds_top_layers = mode(est_preds_top_layers, axis=1).mode.reshape(-1)
     est_preds_top_layers = np.array([1 if len(np.unique(row)) == 1 and np.unique(row)[0] == 1 else 0 for row in est_preds_top_layers])

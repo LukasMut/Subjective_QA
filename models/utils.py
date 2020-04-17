@@ -479,7 +479,7 @@ def train(
                       # compute cosine similarities between each hidden rep in h_a and h_c_mean
                       cosine_sims_a_and_c = np.array([F.cosine_similarity(h_c_mean, h, dim=-1).item() for h in h_a])
                       
-                      # get index of most dissimilar answer token
+                      # get index of most dissimilar answer token (argmin due to similarity measure)
                       h_a_most_dissim_idx = np.argmin(cosine_sims_a_and_c)
                       h_a_most_dissim = h_a[h_a_most_dissim_idx]
                       
@@ -1883,7 +1883,7 @@ def test(
       test_results['sent_pairs'] = sent_pairs
       test_results['feat_reps'] = feat_reps
       # estimate model predictions w.r.t. hidden representations #
-      metrics = ['cosine', 'euclid', 'mahalanobis']
+      metrics = ['cosine', 'euclid'] #, 'mahalanobis']
       est_per_metric = {metric: {'norm' + '_'  + str(norm).lower(): evaluate_estimations(test_results, metric, 'high', norm) for norm in [True, False]} for metric in metrics}
       return test_loss, test_acc, test_f1, est_per_metric
 

@@ -1255,7 +1255,7 @@ if __name__ == '__main__':
                                                                        aux_sbj_batch=False,
                                                                        multi_qa_type_class=args.multi_qa_type_class,
                                                                         )                                                
-            tensor_dataset_test = subjqa_tensor_dataset_test
+                tensor_dataset_test = subjqa_tensor_dataset_test
 
             test_dl = BatchGenerator(
                                     dataset=tensor_dataset_test,
