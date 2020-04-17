@@ -186,7 +186,8 @@ class LinearQAHead(nn.Module):
 
             if output_last_hiddens:
                 bert_hidden_states = distilbert_output[1] # tuple of all hidden states (output of embeddings + output for each transformer layer)
-                bert_hidden_states = bert_hidden_states[-1] # extract hidden states from last transformer layer only
+                #bert_hidden_states = bert_hidden_states[-1] # extract hidden states from last transformer layer only
+                bert_hidden_states = bert_hidden_states[-3] # for now, extract hidden states from third-to-the-last layer to compute cosine loss
                 return outputs, bert_hidden_states
 
             if output_all_hiddens_cls:
@@ -511,8 +512,7 @@ class RecurrentQAHead(nn.Module):
 
             if output_last_hiddens:
                 bert_hidden_states = distilbert_output[1] # tuple of all hidden states (output of embeddings + output for each transformer layer)
-                #bert_hidden_states = bert_hidden_states[-1] # extract hidden states from last transformer layer only
-                bert_hidden_states = bert_hidden_states[-3] # for now, extract hidden states from third-to-the-last layer to compute cosine loss
+                bert_hidden_states = bert_hidden_states[-1] # extract hidden states from last transformer layer only
                 return outputs, bert_hidden_states
 
             if output_all_hiddens_cls:
