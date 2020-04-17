@@ -9,6 +9,7 @@ import numpy as np
 from collections import defaultdict, Counter
 from eval_squad import compute_exact
 from scipy.spatial.distance import mahalanobis
+from scipy.stats import mode 
 from sklearn.decomposition import PCA
 
 
@@ -49,7 +50,8 @@ def cosine_sim(u:np.ndarray, v:np.ndarray):
 def compute_ans_distances(
                           a_hiddens:np.ndarray,
                           metric:str,
-                          inv_cov=None):
+                          inv_cov=None,
+):
     a_mean_dist = 0
     count = 0
     for i, a_i in enumerate(a_hiddens):
@@ -72,6 +74,7 @@ def evaluate_estimations(
                          test_results:dict,
                          metric:str,
                          dim:str,
+                         normalization:bool=False,
 ):
     pred_answers = test_results['predicted_answers']
     true_answers = test_results['true_answers']
@@ -84,24 +87,21 @@ def evaluate_estimations(
     for i, pred_ans in enumerate(pred_answers):
         pred_ans = pred_ans.strip()
         true_ans = true_answers[i].strip()
-        #NOTE: we exclusively want to make predictions for answer spans that contain more than 1 token
+        #NOTE: for now we exclusively want to make predictions for answer spans that contain more than 1 token
         if len(true_ans.split()) > 1:
             if compute_exact(true_ans, pred_ans):
                 true_preds.append(1)
-                pred_indices.append(i)
+                #pred_indices.append(i)
             else:
-                pass
-                #true_preds.append(0)
-            #pred_indices.append(i)
+                #pass
+                true_preds.append(0)
+            pred_indices.append(i)
     
     assert len(true_preds) == len(pred_indices)
     true_preds = np.array(true_preds)
-    print()
-    print(len(true_preds))
-    print(Counter(true_preds))
-    print()
+
     # estimate model predictions w.r.t. hidden reps
-    est_preds_all_layers = estimate_preds_wrt_hiddens(
+    est_preds_top_layers = estimate_preds_wrt_hiddens(
                                                       feat_reps=feat_reps,
                                                       true_start_pos=true_start_pos,
                                                       true_end_pos=true_end_pos,
@@ -109,8 +109,13 @@ def evaluate_estimations(
                                                       pred_indices=pred_indices,
                                                       metric=metric,
                                                       dim=dim,
+                                                      normalization=normalization,
                                                       )
-    est_accs = {'Layer' + '_' + str(l + 1): (est_preds == true_preds).mean() * 100 for l, est_preds in enumerate(est_preds_all_layers)}
+    est_accs = {}
+    est_accs['correct_preds'] = (true_preds[true_preds == 1] == est_preds_top_layers[true_preds == 1]).mean() * 100
+    est_accs['incorrect_preds'] = (true_preds[true_preds == 0] == est_preds_top_layers[true_preds == 0]).mean() * 100
+    est_accs['total_preds'] = (true_preds == est_preds_top_layers).mean() * 100
+    #est_accs = {'Layer' + '_' + str(l + 1): (est_preds == true_preds).mean() * 100 for l, est_preds in enumerate(est_preds_top_layers)}
     return est_accs
 
 def estimate_preds_wrt_hiddens(
@@ -122,84 +127,98 @@ def estimate_preds_wrt_hiddens(
                                metric:str,
                                dim:str,
                                rnd_state:int=42,
+                               normalization:bool=False,
 ):  
     if dim == 'low':
-        assert metric == 'euclid', 'Computing the cosine similarity between (word) vectors in low-dimensional (vector) space is not particularly useful. Thus, we must calculate the euclidean distance instead.'
+        #assert metric == 'euclid', 'Computing the cosine similarity between (word) vectors in low-dimensional (vector) space is not particularly useful. Thus, we must calculate the euclidean distance instead.'
         pca = PCA(n_components=.99, svd_solver='auto', random_state=rnd_state) # initialise PCA
 
     est_preds_top_layers = []
     for l, hiddens_all_sent_pairs in feat_reps.items():
-        #if int(l.lstrip('Layer_')) > 3:
-        N = len(pred_indices)
-        est_preds_current_layer = np.zeros(N)
-        k = 0 # k = idx w.r.t. ans spans for which we want to estimate preds based on hidden reps
-
-        for i, hiddens in enumerate(hiddens_all_sent_pairs):
-            if i in pred_indices:
-                hiddens = np.array(hiddens)
-                # transform feat reps into low-dim space with PCA (only useful for computing Euclidean distances)
-                if dim == 'low':
-                    hiddens = pca.fit_transform(hiddens)
-
-                sent = sent_pairs[i].split()
-                sep_idx = sent.index('[SEP]')
-                a_indices = np.arange(true_start_pos[i], true_end_pos[i]+1)
-                a_hiddens = hiddens[a_indices, :]
-                c_hiddens = np.vstack((hiddens[sep_idx+1:a_indices[0], :], hiddens[a_indices[-1]+1:-1, :]))
-                a_mean_rep = np.mean(a_hiddens, axis=0)
-
-                if metric == 'cosine':
-                    cos_sims_a_and_c = np.array([cosine_sim(u=a_mean_rep, v=c_hidden) for c_hidden in c_hiddens])
-                    c_most_sim_idx = np.argmax(cos_sims_a_and_c) # similarity measure ==> argmax
-                    c_most_sim = c_hiddens[c_most_sim_idx]
-                    c_most_sim_mean_cos = np.mean([cosine_sim(u=c_most_sim, v=a_hidden) for a_hidden in a_hiddens])
-                    a_mean_cos = compute_ans_distances(a_hiddens, metric)
-
-                    if a_mean_cos > c_most_sim_mean_cos: #np.max(cos_sims_a_and_c):
-                        est_preds_current_layer[k] += 1
-
-                elif metric == 'euclid':
-                    euclid_dists_a_and_c = np.array([euclidean_dist(u=a_mean_rep, v=c_hidden) for c_hidden in c_hiddens])
-                    c_closest_idx = np.argmin(euclid_dists_a_and_c) # dissimilarity measure ==> argmin
-                    c_closest = c_hiddens[c_closest_idx]
-                    c_closest_mean_dist = np.mean([euclidean_dist(u=c_closest, v=a_hidden) for a_hidden in a_hiddens])
-                    a_mean_dist = compute_ans_distances(a_hiddens, metric)
-
-                    if a_mean_dist < c_closest_mean_dist: #np.min(euclid_dists_a_and_c):
-                        est_preds_current_layer[k] += 1
-
-                elif metric == 'mahalanobis':
-                    # calculate mean and std of hidden rep matrix without [CLS], [SEP], and question (only answer and context feat reps needed)
-                    hiddens = hiddens[sep_idx+1:-1, :]
-                    hiddens_mu = hiddens.mean(0)
-                    hiddens_sigma = hiddens.std(0)
+        layer_no = int(l.lstrip('Layer' + '_'))
+        # estimate model predictions based on context and answer clusters w.r.t. hidden reps in top 3 layers
+        if layer_no >= 4:
+            N = len(pred_indices)
+            est_preds_current_layer = np.zeros(N)
+            k = 0 # k = idx w.r.t. ans spans for which we want to estimate preds based on hidden reps
+            for i, hiddens in enumerate(hiddens_all_sent_pairs):
+                if i in pred_indices:
+                    sent = sent_pairs[i].split()
+                    sep_idx = sent.index('[SEP]')
+                    hiddens = np.array(hiddens)
                     
-                    #NOTE: standardize features (i.e., yield zero mean AND unit variance) to avoid singular covariance matrix (singular mat is not invertible)
-                    a_hiddens -= hiddens_mu # mean-centering
-                    a_hiddens /= hiddens_sigma # normalization
+                    if normalization or dim == 'low':
+                        # calculate mean and std of hidden rep matrix w.r.t. answer and context feat reps only
+                        hiddens = hiddens[sep_idx+1:-1, :]
+                        hiddens_mu = hiddens.mean(0)
+                        hiddens_sigma = hiddens.std(0)
+                        hiddens -= hiddens_mu # center features
+                        hiddens /= hiddens_sigma # normalize features
 
-                    c_hiddens -= hiddens_mu # mean-centering
-                    c_hiddens /= hiddens_sigma # normalization
+                        # transform feat reps into low-dim space with PCA (only useful for computing Euclidean distances; not necessary for cosine or Mahalanobis)
+                        hiddens = pca.fit_transform(hiddens) if dim == 'low' else hiddens
 
-                    hiddens -= hiddens_mu # mean-centering
-                    hiddens /= hiddens_sigma # normalization
+                        a_start = true_start_pos[i] - (sep_idx + 1)
+                        a_end = true_end_pos[i] - (sep_idx + 1)
+                        a_indices = np.arange(a_start, a_end + 1)
+                        c_hiddens = np.vstack((hiddens[:a_indices[0], :], hiddens[a_indices[-1]+1:, :]))
+                    
+                    else:
+                        a_indices = np.arange(true_start_pos[i], true_end_pos[i]+1)
+                        c_hiddens = np.vstack((hiddens[sep_idx+1:a_indices[0], :], hiddens[a_indices[-1]+1:-1, :]))
 
-                    try:
-                        inv_cov = np.linalg.inv(np.cov(hiddens.T)) #a_hiddens.T
-                    except:
-                        inv_cov = np.cov(hiddens.T) #a_hiddens.T
+                    a_hiddens = hiddens[a_indices, :]    
+                    a_mean_rep = np.mean(a_hiddens, axis=0)
 
-                    mahalanob_dists_a_and_c = np.array([mahalanobis(u=a_mean_rep, v=c_hidden, VI=inv_cov) for c_hidden in c_hiddens])
-                    c_closest_idx = np.argmin(mahalanob_dists_a_and_c) # dissimilarity measure ==> argmin
-                    c_closest = c_hiddens[c_closest_idx]
-                    c_closest_mean_dist = np.mean([mahalanobis(u=c_closest, v=a_hidden, VI=inv_cov) for a_hidden in a_hiddens])
-                    a_mean_dist = compute_ans_distances(a_hiddens, metric, inv_cov=inv_cov)
+                    if metric == 'cosine':
+                        cos_sims_a_and_c = np.array([cosine_sim(u=a_mean_rep, v=c_hidden) for c_hidden in c_hiddens])
+                        c_most_sim_idx = np.argmax(cos_sims_a_and_c) # similarity measure ==> argmax
+                        c_most_sim = c_hiddens[c_most_sim_idx]
+                        c_most_sim_mean_cos = np.mean([cosine_sim(u=c_most_sim, v=a_hidden) for a_hidden in a_hiddens])
+                        a_mean_cos = compute_ans_distances(a_hiddens, metric)
 
-                    if a_mean_dist < c_closest_mean_dist: #np.min(mahalanob_dists_a_and_c)
-                        est_preds_current_layer[k] += 1
-                k += 1
+                        if a_mean_cos > c_most_sim_mean_cos: #np.max(cos_sims_a_and_c):
+                            est_preds_current_layer[k] += 1
 
-        est_preds_top_layers.append(est_preds_current_layer)
+                    elif metric == 'euclid':
+                        euclid_dists_a_and_c = np.array([euclidean_dist(u=a_mean_rep, v=c_hidden) for c_hidden in c_hiddens])
+                        c_closest_idx = np.argmin(euclid_dists_a_and_c) # dissimilarity measure ==> argmin
+                        c_closest = c_hiddens[c_closest_idx]
+                        c_closest_mean_dist = np.mean([euclidean_dist(u=c_closest, v=a_hidden) for a_hidden in a_hiddens])
+                        a_mean_dist = compute_ans_distances(a_hiddens, metric)
+
+                        if a_mean_dist < c_closest_mean_dist: #np.min(euclid_dists_a_and_c):
+                            est_preds_current_layer[k] += 1
+
+                    elif metric == 'mahalanobis':
+                        if not normalization:
+                            hiddens = hiddens[sep_idx+1:-1, :]
+
+                        # compute (inv) cov mat w.r.t. both answer and context hidden reps
+                        try:
+                            inv_cov = np.linalg.inv(np.cov(hiddens.T))
+                        except:
+                            inv_cov = np.cov(hiddens.T)
+                        # compute (inv) cov mat w.r.t. answer hidden reps
+                        try:
+                            a_inv_cov = np.linalg.inv(np.cov(a_hiddens.T))
+                        except:
+                            a_inv_cov = np.cov(a_hiddens.T)
+
+                        mahalanob_dists_a_and_c = np.array([mahalanobis(u=a_mean_rep, v=c_hidden, VI=inv_cov) for c_hidden in c_hiddens])
+                        c_closest_idx = np.argmin(mahalanob_dists_a_and_c) # dissimilarity measure ==> argmin
+                        c_closest = c_hiddens[c_closest_idx]
+
+                        #TODO: figure out, whether we have to pass (inv) cov mat w.r.t. answer hidden reps or w.r.t. both answer and context hidden reps (...not sure about that)
+                        c_closest_mean_dist = np.mean([mahalanobis(u=c_closest, v=a_hidden, VI=inv_cov) for a_hidden in a_hiddens])
+                        a_mean_dist = compute_ans_distances(a_hiddens, metric, inv_cov=a_inv_cov)
+
+                        if a_mean_dist < c_closest_mean_dist: #np.min(mahalanob_dists_a_and_c)
+                            est_preds_current_layer[k] += 1
+                    k += 1
+            est_preds_top_layers.append(est_preds_current_layer)
+    est_preds_top_layers = np.stack(est_preds_top_layers, axis=1)
+    est_preds_top_layers = mode(est_preds_top_layers, axis=1).mode.reshape(-1)
     return est_preds_top_layers
 
 
@@ -215,7 +234,8 @@ if __name__ == "__main__":
     # get feat reps
     test_results, model_name = get_hidden_reps(source=source)
     # estimate model predictions w.r.t. hidden reps in latent space (per transformer layer)
-    est_per_metric = {metric: {dim: evaluate_estimations(test_results, metric, dim) for dim in dims} for metric in metrics}
+    est_per_metric = {metric: {'norm' + '_'  + str(norm).lower(): evaluate_estimations(test_results, metric, 'high', norm) for norm in [True, False]} for metric in metrics}
+    #est_per_metric = {metric: {dim: evaluate_estimations(test_results, metric, dim) for dim in dims} for metric in metrics}
     print()
     print(est_per_metric)
     print()

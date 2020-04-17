@@ -453,8 +453,16 @@ def train(
                     h_a = hidden[b_start_pos[i]:b_end_pos[i]+1, :]
                     # extract hidden reps for context tokens (without ans span token reps) 
                     h_c = torch.cat((hidden[sep_idx:b_start_pos[i], :], hidden[b_end_pos[i]+1:-1, :]), dim=0)
+                    # compute average hidden rep across answer hidden reps
+                    h_a_mean = h_a.mean(0)
                     # compute average hidden rep across context hidden reps
-                    h_c_mean = torch.rand(hidden.size(1)).type_as(hidden) #torch.zeros(hidden.size(1)).type_as(hidden) #h_c.mean(0)
+                    h_c_mean = h_c.mean(0)
+
+                    # we want h_a_mean to be as dissimilar as possible from each hidden state in h_c (hence, y = -1)
+                    y = torch.ones(h_c.size(0)).neg()
+                    y = y.type_as(h_c)
+                    h_a_mean_batch = torch.stack([h_a_mean for _ in range(h_c.size(0))])
+                    cosine_loss += cosine_loss_func(h_a_mean_batch, h_c)
 
                     if h_a.size(0) == 1:
                       # we want h_a to be as dissimilar as possible from h_c_mean (hence, y = -1)
@@ -465,11 +473,13 @@ def train(
                       count += 1
 
                     else:
+                      """
+                      ### NOTE: the computations below might not even be necessary ####
                       # compute cosine similarities between each hidden rep in h_a and h_c_mean
-                      cosine_sims = np.array([F.cosine_similarity(h_c_mean, h, dim=-1).item() for h in h_a])
+                      cosine_sims_a_and_c = np.array([F.cosine_similarity(h_c_mean, h, dim=-1).item() for h in h_a])
                       
                       # get index of most dissimilar answer token
-                      h_a_most_dissim_idx = np.argmin(cosine_sims)
+                      h_a_most_dissim_idx = np.argmin(cosine_sims_a_and_c)
                       h_a_most_dissim = h_a[h_a_most_dissim_idx]
                       
                       # get hidden reps of all ans token hidden reps but the one that is most dissimilar to h_c_mean
@@ -489,14 +499,23 @@ def train(
                       # compute cosine embedding loss to optimize similarity of hidden reps within h_a
                       cosine_loss += cosine_loss_func(h_a_most_dissim, h_a_rest, y)
                       count += 1 
+                      """
+
+                      # we want hidden reps in h_a to be as similar as possible to the mean hidden rep of the answer (hence, y = 1)
+                      y = torch.ones(h_a.size(0))
+                      y = y.type_as(h_a)
+                      h_a_mean_batch = torch.stack([h_a_mean for _ in range(h_a.size(0))])
+
+                      # compute cosine embedding loss to optimize similarity of hidden reps within h_a
+                      cosine_loss += cosine_loss_func(h_a_mean_batch, h_a, y)
+                      count += 1 
 
                       # we want hidden reps in h_a to be as dissimilar as possible from h_c_mean (hence, y = -1)
-                      y = torch.ones(1).neg()
-                      y = y.type_as(h_c_mean)
-                      for h in h_a:
-                        # compute cosine embedding loss to optimize dissimilarity between every h in h_a and h_c_mean
-                        cosine_loss += cosine_loss_func(h_c_mean.unsqueeze(0), h.unsqueeze(0), y)
-                        count += 1
+                      y = y.neg()
+                      h_c_mean_batch = torch.stack([h_c_mean for _ in range(h_a.size(0))])
+                      # compute cosine embedding loss to optimize dissimilarity between every h in h_a and h_c_mean
+                      cosine_loss += cosine_loss_func(h_c_mean_batch, h_a, y)
+                      count += 1
 
                 cosine_loss /= count  
 
