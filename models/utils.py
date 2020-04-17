@@ -34,6 +34,7 @@ from transformers import get_linear_schedule_with_warmup
 from transformers import BertTokenizer, BertModel, BertForQuestionAnswering
 
 from eval_squad import compute_exact, compute_f1
+from eval_hidden_reps import *
 
 # set random seeds to reproduce results
 np.random.seed(42)
@@ -463,6 +464,7 @@ def train(
                     y = y.type_as(h_c)
                     h_a_mean_batch = torch.stack([h_a_mean for _ in range(h_c.size(0))])
                     cosine_loss += cosine_loss_func(h_a_mean_batch, h_c, y)
+                    count += 1
 
                     if h_a.size(0) == 1:
                       # we want h_a to be as dissimilar as possible from h_c_mean (hence, y = -1)
@@ -473,7 +475,6 @@ def train(
                       count += 1
 
                     else:
-                      """
                       ### NOTE: the computations below might not even be necessary ####
                       # compute cosine similarities between each hidden rep in h_a and h_c_mean
                       cosine_sims_a_and_c = np.array([F.cosine_similarity(h_c_mean, h, dim=-1).item() for h in h_a])
@@ -499,8 +500,8 @@ def train(
                       # compute cosine embedding loss to optimize similarity of hidden reps within h_a
                       cosine_loss += cosine_loss_func(h_a_most_dissim, h_a_rest, y)
                       count += 1 
-                      """
 
+                      """
                       # we want hidden reps in h_a to be as similar as possible to the mean hidden rep of the answer (hence, y = 1)
                       y = torch.ones(h_a.size(0))
                       y = y.type_as(h_a)
@@ -509,6 +510,7 @@ def train(
                       # compute cosine embedding loss to optimize similarity of hidden reps within h_a
                       cosine_loss += cosine_loss_func(h_a_mean_batch, h_a, y)
                       count += 1 
+                      """
 
                       # we want hidden reps in h_a to be as dissimilar as possible from h_c_mean (hence, y = -1)
                       y = y.neg()
@@ -1250,6 +1252,7 @@ def test(
         output_all_hiddens_cls:bool=False,
         output_all_hiddens:bool=False,
         output_all_hiddens_cls_q_words:bool=False,
+        estimate_preds_wrt_hiddens:bool=False,
 ):
     n_steps = len(test_dl)
     n_examples = n_steps * batch_size
@@ -1824,10 +1827,10 @@ def test(
 
             #NOTE: uncomment code block below, if you want to store correct and incorrect (answer span) predictions w.r.t. both answerable and unanswerable questions
             
-            if task == 'QA' and output_all_hiddens:
+            #if task == 'QA' and output_all_hiddens:
               # it seems as if we cannot load all hidden representations into memory (lets load (n_steps // 2) * batch_size * n_layers * tensors of shape [seq_len, hidden_size] for now)
-              if n == n_steps // 2:
-                break
+            #if n == n_steps // 2:
+                #break
             
             
     test_loss /= nb_test_steps
@@ -1869,6 +1872,19 @@ def test(
     elif task == 'QA' and detailed_results_q_words:
       results_per_q_word = compute_acc_per_q_word(results_per_q_word)
       return test_loss, test_acc, test_f1, results_per_q_word
+
+    elif task == 'QA' and estimate_preds_wrt_hiddens:
+      test_results = {}
+      test_results['predicted_answers'] = predicted_answers
+      test_results['true_answers'] = true_answers
+      test_results['true_start_pos'] = np.array(true_start_pos).flatten().tolist()
+      test_results['true_end_pos'] = np.array(true_end_pos).flatten().tolist()
+      test_results['sent_pairs'] = sent_pairs
+      test_results['feat_reps'] = feat_reps
+      # estimate model predictions w.r.t. hidden representations #
+      metrics = ['cosine', 'euclid', 'mahalanobis']
+      est_per_metric = {metric: {'norm' + '_'  + str(norm).lower(): evaluate_estimations(test_results, metric, 'high', norm) for norm in [True, False]} for metric in metrics}
+      return test_loss, test_acc, test_f1, est_per_metric
 
     elif task == 'QA' and output_all_hiddens:
       #nested lists of string batches must be flattened via list comprehensions (not possible with np.array().flatten())

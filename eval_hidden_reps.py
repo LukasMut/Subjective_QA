@@ -1,3 +1,5 @@
+__all__ = ['evaluate_estimations']
+
 import argparse
 import json
 import os
@@ -91,7 +93,7 @@ def evaluate_estimations(
         pred_ans = pred_ans.strip()
         true_ans = true_answers[i].strip()
         #NOTE: for now we exclusively want to make predictions for answer spans that contain more than 1 token
-        if len(true_ans.split()) > 1:
+        if len(true_ans.split()) == 1:
             if compute_exact(true_ans, pred_ans):
                 true_preds.append(1)
                 #pred_indices.append(i)
@@ -102,6 +104,11 @@ def evaluate_estimations(
     
     assert len(true_preds) == len(pred_indices)
     true_preds = np.array(true_preds)
+
+    print()
+    print(len(true_preds))
+    print(Counter(true_preds))
+    print()
 
     # estimate model predictions w.r.t. hidden reps
     est_preds_top_layers = estimate_preds_wrt_hiddens(
@@ -174,21 +181,40 @@ def estimate_preds_wrt_hiddens(
                     a_mean_rep = np.mean(a_hiddens, axis=0)
 
                     if metric == 'cosine':
-                        cos_sims_a_and_c = np.array([cosine_sim(u=a_mean_rep, v=c_hidden) for c_hidden in c_hiddens])
-                        c_most_sim_idx = np.argmax(cos_sims_a_and_c) # similarity measure ==> argmax
-                        c_most_sim = c_hiddens[c_most_sim_idx]
-                        c_most_sim_mean_cos = np.mean([cosine_sim(u=c_most_sim, v=a_hidden) for a_hidden in a_hiddens])
-                        a_mean_cos = compute_ans_distances(a_hiddens, metric)
 
-                        if a_mean_cos > c_most_sim_mean_cos: #np.max(cos_sims_a_and_c):
-                            est_preds_current_layer[k] += 1
+                        if a_hiddens.shape[0] == 1:
+                            c_mean_rep = np.mean(c_hiddens, axis=0)
+                            mean_cos_sim_c = np.mean([cosine_sim(u=c_mean_rep, v=c_hidden) for c_hidden in c_hiddens])
+                            cos_sim_a_c = cosine_sim(u=c_mean_rep, v=a_mean_rep)
+
+                            if mean_cos_sim_c > cos_sim_a_c:
+                                est_preds_current_layer[k] += 1
+                        else:
+                            cos_sims_a_and_c = np.array([cosine_sim(u=a_mean_rep, v=c_hidden) for c_hidden in c_hiddens])
+                            c_most_sim_idx = np.argmax(cos_sims_a_and_c) # similarity measure ==> argmax
+                            c_most_sim = c_hiddens[c_most_sim_idx]
+                            c_most_sim_mean_cos = np.mean([cosine_sim(u=c_most_sim, v=a_hidden) for a_hidden in a_hiddens])
+                            a_mean_cos = compute_ans_distances(a_hiddens, metric)
+
+                            if a_mean_cos > c_most_sim_mean_cos: #np.max(cos_sims_a_and_c):
+                                est_preds_current_layer[k] += 1
 
                     elif metric == 'euclid':
-                        euclid_dists_a_and_c = np.array([euclidean_dist(u=a_mean_rep, v=c_hidden) for c_hidden in c_hiddens])
-                        c_closest_idx = np.argmin(euclid_dists_a_and_c) # dissimilarity measure ==> argmin
-                        c_closest = c_hiddens[c_closest_idx]
-                        c_closest_mean_dist = np.mean([euclidean_dist(u=c_closest, v=a_hidden) for a_hidden in a_hiddens])
-                        a_mean_dist = compute_ans_distances(a_hiddens, metric)
+
+                        if a_hiddens.shape[0] == 1:
+                            c_mean_rep = np.mean(c_hiddens, axis=0)
+                            mean_dist_c = np.mean([euclidean_dist(u=c_mean_rep, v=c_hidden) for c_hidden in c_hiddens])
+                            dist_a_c = euclidean_dist(u=c_mean_rep, v=a_mean_rep)
+
+                            if mean_dist_c < dist_a_c:
+                                est_preds_current_layer[k] += 1
+
+                        else:
+                            euclid_dists_a_and_c = np.array([euclidean_dist(u=a_mean_rep, v=c_hidden) for c_hidden in c_hiddens])
+                            c_closest_idx = np.argmin(euclid_dists_a_and_c) # dissimilarity measure ==> argmin
+                            c_closest = c_hiddens[c_closest_idx]
+                            c_closest_mean_dist = np.mean([euclidean_dist(u=c_closest, v=a_hidden) for a_hidden in a_hiddens])
+                            a_mean_dist = compute_ans_distances(a_hiddens, metric)
 
                         if a_mean_dist < c_closest_mean_dist: #np.min(euclid_dists_a_and_c):
                             est_preds_current_layer[k] += 1
@@ -221,9 +247,11 @@ def estimate_preds_wrt_hiddens(
                     k += 1
             est_preds_top_layers.append(est_preds_current_layer)
     est_preds_top_layers = np.stack(est_preds_top_layers, axis=1)
+    ###################################################################################################################################################
     ### ALTERNATIVE 1: IF MODE ACROSS ESTIMATIONS W.R.T. TOP THREE LAYERS YIELDS CORRECT PRED WE ASSUME A CORRECT PRED BY THE MODEL ELSE INCORRECT ####
     #est_preds_top_layers = mode(est_preds_top_layers, axis=1).mode.reshape(-1)
     ### ALTERNATIVE 2: IF ALL ESTIMATIONS W.R.T. TOP THREE LAYERS YIELD CORRECT PRED WE ASSUME A CORRECT PRED BY THE MODEL ELSE INCORRECT ###
+    ###################################################################################################################################################
     est_preds_top_layers = np.array([1 if len(np.unique(row)) == 1 and np.unique(row)[0] == 1 else 0 for row in est_preds_top_layers])
     return est_preds_top_layers
 

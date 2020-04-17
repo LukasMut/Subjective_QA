@@ -91,7 +91,9 @@ if __name__ == '__main__':
         help='If provided, hidden states for each layer at every timestep will be stored for each input sequence in the test set. Inference must be performed on QA.')
     parser.add_argument('--compute_cosine_loss', action='store_true',
             help='If provided, compute cosine embedding loss to assess cosine similarity among hidden representations w.r.t. correct answer span at last transfomer layer.')
-
+    parser.add_argument('--estimate_preds_wrt_hiddens', action='store_true',
+            help='If provided, estimate model predictions (whether model will make a correct or an erroneous pred) w.r.t. hidden representations of both answer and context (in latent space) at inference time.')
+    
     args = parser.parse_args()
     
     # check whether arg.parser works correctly
@@ -1353,6 +1355,21 @@ if __name__ == '__main__':
                                                                             inference_strategy = args.sequential_transfer_evaluation,
                                                                             output_all_hiddens_cls_q_words = args.output_all_hiddens_cls_q_words,
                                                                             )
+            elif task == 'QA' and args.estimate_preds_wrt_hiddens:
+                test_loss, test_acc, test_f1, est_preds_per_metric = test(
+                                                                         model = model,
+                                                                         tokenizer = bert_tokenizer,
+                                                                         test_dl = test_dl,
+                                                                         batch_size = batch_size,
+                                                                         not_finetuned = args.not_finetuned,
+                                                                         task = 'QA' if task == 'all' else task,
+                                                                         n_domains = n_domain_labels,
+                                                                         input_sequence = 'question_answer' if args.batches == 'alternating' else 'question_context',
+                                                                         sequential_transfer = args.sequential_transfer,
+                                                                         inference_strategy = args.sequential_transfer_evaluation,
+                                                                         output_all_hiddens = True,
+                                                                         estimate_preds_wrt_hiddens = args.estimate_preds_wrt_hiddens,
+                                                                         )
 
 
             elif (task == 'QA' or args.sequential_transfer) and (args.output_last_hiddens_cls or args.output_all_hiddens_cls):
@@ -1427,6 +1444,9 @@ if __name__ == '__main__':
 
             elif task == 'QA' and args.detailed_results_q_words:
                 test_results['test_results_q_word'] = results_per_q_word
+
+            elif task == 'QA' and args.estimate_preds_wrt_hiddens:
+                test_results['est_preds_per_metric'] = est_preds_per_metric
 
             elif task == 'QA' and (args.output_last_hiddens_cls or args.output_all_hiddens_cls):
                 test_results['domain_labels'] = domain_labels
