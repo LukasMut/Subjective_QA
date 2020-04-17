@@ -84,6 +84,9 @@ def evaluate_estimations(
     feat_reps = test_results['feat_reps']
     true_preds, pred_indices = [], []
     
+    print()
+    print("Total number of predictions: {}".format(len(pred_answers)))
+    print()
     for i, pred_ans in enumerate(pred_answers):
         pred_ans = pred_ans.strip()
         true_ans = true_answers[i].strip()
@@ -218,7 +221,10 @@ def estimate_preds_wrt_hiddens(
                     k += 1
             est_preds_top_layers.append(est_preds_current_layer)
     est_preds_top_layers = np.stack(est_preds_top_layers, axis=1)
-    est_preds_top_layers = mode(est_preds_top_layers, axis=1).mode.reshape(-1)
+    ### ALTERNATIVE 1: IF MODE ACROSS ESTIMATIONS W.R.T. TOP THREE LAYERS YIELDS CORRECT PRED WE ASSUME A CORRECT PRED BY THE MODEL ELSE INCORRECT ####
+    #est_preds_top_layers = mode(est_preds_top_layers, axis=1).mode.reshape(-1)
+    ### ALTERNATIVE 2: IF ALL ESTIMATIONS W.R.T. TOP THREE LAYERS YIELD CORRECT PRED WE ASSUME A CORRECT PRED BY THE MODEL ELSE INCORRECT ###
+    est_preds_top_layers = np.array([1 if len(np.unique(row)) == 1 and np.unique(row)[0] == 1 else 0 for row in est_preds_top_layers])
     return est_preds_top_layers
 
 

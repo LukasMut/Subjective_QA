@@ -462,7 +462,7 @@ def train(
                     y = torch.ones(h_c.size(0)).neg()
                     y = y.type_as(h_c)
                     h_a_mean_batch = torch.stack([h_a_mean for _ in range(h_c.size(0))])
-                    cosine_loss += cosine_loss_func(h_a_mean_batch, h_c)
+                    cosine_loss += cosine_loss_func(h_a_mean_batch, h_c, y)
 
                     if h_a.size(0) == 1:
                       # we want h_a to be as dissimilar as possible from h_c_mean (hence, y = -1)
