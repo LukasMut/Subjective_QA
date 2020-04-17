@@ -86,14 +86,15 @@ def evaluate_estimations(
     feat_reps = test_results['feat_reps']
     true_preds, pred_indices = [], []
     
-    print()
-    print("Total number of predictions: {}".format(len(pred_answers)))
+    print("=============================================")
+    print("===== Total number of predictions: {} =====".format(len(pred_answers)))
+    print("=============================================")
     print()
     for i, pred_ans in enumerate(pred_answers):
         pred_ans = pred_ans.strip()
         true_ans = true_answers[i].strip()
         #NOTE: for now we exclusively want to make predictions for answer spans that contain more than 1 token
-        if len(true_ans.split()) == 1:
+        if len(true_ans.split()) > 1:
             if compute_exact(true_ans, pred_ans):
                 true_preds.append(1)
                 #pred_indices.append(i)
@@ -216,8 +217,8 @@ def estimate_preds_wrt_hiddens(
                             c_closest_mean_dist = np.mean([euclidean_dist(u=c_closest, v=a_hidden) for a_hidden in a_hiddens])
                             a_mean_dist = compute_ans_distances(a_hiddens, metric)
 
-                        if a_mean_dist < c_closest_mean_dist: #np.min(euclid_dists_a_and_c):
-                            est_preds_current_layer[k] += 1
+                            if a_mean_dist < c_closest_mean_dist: #np.min(euclid_dists_a_and_c):
+                                est_preds_current_layer[k] += 1
 
                     elif metric == 'mahalanobis':
                         if not normalization:
@@ -247,11 +248,13 @@ def estimate_preds_wrt_hiddens(
                     k += 1
             est_preds_top_layers.append(est_preds_current_layer)
     est_preds_top_layers = np.stack(est_preds_top_layers, axis=1)
-    ###################################################################################################################################################
-    ### ALTERNATIVE 1: IF MODE ACROSS ESTIMATIONS W.R.T. TOP THREE LAYERS YIELDS CORRECT PRED WE ASSUME A CORRECT PRED BY THE MODEL ELSE INCORRECT ####
+
+    ####################################################################################################################################################
+    #### ALTERNATIVE 1: IF MODE ACROSS ESTIMATIONS W.R.T. TOP THREE LAYERS YIELDS CORRECT PRED WE ASSUME A CORRECT PRED BY THE MODEL ELSE INCORRECT ####
+    ######## ALTERNATIVE 2: IF ALL ESTIMATIONS W.R.T. TOP THREE LAYERS YIELD CORRECT PRED WE ASSUME A CORRECT PRED BY THE MODEL ELSE INCORRECT #########
+    ####################################################################################################################################################
+
     #est_preds_top_layers = mode(est_preds_top_layers, axis=1).mode.reshape(-1)
-    ### ALTERNATIVE 2: IF ALL ESTIMATIONS W.R.T. TOP THREE LAYERS YIELD CORRECT PRED WE ASSUME A CORRECT PRED BY THE MODEL ELSE INCORRECT ###
-    ###################################################################################################################################################
     est_preds_top_layers = np.array([1 if len(np.unique(row)) == 1 and np.unique(row)[0] == 1 else 0 for row in est_preds_top_layers])
     return est_preds_top_layers
 
@@ -263,7 +266,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     # define variables
     source = args.source
-    metrics = ['cosine', 'euclid', 'mahalanobis']
+    metrics = ['cosine', 'euclid']#, 'mahalanobis']
     dims = ['high'] #['high', 'low']
     # get feat reps
     test_results, model_name = get_hidden_reps(source=source)

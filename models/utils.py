@@ -433,9 +433,9 @@ def train(
                              output_last_hiddens=True if compute_cosine_loss else False,
                              )
 
-              ###############################################################################################################
-              ####### IMPLEMENTATION OF COSINE-LOSS FOR MODEL'S HIDDEN REPS AT LAST LAYER WITH RESPECT TO ANSWER SPAN #######
-              ###############################################################################################################
+              #############################################################################################################################
+              ####### IMPLEMENTATION OF COSINE-LOSS FOR MODEL'S HIDDEN REPS AT SECOND-TO-THE-LAST LAYER WITH RESPECT TO ANSWER SPAN #######
+              #############################################################################################################################
 
               # extract all hidden representations for each input sequence in batch from last transformer layer
               # hiddens = torch.tensor(batch_size, seq_len, hidden_size, requires_grad=True)
@@ -513,7 +513,8 @@ def train(
                       """
 
                       # we want hidden reps in h_a to be as dissimilar as possible from h_c_mean (hence, y = -1)
-                      y = y.neg()
+                      y = torch.ones(h_a.size(0)).neg()
+                      y = y.type_as(h_a)
                       h_c_mean_batch = torch.stack([h_c_mean for _ in range(h_a.size(0))])
                       # compute cosine embedding loss to optimize dissimilarity between every h in h_a and h_c_mean
                       cosine_loss += cosine_loss_func(h_c_mean_batch, h_a, y)
