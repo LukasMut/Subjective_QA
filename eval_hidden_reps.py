@@ -280,7 +280,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     # define variables
     source = args.source
-    metrics = ['cosine', 'euclid']#, 'mahalanobis']
+    metrics = ['cosine', 'euclid'] #, 'mahalanobis']
     dims = ['high'] #['high', 'low']
     # get feat reps
     test_results, model_name = get_hidden_reps(source=source)
