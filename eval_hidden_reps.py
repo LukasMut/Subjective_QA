@@ -50,28 +50,14 @@ def cosine_sim(u:np.ndarray, v:np.ndarray):
     denom = np.linalg.norm(u) * np.linalg.norm(v) # default is Frobenius norm (i.e., L2 norm)
     return num / denom
 
-def compute_ans_distances(
-                          a_hiddens:np.ndarray,
-                          metric:str,
-                          inv_cov=None,
-):
-    a_mean_dist = 0
-    count = 0
+def compute_ans_distances(a_hiddens:np.ndarray, metric:str):
+    a_dists = []
     for i, a_i in enumerate(a_hiddens):
         for j, a_j in enumerate(a_hiddens):
-            #NOTE: we don't want to compute cosine sim of a vector with itself (i.e., cos_sim = 1),
-            #AND it's redundant to compute cosine sim (or Euclid dist) twice for some pair of vectors (i.e., cos_sim(u, v) == cos_sim(v, u) AND euclid(u, v) == euclid(v, u))
+            #NOTE: we don't want to compute cosine sim of a vector with itself (i.e., cos_sim = 1)
             if i != j and j > i:
-                if metric == 'cosine':
-                    a_mean_dist += cosine_sim(u=a_i, v=a_j)
-                elif metric == 'euclid':
-                    a_mean_dist += euclidean_dist(u=a_i, v=a_j)
-                elif metric == 'mahalanobis':
-                    assert isinstance(inv_cov, np.ndarray), 'To compute {} distance between 1-D arrays, (inverse) cov matrix must be provided'.format(metric.capitalize())
-                    a_mean_dist += mahalanobis(u=a_i, v=a_j, VI=inv_cov)
-                count += 1
-    a_mean_dist /= count
-    return a_mean_dist
+                a_dists.append(cosine_sim(u=a_i, v=a_j))
+    return np.mean(a_dists), np.std(a_dists)
 
 def evaluate_estimations(
                          test_results:dict,
@@ -111,20 +97,21 @@ def evaluate_estimations(
     print(Counter(true_preds))
     print()
 
-    # compute (dis-)similarities among hidden representations in H_a for both correct and erroneous model predictions at each transformer layer
+    # compute (dis-)similarities among hidden reps in H_a for both correct and erroneous model predictions at each layer
+    # AND estimate model predictions w.r.t. hidden reps in the penultimate layer
     ans_similarities, est_preds = compute_distances_across_layers(
-                                                       feat_reps=feat_reps,
-                                                       true_start_pos=true_start_pos,
-                                                       true_end_pos=true_end_pos,
-                                                       sent_pairs=sent_pairs,
-                                                       pred_indices=pred_indices,
-                                                       true_preds=true_preds,
-                                                       metric=metric,
-                                                       dim=dim,
-                                                      )
+                                                                   feat_reps=feat_reps,
+                                                                   true_start_pos=true_start_pos,
+                                                                   true_end_pos=true_end_pos,
+                                                                   sent_pairs=sent_pairs,
+                                                                   pred_indices=pred_indices,
+                                                                   true_preds=true_preds,
+                                                                   metric=metric,
+                                                                   dim=dim,
+                                                                   )
 
     """
-    # estimate model predictions w.r.t. hidden reps
+    
     est_preds_top_layers = estimate_preds_wrt_hiddens(
                                                       feat_reps=feat_reps,
                                                       true_start_pos=true_start_pos,
@@ -156,19 +143,25 @@ def compute_distances_across_layers(
                                     p_components:int=2,
                                     rnd_state:int=42,
                                     est_layer:int=5,
-                                    cos_thresh:int=.85,
+                                    cos_thresh_layer_4:int=.90,
+                                    std_thresh_layer_4:int=.10,
+                                    cos_thresh_layer_5:int=.89,
+                                    std_thresh_layer_5:int=.15,
 ):
     if dim == 'low':
         pca = PCA(n_components=p_components, svd_solver='auto', random_state=rnd_state)
 
     ans_similarities = defaultdict(dict)
     N = len(pred_indices)
+    #est_preds = []
     est_preds = np.zeros(N)
 
     for l, hiddens_all_sents in feat_reps.items():
         layer_no = int(l.lstrip('Layer' + '_'))
         correct_preds_dists, incorrect_preds_dists = [], []
         k = 0
+        #if layer_no in est_layers:
+        #   est_preds_current = np.zeros(N)
         for i, hiddens in enumerate(hiddens_all_sents):
             if i in pred_indices:
                 sent = sent_pairs[i].split()
@@ -183,36 +176,34 @@ def compute_distances_across_layers(
                 a_hiddens = hiddens[true_start_pos[i]:true_end_pos[i]+1, :]
                 c_hiddens = np.vstack((hiddens[sep_idx+1:true_start_pos[i]], hiddens[true_end_pos[i]+1:-1,:]))
 
-                # compute mean hidden reps
-                a_mean_rep = a_hiddens.mean(0)
-                c_mean_rep = c_hiddens.mean(0)
-
-                a_mean_dist = compute_ans_distances(a_hiddens, metric)
-                a_c_dist = cosine_sim(u=c_mean_rep, v=a_mean_rep) if metric == 'cosine' else euclidean_dist(u=c_mean_rep, v=a_mean_rep)
+                # compute cosine similarities among hidden reps in w.r.t. answer span
+                a_mean_dist, a_std_dist = compute_ans_distances(a_hiddens, metric)
 
                 if true_preds[pred_indices == i] == 1:
-                    correct_preds_dists.append((a_mean_dist, a_c_dist))
+                    correct_preds_dists.append((a_mean_dist, a_std_dist))
                 else:
-                    incorrect_preds_dists.append((a_mean_dist, a_c_dist))
+                    incorrect_preds_dists.append((a_mean_dist, a_std_dist))
 
-                # estimate model predictions w.r.t. avg cosine similarities in low-dim space among hidden reps in h_a AND dissimilarity to h_c in the penultimate transformer layer
+                # estimate model predictions w.r.t. avg cosine similarities among answer hidden reps in the penultimate transformer layer
                 if layer_no == est_layer:
-                    if a_mean_dist > cos_thresh:
+                    if a_mean_dist > cos_thresh and a_std_dist < std_thresh:
                         est_preds[k] += 1
                 k += 1
 
         ans_similarities[l]['correct_preds'] = {}
         ans_similarities[l]['correct_preds']['mean_cos_ha'] = np.mean(list(map(lambda d: d[0], correct_preds_dists)))
-        ans_similarities[l]['correct_preds']['std_cos_ha'] = np.std(list(map(lambda d: d[0], correct_preds_dists)))
-        ans_similarities[l]['correct_preds']['mean_cos_ha_hc'] = np.mean(list(map(lambda d: d[1], correct_preds_dists)))
-        ans_similarities[l]['correct_preds']['std_cos_ha_hc'] = np.std(list(map(lambda d: d[1], correct_preds_dists)))
+        ans_similarities[l]['correct_preds']['std_cos_ha'] = np.mean(list(map(lambda d: d[1], correct_preds_dists)))
 
         ans_similarities[l]['incorrect_preds'] = {}
         ans_similarities[l]['incorrect_preds']['mean_cos_ha'] = np.mean(list(map(lambda d: d[0], incorrect_preds_dists)))
-        ans_similarities[l]['incorrect_preds']['std_cos_ha'] = np.std(list(map(lambda d: d[0], incorrect_preds_dists)))
-        ans_similarities[l]['incorrect_preds']['mean_dist_ha_hc'] = np.mean(list(map(lambda d: d[1], incorrect_preds_dists)))
-        ans_similarities[l]['incorrect_preds']['std_dist_ha_hc'] = np.std(list(map(lambda d: d[1], incorrect_preds_dists)))
+        ans_similarities[l]['incorrect_preds']['std_cos_ha'] = np.std(list(map(lambda d: d[1], incorrect_preds_dists)))
 
+        #if layer_no in est_layers:
+        #   est_preds.append(est_preds_current)
+    #est_preds = np.stack(est_preds, axis=1)
+
+    #if all estimations w.r.t. both layer 4 and 5 yield correct pred we assume a correct model pred else incorrect
+    #est_preds = np.array([1 if len(np.unique(row)) == 1 and np.unique(row)[0] == 1 else 0 for row in est_preds])
     return ans_similarities, est_preds
 
 def estimate_preds_wrt_hiddens(
@@ -252,7 +243,7 @@ def estimate_preds_wrt_hiddens(
                     a_mean_rep = a_hiddens.mean(0)
 
                     if metric == 'cosine':
-                        
+
                         cos_sims_a_and_c = np.array([cosine_sim(u=a_mean_rep, v=c_hidden) for c_hidden in c_hiddens])
                         c_most_sim_idx = np.argmax(cos_sims_a_and_c) # similarity measure ==> argmax
                         c_most_sim = c_hiddens[c_most_sim_idx]
