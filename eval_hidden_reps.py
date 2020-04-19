@@ -62,8 +62,148 @@ def compute_ans_similarities(a_hiddens:np.ndarray, metric:str):
                 a_dists.append(cosine_sim(u=a_i, v=a_j))
     return np.mean(a_dists), np.std(a_dists)
 
+def plot_cosine_distrib(
+                        a_correct_cosines_mean:np.ndarray,
+                        a_incorrect_cosines_mean:np.ndarray,
+                        source:str,
+                        dim:str,
+                        layer_no:str,
+):
+    # the higher the dpi, the better is the resolution of the plot (don't set dpi too high)
+    plt.figure(figsize=(6, 4), dpi=100)
+
+    # set vars
+    legend_fontsize = 8
+    lab_fontsize = 10
+
+    ax = plt.subplot(111)
+
+    # hide the right and top spines
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+
+    # only show ticks on the left (y-axis) and bottom (x-axis) spines
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+        
+    sns.distplot(a_correct_cosines_mean, kde=True, norm_hist=True, label='correct preds')
+    sns.distplot(a_incorrect_cosines_mean, kde=True, norm_hist=True, label='erroneous preds')
+    plt.xlabel('cosine similarities', fontsize=lab_fontsize)
+    plt.ylabel('density', fontsize=lab_fontsize)
+    plt.legend(fancybox=True, shadow=True, loc='best', fontsize=legend_fontsize)
+    plt.tight_layout()
+    plt.savefig('./plots/hidden_reps/cosine_distributions/' + source.lower() + '/' + dim + '_' + 'dim' + '/' + 'layer' + '_' + layer_no + '.png')
+    plt.close()
+
+def compute_distances_across_layers(
+                                    feat_reps:dict,
+                                    true_start_pos:list,
+                                    true_end_pos:list,
+                                    sent_pairs:list,
+                                    pred_indices:list,
+                                    true_preds:np.ndarray,
+                                    source:str,
+                                    metric:str,
+                                    dim:str,
+                                    rnd_state:int=42,
+):
+    if dim == 'high':
+        p_components = .95 #retain 90% or 95% of the hidden rep's variance
+        cos_thresh = .45
+        std_thresh = .15
+        est_layers = [4, 5, 6]
+    else:
+        p_components = 2 #keep top two or three principal components (analog to 2D / 3D plots)
+        cos_thresh = .80
+        std_thresh = .20
+        est_layers = [4, 5, 6]
+
+    # initialise PCA (we need to apply PCA to remove noise from the feature representations)
+    pca = PCA(n_components=p_components, svd_solver='auto', random_state=rnd_state)
+
+    ans_similarities = defaultdict(dict)
+    N = len(pred_indices)    
+    est_preds = []
+    #est_preds = np.zeros(N)
+    for l, hiddens_all_sents in feat_reps.items():
+        layer_no = int(l.lstrip('Layer' + '_'))
+        correct_preds_dists, incorrect_preds_dists = [], []
+        k = 0
+        if layer_no in est_layers:
+           est_preds_current = np.zeros(N)
+
+        for i, hiddens in enumerate(hiddens_all_sents):
+            if i in pred_indices:
+                hiddens = np.array(hiddens)
+                sent = sent_pairs[i].strip().split()
+                sep_idx = sent.index('[SEP]')
+
+                # remove hidden reps for special [CLS] and [SEP] tokens
+                #hiddens = np.vstack((hiddens[1:sep_idx, :], hiddens[sep_idx+1:-1, :])) 
+                
+                # transform feat reps into low-dim space with PCA
+                hiddens = pca.fit_transform(hiddens)
+
+                # extract hidden reps for answer span
+                #a_hiddens = hiddens[true_start_pos[i]-2:true_end_pos[i]-1, :] # move ans span indices two positions to the left
+                a_hiddens = hiddens[true_start_pos[i]:true_end_pos[i]+1, :]
+
+                # compute cosine similarities among hidden reps w.r.t. answer span
+                a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens, metric)
+
+                if true_preds[pred_indices == i] == 1:
+                    correct_preds_dists.append((a_mean_cos, a_std_cos))
+                else:
+                    incorrect_preds_dists.append((a_mean_cos, a_std_cos))
+
+                # estimate model predictions w.r.t. avg cosine similarities among answer hidden reps in the penultimate transformer layer
+                if layer_no in est_layers:
+                    if dim == 'low' and layer_no > 4:
+                        cos_thresh -= .10
+                    """
+                    if dim == 'high':
+                        if a_mean_cos > cos_thresh: 
+                            est_preds_current[k] += 1
+                    """
+                    if a_mean_cos > cos_thresh and a_std_cos < std_thresh:
+                        est_preds_current[k] += 1
+                k += 1
+
+        # unzip means and stds w.r.t. cosine similarities
+        a_correct_cosines_mean, a_correct_cosines_std = zip(*correct_preds_dists)
+        a_incorrect_cosines_mean, a_incorrect_cosines_std = zip(*incorrect_preds_dists)
+
+        ans_similarities[l]['correct_preds'] = {}
+        ans_similarities[l]['correct_preds']['mean_cos_ha'] = np.mean(a_correct_cosines_mean)
+        #ans_similarities[l]['correct_preds']['std_cos_ha'] = np.mean(a_correct_cosines_std)
+        ans_similarities[l]['correct_preds']['std_cos_ha'] = np.std(a_correct_cosines_mean)
+        
+        ans_similarities[l]['incorrect_preds'] = {}
+        ans_similarities[l]['incorrect_preds']['mean_cos_ha'] = np.mean(a_incorrect_cosines_mean)
+        #ans_similarities[l]['incorrect_preds']['std_cos_ha'] = np.mean(a_incorrect_cosines_std)
+        ans_similarities[l]['incorrect_preds']['std_cos_ha'] = np.std(a_incorrect_cosines_mean) 
+
+
+        # plot the cosine similarity distributions for both correct and incorrect model predictions across all transformer layers
+        plot_cosine_distrib(
+                            a_correct_cosines_mean=np.array(a_correct_cosines_mean),
+                            a_incorrect_cosines_mean=np.array(a_incorrect_cosines_mean),
+                            source=source,
+                            dim=dim,
+                            layer_no=str(layer_no),
+                            )
+
+        if layer_no in est_layers:
+            est_preds.append(est_preds_current)
+
+    est_preds = np.stack(est_preds, axis=1)
+    #if all estimations w.r.t. both layer 4, 5 and 6 yield correct pred we assume a correct model pred else incorrect
+    est_preds = np.array([1 if len(np.unique(row)) == 1 and np.unique(row)[0] == 1 else 0 for row in est_preds])
+    return ans_similarities, est_preds
+
 def evaluate_estimations(
                          test_results:dict,
+                         source:str,
                          metric:str,
                          dim:str,
 ):
@@ -103,159 +243,25 @@ def evaluate_estimations(
     # compute (dis-)similarities among hidden reps in H_a for both correct and erroneous model predictions at each layer
     # AND estimate model predictions w.r.t. hidden reps in the penultimate layer
     ans_similarities, est_preds = compute_distances_across_layers(
-                                                                   feat_reps=feat_reps,
-                                                                   true_start_pos=true_start_pos,
-                                                                   true_end_pos=true_end_pos,
-                                                                   sent_pairs=sent_pairs,
-                                                                   pred_indices=pred_indices,
-                                                                   true_preds=true_preds,
-                                                                   metric=metric,
-                                                                   dim=dim,
-                                                                   )
+                                                                  feat_reps=feat_reps,
+                                                                  true_start_pos=true_start_pos,
+                                                                  true_end_pos=true_end_pos,
+                                                                  sent_pairs=sent_pairs,
+                                                                  pred_indices=pred_indices,
+                                                                  true_preds=true_preds,
+                                                                  source=source,
+                                                                  metric=metric,
+                                                                  dim=dim,
+                                                                  )
 
     est_accs = {}
     est_accs['correct_preds'] = (true_preds[true_preds == 1] == est_preds[true_preds == 1]).mean() * 100
     est_accs['incorrect_preds'] = (true_preds[true_preds == 0] == est_preds[true_preds == 0]).mean() * 100
     est_accs['total_preds'] = {} 
     est_accs['total_preds']['acc'] = (true_preds == est_preds).mean() * 100
-    est_accs['total_preds']['f1_macro'] = f1_score(true_preds, est_preds, average='macro') * 100
+    est_accs['total_preds']['f1_weighted'] = f1_score(true_preds, est_preds, average='weighted') * 100
     #est_accs = {'Layer' + '_' + str(l + 1): (est_preds == true_preds).mean() * 100 for l, est_preds in enumerate(est_preds_top_layers)}
     return est_accs, ans_similarities
-
-def plot_cosine_distrib(
-                        a_correct_cosines_mean:np.ndarray,
-                        a_incorrect_cosines_mean:np.ndarray,
-                        dim:str,
-                        layer_no:str,
-):
-    # the higher the dpi, the better is the resolution of the plot (don't set dpi too high)
-    plt.figure(figsize=(6, 4), dpi=100)
-
-    # set vars
-    legend_fontsize = 8
-    lab_fontsize = 10
-
-    ax = plt.subplot(111)
-
-    # hide the right and top spines
-    ax.spines['right'].set_visible(False)
-    ax.spines['top'].set_visible(False)
-
-    # only show ticks on the left (y-axis) and bottom (x-axis) spines
-    ax.yaxis.set_ticks_position('left')
-    ax.xaxis.set_ticks_position('bottom')
-        
-    sns.distplot(a_correct_cosines_mean, kde=True, norm_hist=True, label='correct preds')
-    sns.distplot(a_incorrect_cosines_mean, kde=True, norm_hist=True, label='erroneous preds')
-    plt.xlabel('cosine similarities', fontsize=lab_fontsize)
-    plt.ylabel('density', fontsize=lab_fontsize)
-    plt.legend(fancybox=True, shadow=True, loc='best', fontsize=legend_fontsize)
-    plt.tight_layout()
-    plt.savefig('./plots/hidden_reps/cosine_distributions/' + dim + '_' + 'dim' + '/' + layer_no + '.png')
-    plt.close()
-
-def compute_distances_across_layers(
-                                    feat_reps:dict,
-                                    true_start_pos:list,
-                                    true_end_pos:list,
-                                    sent_pairs:list,
-                                    pred_indices:list,
-                                    true_preds:np.ndarray,
-                                    metric:str,
-                                    dim:str,
-                                    rnd_state:int=42,
-):
-    if dim == 'high':
-        p_components = .95 #retain 90% or 95% of the hidden rep's variance
-        cos_thresh = .47
-        std_thresh = .10
-        est_layers = [4, 5, 6]
-    else:
-        p_components = 2 #keep top two or three principal components (analog to 2D / 3D plots)
-        cos_thresh = .80
-        std_thresh = .20
-        est_layers = [4, 5, 6]
-
-    # initialise PCA (we need to apply PCA to remove noise from the feature representations)
-    pca = PCA(n_components=p_components, svd_solver='auto', random_state=rnd_state)
-
-    ans_similarities = defaultdict(dict)
-    N = len(pred_indices)    
-    est_preds = []
-    #est_preds = np.zeros(N)
-    for l, hiddens_all_sents in feat_reps.items():
-        layer_no = int(l.lstrip('Layer' + '_'))
-        correct_preds_dists, incorrect_preds_dists = [], []
-        k = 0
-        if layer_no in est_layers:
-           est_preds_current = np.zeros(N)
-
-        for i, hiddens in enumerate(hiddens_all_sents):
-            if i in pred_indices:
-                hiddens = np.array(hiddens)
-                sent = sent_pairs[i].strip().split()
-                sep_idx = sent.index('[SEP]')
-
-                # remove hidden reps for special [CLS] and [SEP] tokens
-                hiddens = np.vstack((hiddens[1:sep_idx, :], hiddens[sep_idx+1:-1, :])) 
-                
-                # transform feat reps into low-dim space with PCA
-                hiddens = pca.fit_transform(hiddens)
-
-                # extract hidden reps for answer span
-                a_hiddens = hiddens[true_start_pos[i]-2:true_end_pos[i]-1, :] # move ans span indices two positions to the left
-                #a_hiddens = hiddens[true_start_pos[i]:true_end_pos[i]+1, :]
-
-                # compute cosine similarities among hidden reps w.r.t. answer span
-                a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens, metric)
-
-                if true_preds[pred_indices == i] == 1:
-                    correct_preds_dists.append((a_mean_cos, a_std_cos))
-                else:
-                    incorrect_preds_dists.append((a_mean_cos, a_std_cos))
-
-                # estimate model predictions w.r.t. avg cosine similarities among answer hidden reps in the penultimate transformer layer
-                if layer_no in est_layers:
-                    if dim == 'high':
-                        if a_mean_cos > cos_thresh: 
-                            est_preds_current[k] += 1
-                    else:
-                        if layer_no > 4:
-                            cos_thresh -= .10
-                        if a_mean_cos > cos_thresh and a_std_cos < std_thresh:
-                            est_preds_current[k] += 1
-                k += 1
-
-        # unzip means and stds w.r.t. cosine similarities
-        a_correct_cosines_mean, a_correct_cosines_std = zip(*correct_preds_dists)
-        a_incorrect_cosines_mean, a_incorrect_cosines_std = zip(*incorrect_preds_dists)
-
-        ans_similarities[l]['correct_preds'] = {}
-        ans_similarities[l]['correct_preds']['mean_cos_ha'] = np.median(a_correct_cosines_mean)
-        #ans_similarities[l]['correct_preds']['std_cos_ha'] = np.mean(a_correct_cosines_std)
-        ans_similarities[l]['correct_preds']['std_cos_ha'] = np.std(a_correct_cosines_mean)
-        
-        ans_similarities[l]['incorrect_preds'] = {}
-        ans_similarities[l]['incorrect_preds']['mean_cos_ha'] = np.median(a_incorrect_cosines_mean)
-        #ans_similarities[l]['incorrect_preds']['std_cos_ha'] = np.mean(a_incorrect_cosines_std)
-        ans_similarities[l]['incorrect_preds']['std_cos_ha'] = np.std(a_incorrect_cosines_mean) 
-
-
-        # plot the cosine similarity distributions for both correct and incorrect model predictions across all transformer layers
-        plot_cosine_distrib(
-                            a_correct_cosines_mean=np.array(a_correct_cosines_mean),
-                            a_incorrect_cosines_mean=np.array(a_incorrect_cosines_mean),
-                            dim=dim,
-                            layer_no=str(layer_no),
-                            )
-
-        if layer_no in est_layers:
-            est_preds.append(est_preds_current)
-
-    est_preds = np.stack(est_preds, axis=1)
-    #if all estimations w.r.t. both layer 4, 5 and 6 yield correct pred we assume a correct model pred else incorrect
-    est_preds = np.array([1 if len(np.unique(row)) == 1 and np.unique(row)[0] == 1 else 0 for row in est_preds])
-    return ans_similarities, est_preds
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -265,6 +271,7 @@ if __name__ == "__main__":
    
     # set variables
     source = args.source
+    metric = 'cosine'
     dims = ['high', 'low']
 
     # get feat reps
@@ -272,7 +279,7 @@ if __name__ == "__main__":
 
     # estimate model predictions w.r.t. answer and context hidden reps in latent space (per transformer layer) AND
     # compute (dis-)similarities among hidden representations in h_a for both correct and erroneous model predictions (at each layer)
-    ests_and_dists  = {dim: evaluate_estimations(test_results=test_results, metric='cosine', dim=dim) for dim in dims}
+    ests_and_dists  = {dim: evaluate_estimations(test_results=test_results, source=source, metric=metric, dim=dim) for dim in dims}
 
     hidden_reps_results = {}
     hidden_reps_results['estimations'] = {dim: results[0] for dim, results in ests_and_dists.items()}
