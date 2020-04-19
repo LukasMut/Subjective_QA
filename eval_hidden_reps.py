@@ -142,6 +142,12 @@ def compute_similarities_across_layers(
                 # transform feat reps into low-dim space with PCA
                 hiddens = pca.fit_transform(hiddens)
 
+                if layer_no == 1 and i == pred_indices[0]:
+                    print("==============================================================")
+                    print("=== Number of components in transformed hidden reps: {} ===".format(hiddens.shape[1]))
+                    print("==============================================================")
+                    print()
+
                 # extract hidden reps for answer span
                 #a_hiddens = hiddens[true_start_pos[i]-2:true_end_pos[i]-1, :] # move ans span indices two positions to the left
                 a_hiddens = hiddens[true_start_pos[i]:true_end_pos[i]+1, :]
