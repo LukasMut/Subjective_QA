@@ -1893,7 +1893,7 @@ def test(
       # estimate model predictions w.r.t. hidden representations
       metric = 'cosine'
       dims = ['high', 'low']
-      assert isinstance(source, str), 'Data source must be provided'
+      assert isinstance(source, str), 'data source must be provided'
       ests_and_cosines  = {dim: evaluate_estimations(test_results=test_results, source=source, metric=metric, dim=dim) for dim in dims}
       
       return test_loss, test_acc, test_f1, ests_and_cosines
