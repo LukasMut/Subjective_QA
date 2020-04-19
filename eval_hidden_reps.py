@@ -109,13 +109,13 @@ def compute_distances_across_layers(
 ):
     if dim == 'high':
         p_components = .95 #retain 90% or 95% of the hidden rep's variance
-        cos_thresh = .45
+        cos_thresh = .46
         std_thresh = .15
         est_layers = [4, 5, 6]
     else:
         p_components = 2 #keep top two or three principal components (analog to 2D / 3D plots)
-        cos_thresh = .80
-        std_thresh = .20
+        cos_thresh = .85
+        std_thresh = .15
         est_layers = [4, 5, 6]
 
     # initialise PCA (we need to apply PCA to remove noise from the feature representations)
@@ -158,15 +158,14 @@ def compute_distances_across_layers(
 
                 # estimate model predictions w.r.t. avg cosine similarities among answer hidden reps in the penultimate transformer layer
                 if layer_no in est_layers:
-                    if dim == 'low' and layer_no > 4:
-                        cos_thresh -= .10
-                    """
                     if dim == 'high':
                         if a_mean_cos > cos_thresh: 
                             est_preds_current[k] += 1
-                    """
-                    if a_mean_cos > cos_thresh and a_std_cos < std_thresh:
-                        est_preds_current[k] += 1
+                    else:
+                        if layer_no == 6:
+                            cos_thresh -= .20
+                        if a_mean_cos > cos_thresh and a_std_cos < std_thresh:
+                            est_preds_current[k] += 1
                 k += 1
 
         # unzip means and stds w.r.t. cosine similarities
