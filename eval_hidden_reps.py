@@ -108,7 +108,6 @@ def compute_similarities_across_layers(
     if dim == 'high':
         p_components = .95 #retain 90% or 95% of the hidden rep's variance (95% = top 57 principal components)
         cos_thresh = .45 if source.lower() == 'subjqa' else .50
-        #std_thresh = .15
         est_layers = [4, 5, 6] if source.lower() == 'subjqa' else [5, 6]
     else:
         p_components = 2 #keep top two or three principal components (analog to 2D / 3D plots)
