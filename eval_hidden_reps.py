@@ -1,10 +1,9 @@
-__all__ = ['evaluate_estimations']
+__all__ = ['evaluate_estimations_and_cosines']
 
 import argparse
 import matplotlib
 import json
 import os
-import random
 import re 
 
 import matplotlib.pyplot as plt
@@ -13,7 +12,6 @@ import seaborn as sns
 
 from collections import defaultdict, Counter
 from eval_squad import compute_exact
-from scipy.spatial.distance import mahalanobis
 from scipy.stats import mode 
 from sklearn.decomposition import PCA
 from sklearn.metrics import f1_score
@@ -57,7 +55,7 @@ def compute_ans_similarities(a_hiddens:np.ndarray, metric:str):
     a_dists = []
     for i, a_i in enumerate(a_hiddens):
         for j, a_j in enumerate(a_hiddens):
-            #NOTE: we don't want to compute cosine sim of a vector with itself (i.e., cos_sim = 1)
+            #NOTE: we don't want to compute cosine sim of a vector with itself (i.e., cos_sim(u, u) = 1)
             if i != j and j > i:
                 a_dists.append(cosine_sim(u=a_i, v=a_j))
     return np.mean(a_dists), np.std(a_dists)
@@ -95,17 +93,17 @@ def plot_cosine_distrib(
     plt.savefig('./plots/hidden_reps/cosine_distributions/' + source.lower() + '/' + dim + '_' + 'dim' + '/' + 'layer' + '_' + layer_no + '.png')
     plt.close()
 
-def compute_distances_across_layers(
-                                    feat_reps:dict,
-                                    true_start_pos:list,
-                                    true_end_pos:list,
-                                    sent_pairs:list,
-                                    pred_indices:list,
-                                    true_preds:np.ndarray,
-                                    source:str,
-                                    metric:str,
-                                    dim:str,
-                                    rnd_state:int=42,
+def compute_similarities_across_layers(
+                                       feat_reps:dict,
+                                       true_start_pos:list,
+                                       true_end_pos:list,
+                                       sent_pairs:list,
+                                       pred_indices:list,
+                                       true_preds:np.ndarray,
+                                       source:str,
+                                       metric:str,
+                                       dim:str,
+                                       rnd_state:int=42,
 ):
     if dim == 'high':
         p_components = .95 #retain 90% or 95% of the hidden rep's variance
@@ -200,11 +198,11 @@ def compute_distances_across_layers(
     est_preds = np.array([1 if len(np.unique(row)) == 1 and np.unique(row)[0] == 1 else 0 for row in est_preds])
     return ans_similarities, est_preds
 
-def evaluate_estimations(
-                         test_results:dict,
-                         source:str,
-                         metric:str,
-                         dim:str,
+def evaluate_estimations_and_cosines(
+                                     test_results:dict,
+                                     source:str,
+                                     metric:str,
+                                     dim:str,
 ):
     pred_answers = test_results['predicted_answers']
     true_answers = test_results['true_answers']
@@ -241,16 +239,16 @@ def evaluate_estimations(
 
     # compute (dis-)similarities among hidden reps in H_a for both correct and erroneous model predictions at each layer
     # AND estimate model predictions w.r.t. hidden reps in the penultimate layer
-    ans_similarities, est_preds = compute_distances_across_layers(
-                                                                  feat_reps=feat_reps,
-                                                                  true_start_pos=true_start_pos,
-                                                                  true_end_pos=true_end_pos,
-                                                                  sent_pairs=sent_pairs,
-                                                                  pred_indices=pred_indices,
-                                                                  true_preds=true_preds,
-                                                                  source=source,
-                                                                  metric=metric,
-                                                                  dim=dim,
+    ans_similarities, est_preds = compute_similarities_across_layers(
+                                                                     feat_reps=feat_reps,
+                                                                     true_start_pos=true_start_pos,
+                                                                     true_end_pos=true_end_pos,
+                                                                     sent_pairs=sent_pairs,
+                                                                     pred_indices=pred_indices,
+                                                                     true_preds=true_preds,
+                                                                     source=source,
+                                                                     metric=metric,
+                                                                     dim=dim,
                                                                   )
 
     est_accs = {}
@@ -278,7 +276,7 @@ if __name__ == "__main__":
 
     # estimate model predictions w.r.t. answer and context hidden reps in latent space (per transformer layer) AND
     # compute (dis-)similarities among hidden representations in h_a for both correct and erroneous model predictions (at each layer)
-    ests_and_cosines  = {dim: evaluate_estimations(test_results=test_results, source=source, metric=metric, dim=dim) for dim in dims}
+    ests_and_cosines  = {dim: evaluate_estimations_and_cosines(test_results=test_results, source=source, metric=metric, dim=dim) for dim in dims}
 
     hidden_reps_results = {}
     hidden_reps_results['estimations'] = {dim: results[0] for dim, results in ests_and_cosines.items()}
