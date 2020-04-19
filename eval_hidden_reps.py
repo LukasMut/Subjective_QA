@@ -90,7 +90,7 @@ def plot_cosine_distrib(
     plt.ylabel('density', fontsize=lab_fontsize)
     plt.legend(fancybox=True, shadow=True, loc='best', fontsize=legend_fontsize)
     plt.tight_layout()
-    plt.savefig('./plots/hidden_reps/cosine_distributions/' + source.lower() + '/' + dim + '_' + 'dim' + '/' + 'layer' + '_' + layer_no + '.png')
+    #plt.savefig('./plots/hidden_reps/cosine_distributions/' + source.lower() + '/' + dim + '_' + 'dim' + '/' + 'layer' + '_' + layer_no + '.png')
     plt.close()
 
 def compute_similarities_across_layers(
@@ -107,13 +107,13 @@ def compute_similarities_across_layers(
 ):
     if dim == 'high':
         p_components = .95 #retain 90% or 95% of the hidden rep's variance
-        cos_thresh = .46
+        cos_thresh = .45
         std_thresh = .15
         est_layers = [4, 5, 6]
     else:
         p_components = 2 #keep top two or three principal components (analog to 2D / 3D plots)
         cos_thresh = .85
-        std_thresh = .15
+        std_thresh = .20
         est_layers = [4, 5, 6]
 
     # initialise PCA (we need to apply PCA to remove noise from the feature representations)
