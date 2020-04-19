@@ -279,11 +279,11 @@ if __name__ == "__main__":
 
     # estimate model predictions w.r.t. answer and context hidden reps in latent space (per transformer layer) AND
     # compute (dis-)similarities among hidden representations in h_a for both correct and erroneous model predictions (at each layer)
-    ests_and_dists  = {dim: evaluate_estimations(test_results=test_results, source=source, metric=metric, dim=dim) for dim in dims}
+    ests_and_cosines  = {dim: evaluate_estimations(test_results=test_results, source=source, metric=metric, dim=dim) for dim in dims}
 
     hidden_reps_results = {}
-    hidden_reps_results['estimations'] = {dim: results[0] for dim, results in ests_and_dists.items()}
-    hidden_reps_results['similarities'] = {dim: results[1] for dim, results in ests_and_dists.items()}
+    hidden_reps_results['estimations'] = {dim: results[0] for dim, results in ests_and_cosines.items()}
+    hidden_reps_results['cos_similarities'] = {dim: results[1] for dim, results in ests_and_cosines.items()}
 
     print()
     print(hidden_reps_results)

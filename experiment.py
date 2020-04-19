@@ -1356,7 +1356,7 @@ if __name__ == '__main__':
                                                                             output_all_hiddens_cls_q_words = args.output_all_hiddens_cls_q_words,
                                                                             )
             elif task == 'QA' and args.estimate_preds_wrt_hiddens:
-                test_loss, test_acc, test_f1, est_preds_per_metric = test(
+                test_loss, test_acc, test_f1, ests_and_cosines = test(
                                                                          model = model,
                                                                          tokenizer = bert_tokenizer,
                                                                          test_dl = test_dl,
@@ -1369,6 +1369,7 @@ if __name__ == '__main__':
                                                                          inference_strategy = args.sequential_transfer_evaluation,
                                                                          output_all_hiddens = True,
                                                                          estimate_preds_wrt_hiddens = args.estimate_preds_wrt_hiddens,
+                                                                         source = args.finetuning,
                                                                          )
 
 
@@ -1446,7 +1447,7 @@ if __name__ == '__main__':
                 test_results['test_results_q_word'] = results_per_q_word
 
             elif task == 'QA' and args.estimate_preds_wrt_hiddens:
-                test_results['est_preds_per_metric'] = est_preds_per_metric
+                test_results['ests_and_cosines'] = ests_and_cosines
 
             elif task == 'QA' and (args.output_last_hiddens_cls or args.output_all_hiddens_cls):
                 test_results['domain_labels'] = domain_labels

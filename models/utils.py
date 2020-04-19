@@ -1260,6 +1260,7 @@ def test(
         output_all_hiddens:bool=False,
         output_all_hiddens_cls_q_words:bool=False,
         estimate_preds_wrt_hiddens:bool=False,
+        source=None,
 ):
     n_steps = len(test_dl)
     n_examples = n_steps * batch_size
@@ -1888,10 +1889,14 @@ def test(
       test_results['true_end_pos'] = np.array(true_end_pos).flatten().tolist()
       test_results['sent_pairs'] = sent_pairs
       test_results['feat_reps'] = feat_reps
-      # estimate model predictions w.r.t. hidden representations #
-      metrics = ['cosine', 'euclid'] #, 'mahalanobis']
-      est_per_metric = {metric: {'norm' + '_'  + str(norm).lower(): evaluate_estimations(test_results, metric, 'high', norm) for norm in [True, False]} for metric in metrics}
-      return test_loss, test_acc, test_f1, est_per_metric
+      
+      # estimate model predictions w.r.t. hidden representations
+      metric = 'cosine'
+      dims = ['high', 'low']
+      assert isinstance(source, str), 'Data source must be provided'
+      ests_and_cosines  = {dim: evaluate_estimations(test_results=test_results, source=source, metric=metric, dim=dim) for dim in dims}
+      
+      return test_loss, test_acc, test_f1, ests_and_cosines
 
     elif task == 'QA' and output_all_hiddens:
       #nested lists of string batches must be flattened via list comprehensions (not possible with np.array().flatten())
