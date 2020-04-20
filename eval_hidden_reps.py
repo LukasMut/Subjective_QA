@@ -12,7 +12,7 @@ import seaborn as sns
 
 from collections import defaultdict, Counter
 from eval_squad import compute_exact
-from scipy.stats import mode 
+from scipy.stats import f_oneway, mode, ttest_ind
 from sklearn.decomposition import PCA
 from sklearn.metrics import f1_score
 
@@ -254,7 +254,10 @@ def compute_similarities_across_layers(
         ans_similarities[l]['incorrect_preds'] = {}
         ans_similarities[l]['incorrect_preds']['mean_cos_ha'] = np.mean(a_incorrect_cosines_mean)
         #ans_similarities[l]['incorrect_preds']['std_cos_ha'] = np.mean(a_incorrect_cosines_std)
-        ans_similarities[l]['incorrect_preds']['std_cos_ha'] = np.std(a_incorrect_cosines_mean) 
+        ans_similarities[l]['incorrect_preds']['std_cos_ha'] = np.std(a_incorrect_cosines_mean)
+
+        ans_similarities[l]['ttest_p_val'] = ttest_ind(a_correct_cosines_mean, a_incorrect_cosines_mean, equal_var=False)[1]
+        ans_similarities[l]['anova_p_val'] = f_oneway(a_correct_cosines_mean, a_incorrect_cosines_mean)[1]
 
 
         # plot the cosine similarity distributions for both correct and incorrect model predictions across all transformer layers
