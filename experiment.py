@@ -1447,7 +1447,8 @@ if __name__ == '__main__':
                 test_results['test_results_q_word'] = results_per_q_word
 
             elif task == 'QA' and args.estimate_preds_wrt_hiddens:
-                test_results['ests_and_cosines'] = ests_and_cosines
+                test_results['estimations'] = {dim: results[0] for dim, results in ests_and_cosines.items()}
+                test_results['cos_similarities'] = {dim: results[1] for dim, results in ests_and_cosines.items()}
 
             elif task == 'QA' and (args.output_last_hiddens_cls or args.output_all_hiddens_cls):
                 test_results['domain_labels'] = domain_labels

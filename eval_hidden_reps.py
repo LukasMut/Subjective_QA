@@ -256,7 +256,8 @@ def compute_similarities_across_layers(
         #ans_similarities[l]['incorrect_preds']['std_cos_ha'] = np.mean(a_incorrect_cosines_std)
         ans_similarities[l]['incorrect_preds']['std_cos_ha'] = np.std(a_incorrect_cosines_mean)
 
-        ans_similarities[l]['ttest_p_val'] = ttest_ind(a_correct_cosines_mean, a_incorrect_cosines_mean, equal_var=False)[1]
+        #TODO: figure out whether equal_var should be set to False
+        ans_similarities[l]['ttest_p_val'] = ttest_ind(a_correct_cosines_mean, a_incorrect_cosines_mean, equal_var=True)[1]
         ans_similarities[l]['anova_p_val'] = f_oneway(a_correct_cosines_mean, a_incorrect_cosines_mean)[1]
 
 
