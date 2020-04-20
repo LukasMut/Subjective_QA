@@ -158,13 +158,13 @@ def plot_cosine_distrib(
     ax.yaxis.set_ticks_position('left')
     ax.xaxis.set_ticks_position('bottom')
         
-    sns.distplot(a_correct_cosines_mean, kde=True, norm_hist=True, label='correct preds')
-    sns.distplot(a_incorrect_cosines_mean, kde=True, norm_hist=True, label='erroneous preds')
+    sns.distplot(a_correct_cosines_mean, kde=True, norm_hist=True, label='correct answers')
+    sns.distplot(a_incorrect_cosines_mean, kde=True, norm_hist=True, label='wrong answers')
     plt.xlabel('cosine similarities', fontsize=lab_fontsize)
     plt.ylabel('density', fontsize=lab_fontsize)
     plt.legend(fancybox=True, shadow=True, loc='best', fontsize=legend_fontsize)
     plt.tight_layout()
-    #plt.savefig('./plots/hidden_reps/cosine_distributions/' + source.lower() + '/' + dim + '_' + 'dim' + '/' + 'density_plots' + '/' + 'layer' + '_' + layer_no + '.png')
+    plt.savefig('./plots/hidden_reps/cosine_distributions/' + source.lower() + '/' + dim + '_' + 'dim' + '/' + 'density_plots' + '/' + 'layer' + '_' + layer_no + '.png')
     plt.close()
 
 def compute_similarities_across_layers(
