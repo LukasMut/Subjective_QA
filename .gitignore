@@ -83,3 +83,5 @@ emnlp_2020_paper/emnlp2020-templates/__MACOSX/emnlp2020-templates/._.DS_Store
 *.tex
 emnlp_2020_paper/emnlp2020-templates/__MACOSX/._emnlp2020-templates
 emnlp_2020_paper/emnlp2020-templates.zip
+plotting_attempts.ipynb
+.ipynb_checkpoints/plotting_attempts-checkpoint.ipynb

@@ -60,6 +60,77 @@ def compute_ans_similarities(a_hiddens:np.ndarray, metric:str):
                 a_dists.append(cosine_sim(u=a_i, v=a_j))
     return np.mean(a_dists), np.std(a_dists)
 
+
+def plot_cosine_boxplots(
+                         a_correct_cosines_mean:np.ndarray,
+                         a_incorrect_cosines_mean:np.ndarray,
+                         source:str,
+                         dim:str,
+                         layer_no:str,
+                         boxplot_version:str,
+):
+    plt.figure(figsize=(6, 4), dpi=100)
+
+    # set fontsize var
+    lab_fontsize = 12
+
+    ax = plt.subplot(111)
+
+    # hide the right and top spines
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+
+    # only show ticks on the left (y-axis) and bottom (x-axis) spines
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+
+    if boxplot_version == 'seaborn':
+        
+        sns.boxplot(
+                     data=[a_correct_cosines_mean, a_incorrect_cosines_mean],
+                     color='white',
+                     meanline=False, # not necessary to show dotted mean line when showmeans = True (only set one of the two to True)
+                     showmeans=True,
+                     showcaps=True,
+                     showfliers=True,
+                     )
+
+        ax.set_xticklabels(['correct', 'erroneous'])
+        ax.set_xlabel('answer predictions', fontsize=lab_fontsize)
+        ax.set_ylabel('cosine similarities', fontsize=lab_fontsize)
+
+        for i, artist in enumerate(ax.artists):
+            if i % 2 == 0:
+                col = 'pink'
+            else:
+                col = 'steelblue'
+
+            # this sets the color for the main box
+            artist.set_edgecolor(col)
+            
+            # each box has 7 associated Line2D objects (to make the whiskers, median lines, means, fliers, etc.)
+            # loop over them, and use the same colour as above (display means in black to make them more salient)
+            for j in range(i*7,i*7+7):
+                line = ax.lines[j]
+                line.set_color('black' if j == 5 + (i*7) else col)
+                line.set_mfc('black' if j == 5 + (i*7) else col)
+                line.set_mec('black' if j == 5 + (i*7) else col)
+
+    elif boxplot_version == 'matplotlib':
+        
+        plt.boxplot(
+                    x=[a_correct_cosines_mean, a_incorrect_cosines_mean],
+                    notch=True,
+                    bootstrap=1000,
+                    meanline=False, 
+                    showmeans=True, 
+                    labels=['correct', 'erroneous'],
+                    )
+
+    plt.tight_layout()
+    plt.savefig('./plots/hidden_reps/cosine_distributions/' + source.lower() + '/' + dim + '_' + 'dim' + '/' + 'boxplots' + '/' + 'layer' + '_' + layer_no +  '_' + boxplot_version + '.png')
+    plt.close()
+
 def plot_cosine_distrib(
                         a_correct_cosines_mean:np.ndarray,
                         a_incorrect_cosines_mean:np.ndarray,
@@ -90,7 +161,7 @@ def plot_cosine_distrib(
     plt.ylabel('density', fontsize=lab_fontsize)
     plt.legend(fancybox=True, shadow=True, loc='best', fontsize=legend_fontsize)
     plt.tight_layout()
-    #plt.savefig('./plots/hidden_reps/cosine_distributions/' + source.lower() + '/' + dim + '_' + 'dim' + '/' + 'layer' + '_' + layer_no + '.png')
+    #plt.savefig('./plots/hidden_reps/cosine_distributions/' + source.lower() + '/' + dim + '_' + 'dim' + '/' + 'density_plots' + '/' + 'layer' + '_' + layer_no + '.png')
     plt.close()
 
 def compute_similarities_across_layers(
@@ -194,6 +265,16 @@ def compute_similarities_across_layers(
                             dim=dim,
                             layer_no=str(layer_no),
                             )
+
+        for boxplot_version in ['seaborn', 'matplotlib']:
+            plot_cosine_boxplots(
+                                a_correct_cosines_mean=np.array(a_correct_cosines_mean),
+                                a_incorrect_cosines_mean=np.array(a_incorrect_cosines_mean),
+                                source=source,
+                                dim=dim,
+                                layer_no=str(layer_no),
+                                boxplot_version=boxplot_version,
+                                )
 
         if layer_no in est_layers:
             est_preds.append(est_preds_current)
