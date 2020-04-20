@@ -126,9 +126,12 @@ def plot_cosine_boxplots(
                     showmeans=True, 
                     labels=['correct', 'erroneous'],
                     )
+        plt.xlabel('answer predictions', fontsize=lab_fontsize)
+        plt.ylabel('cosine similarities', fontsize=lab_fontsize)
 
     plt.tight_layout()
     plt.savefig('./plots/hidden_reps/cosine_distributions/' + source.lower() + '/' + dim + '_' + 'dim' + '/' + 'boxplots' + '/' + 'layer' + '_' + layer_no +  '_' + boxplot_version + '.png')
+    plt.clf()
     plt.close()
 
 def plot_cosine_distrib(
