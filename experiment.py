@@ -93,7 +93,7 @@ if __name__ == '__main__':
             help='If provided, compute cosine embedding loss to assess cosine similarity among hidden representations w.r.t. correct answer span at last transfomer layer.')
     parser.add_argument('--estimate_preds_wrt_hiddens', action='store_true',
             help='If provided, estimate model predictions (whether model will make a correct or an erroneous pred) w.r.t. hidden representations of both answer and context (in latent space) at inference time.')
-    parser.add_argument('--get_incorrect_predictions', action='store_true',
+    parser.add_argument('--get_erroneous_predictions', action='store_true',
             help='If provided, store erroneous answer span predictions at inference time and compute distribution w.r.t. the latter.')
     
     
@@ -1329,8 +1329,8 @@ if __name__ == '__main__':
                                                                     inference_strategy = args.sequential_transfer_evaluation,
                                                                     detailed_analysis_sbj_class = True,
                                                                     )
-            elif task == 'QA' and args.get_incorrect_predictions:
-                test_loss, test_acc, test_f1, incorrect_preds_distribution = test(
+            elif task == 'QA' and args.get_erroneous_predictions:
+                test_loss, test_acc, test_f1, erroneous_preds_distribution = test(
                                                                                 model = model,
                                                                                 tokenizer = bert_tokenizer,
                                                                                 test_dl = test_dl,
@@ -1341,7 +1341,7 @@ if __name__ == '__main__':
                                                                                 input_sequence = 'question_answer' if args.batches == 'alternating' else 'question_context',
                                                                                 sequential_transfer = args.sequential_transfer,
                                                                                 inference_strategy = args.sequential_transfer_evaluation,
-                                                                                get_incorrect_predictions = args.get_incorrect_predictions,
+                                                                                get_erroneous_predictions = args.get_erroneous_predictions,
                                                                                 )
 
 
@@ -1464,8 +1464,8 @@ if __name__ == '__main__':
             if args.detailed_analysis_sbj_class:
                 test_results['test_results_per_ds'] = results_per_ds
 
-            elif task == 'QA' and args.get_incorrect_predictions:
-                test_results['incorrect_ans_distribution'] = incorrect_preds_distribution
+            elif task == 'QA' and args.get_erroneous_predictions:
+                test_results['erroneous_ans_distribution'] = erroneous_preds_distribution
 
             elif task == 'QA' and args.detailed_results_q_words:
                 test_results['test_results_q_word'] = results_per_q_word
