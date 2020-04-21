@@ -1260,6 +1260,7 @@ def test(
         output_all_hiddens:bool=False,
         output_all_hiddens_cls_q_words:bool=False,
         estimate_preds_wrt_hiddens:bool=False,
+        get_incorrect_predictions:bool=False,
         source=None,
 ):
     n_steps = len(test_dl)
@@ -1315,6 +1316,10 @@ def test(
         assert task == 'QA', 'Model must perform QA, if we want to compute exact-match scores per top k interrogative word'
         q_words = ['how', 'what', 'is', 'where', 'does', 'do']
         results_per_q_word = defaultdict(dict)
+
+    elif get_incorrect_predictions:
+        assert task == 'QA', 'Model must perform QA, if we want to store erroneous answer span predictions'
+        incorrect_predictions = []
 
     ###################################################
 
@@ -1562,7 +1567,7 @@ def test(
                       
                       if output_all_hiddens: # 2D matrix
                         #NOTE: for now, we just want to store correct and incorrect (answer span) predictions w.r.t answerable (!) questions
-                        #if compute_exact(b_true_answers[i], b_pred_answers[i]) and b_true_answers[i].strip() != '[CLS]':
+                        #if compute_exact(b_true_answers[i], b_pred_answers[i]) and b_true_answers[i].strip() != '[CLS]': # exclusively correct answers
                         if b_true_answers[i].strip() != '[CLS]':
                           feat_reps['Layer' + '_' + str(l + 1)].append(hidden[:b_input_lengths[i], :].tolist()) # remove PAD token vector representations
                           if l == 0:
@@ -1628,10 +1633,14 @@ def test(
                                                                     q_words,
                                                                     )
 
-
               ##################################################
               #### MODEL'S PREDICTED ANSWERS & TRUE ANSWERS ####
               ##################################################
+
+              if get_incorrect_predictions:
+                  for pred_ans, true_ans in zip(b_pred_answers, b_true_answers):
+                      if not compute_exact(true_ans, pred_ans):
+                          incorrect_predictions.append(pred_ans)
 
               #NOTE: uncomment code block below, if you want to store correct and incorrect (answer span) predictions w.r.t. both answerable and unanswerable questions
               """
@@ -1876,6 +1885,10 @@ def test(
     if detailed_analysis_sbj_class:
       results_per_ds = compute_acc_per_ds(results_per_ds)
       return test_loss, test_acc, test_f1, results_per_ds
+
+    elif task == 'QA' and get_incorrect_predictions:
+      incorrect_preds_distribution = {pred: (freq / len(incorrect_predictions)) * 100 for pred, freq in Counter(incorrect_predictions).items()}
+      return test_loss, test_acc, test_f1, incorrect_preds_distribution
 
     elif task == 'QA' and detailed_results_q_words:
       results_per_q_word = compute_acc_per_q_word(results_per_q_word)
