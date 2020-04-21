@@ -1888,6 +1888,7 @@ def test(
 
     elif task == 'QA' and get_erroneous_predictions:
       erroneous_preds_distribution = {pred: (freq / len(erroneous_predictions)) * 100 for pred, freq in Counter(erroneous_predictions).items()}
+      erroneous_preds_distribution = dict(sorted(erroneous_preds_distribution.items(), key=lambda kv:kv[1], reverse=True))
       return test_loss, test_acc, test_f1, erroneous_preds_distribution
 
     elif task == 'QA' and detailed_results_q_words:
