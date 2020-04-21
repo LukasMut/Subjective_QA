@@ -98,7 +98,6 @@ if __name__ == '__main__':
     parser.add_argument('--get_erroneous_predictions', action='store_true',
             help='If provided, store erroneous answer span predictions at inference time and compute distribution w.r.t. the latter.')
     
-    
     args = parser.parse_args()
     
     # check whether arg.parser works correctly
