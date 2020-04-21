@@ -7,6 +7,7 @@ __all__ = [
            'compute_f1_batch',
            'cosine_sim',
            'create_optimizer',
+           'sort_dict',
            'to_cpu',
            'train',
            'train_all',
@@ -70,6 +71,28 @@ def compute_acc_per_ds(results_per_ds:dict):
 
 def compute_acc_per_q_word(results_per_q_word:dict):
   return {q_word: 100 * (val['correct'] / val['freq']) for q_word, val in results_per_q_word.items()}
+
+def compute_acc_per_domain(results_per_domain:dict):
+  return {domain: 100 * (val['correct'] / val['freq']) for domain, val in results_per_domain.items()}
+
+def sort_dict(results:dict): return dict(sorted(results.items(), key=lambda kv:kv[1], reverse=True))
+
+def compute_batch_score_per_domain(
+                                   results_per_domain:dict,
+                                   idx_to_domain:dict,
+                                   b_true_answers:list,
+                                   b_pred_answers:list,
+                                   b_domains:torch.Tensor,
+                                   ):
+  b_domains = to_cpu(b_domains, numpy=True)
+  for i, (true_ans, pred_ans) in enumerate(zip(b_true_answers, b_pred_answers)):
+    try:
+      results_per_domain[b_domains[i]]['freq'] += 1
+    except KeyError:
+      results_per_domain[b_domains[i]]['freq'] = 1
+      results_per_domain[b_domains[i]]['correct'] = 0
+    results_per_domain[b_domains[i]]['correct'] += compute_exact(true_ans, pred_ans)
+  return results_per_domain
 
 def compute_batch_score_per_q_word(
                                    results_per_q_word:dict,
@@ -1254,6 +1277,7 @@ def test(
         inference_strategy:str=None,
         detailed_analysis_sbj_class:bool=False,
         detailed_results_q_words:bool=False,
+        detailed_results_domains:bool=False,
         multi_qa_type_class:bool=False,
         output_last_hiddens_cls:bool=False,
         output_all_hiddens_cls:bool=False,
@@ -1316,6 +1340,12 @@ def test(
         assert task == 'QA', 'Model must perform QA, if we want to compute exact-match scores per top k interrogative word'
         q_words = ['how', 'what', 'is', 'where', 'does', 'do']
         results_per_q_word = defaultdict(dict)
+
+    elif detailed_results_domains:
+        assert task == 'QA', 'Model must perform QA, if we want to compute exact-match scores per review domain'
+        domains = ['books', 'tripadvisor', 'grocery', 'electronics', 'movies', 'restaurants']
+        idx_to_domain = dict(enumerate(domains))
+        results_per_domain = defaultdict(dict)
 
     elif get_erroneous_predictions:
         assert task == 'QA', 'Model must perform QA, if we want to store erroneous answer span predictions'
@@ -1633,6 +1663,15 @@ def test(
                                                                     q_words,
                                                                     )
 
+              if detailed_results_domains:
+                results_per_domain = compute_batch_score_per_domain(
+                                                                    results_per_domain=results_per_domain,
+                                                                    idx_to_domain=idx_to_domain,
+                                                                    b_true_answers=b_true_answers,
+                                                                    b_pred_answers=b_pred_answers,
+                                                                    b_domains=b_domains,
+                                                                    )
+
               ##################################################
               #### MODEL'S PREDICTED ANSWERS & TRUE ANSWERS ####
               ##################################################
@@ -1888,11 +1927,15 @@ def test(
 
     elif task == 'QA' and get_erroneous_predictions:
       erroneous_preds_distribution = {pred: (freq / len(erroneous_predictions)) * 100 for pred, freq in Counter(erroneous_predictions).items()}
-      erroneous_preds_distribution = dict(sorted(erroneous_preds_distribution.items(), key=lambda kv:kv[1], reverse=True))
+      erroneous_preds_distribution = sort_dict(erroneous_preds_distribution)
       return test_loss, test_acc, test_f1, erroneous_preds_distribution
 
+    elif task == 'QA' and detailed_results_domains:
+      results_per_domain = sort_dict(compute_acc_per_domain(results_per_domain))
+      return test_loss, test_acc, test_f1, results_per_domain
+
     elif task == 'QA' and detailed_results_q_words:
-      results_per_q_word = compute_acc_per_q_word(results_per_q_word)
+      results_per_q_word = sort_dict(compute_acc_per_q_word(results_per_q_word))
       return test_loss, test_acc, test_f1, results_per_q_word
 
     elif task == 'QA' and estimate_preds_wrt_hiddens:
