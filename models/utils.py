@@ -84,7 +84,7 @@ def compute_batch_score_per_domain(
                                    b_pred_answers:list,
                                    b_domains:torch.Tensor,
                                    ):
-  b_domains = to_cpu(b_domains, to_numpy=True)
+  b_domains = to_cpu(b_domains)
   for i, (true_ans, pred_ans) in enumerate(zip(b_true_answers, b_pred_answers)):
     try:
       results_per_domain[b_domains[i]]['freq'] += 1
