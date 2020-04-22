@@ -81,7 +81,7 @@ if __name__ == '__main__':
             help='If provided, compute detailed analysis of subjectivity classification test results w.r.t datasets.')
     parser.add_argument('--detailed_results_q_words', action='store_true',
             help='If provided, compute exact-match accuracies per (top k) interrogative word across all questions in the test set.')
-    parser.add_argument('--detailed_results_domain', action='store_true',
+    parser.add_argument('--detailed_results_domains', action='store_true',
             help='If provided, compute exact-match accuracies per review domain across all questions in the test set.')  
     parser.add_argument('--output_last_hiddens_cls', action='store_true',
             help='If provided, feature representations of [CLS] token at last layer will be stored for each input sequence in the test set.')
@@ -1348,7 +1348,7 @@ if __name__ == '__main__':
 
 
 
-            elif task == 'QA' and args.detailed_results_domain:
+            elif task == 'QA' and args.detailed_results_domains:
                 test_loss, test_acc, test_f1, results_per_domain = test(
                                                                         model = model,
                                                                         tokenizer = bert_tokenizer,
@@ -1360,7 +1360,7 @@ if __name__ == '__main__':
                                                                         input_sequence = 'question_answer' if args.batches == 'alternating' else 'question_context',
                                                                         sequential_transfer = args.sequential_transfer,
                                                                         inference_strategy = args.sequential_transfer_evaluation,
-                                                                        detailed_results_domain = args.detailed_results_domain,
+                                                                        detailed_results_domains = args.detailed_results_domains,
                                                                         )
             elif task == 'QA' and args.detailed_results_q_words:
                 test_loss, test_acc, test_f1, results_per_q_word = test(
@@ -1482,7 +1482,7 @@ if __name__ == '__main__':
             elif task == 'QA' and args.get_erroneous_predictions:
                 test_results['erroneous_ans_distribution'] = erroneous_preds_distribution
 
-            elif task == 'QA' and args.detailed_results_domain:
+            elif task == 'QA' and args.detailed_results_domains:
                 test_results['test_results_domain'] = results_per_domain
 
             elif task == 'QA' and args.detailed_results_q_words:
