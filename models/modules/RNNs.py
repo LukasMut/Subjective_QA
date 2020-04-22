@@ -22,7 +22,6 @@ class BiLSTM(nn.Module):
                  dropout:float=0.25,
                  bidir:bool=True,
     ):
-        
         super(BiLSTM, self).__init__()
         self.in_size = in_size
         self.hidden_size = in_size // 2  # if hidden_size = in_size // 2 -> in_size for classification head is in_size due to bidir
@@ -84,7 +83,6 @@ class BiGRU(nn.Module):
                  dropout:float=0.25,
                  bidir:bool=True,
     ):
-        
         super(BiGRU, self).__init__()
         self.in_size = in_size
         self.hidden_size = in_size // 2 # if hidden_size = in_size // 2 -> in_size for classification head is in_size due to bidir

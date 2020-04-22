@@ -15,6 +15,8 @@ from eval_squad import compute_exact
 from scipy.stats import f_oneway, mode, ttest_ind
 from sklearn.decomposition import PCA
 from sklearn.metrics import f1_score
+from torch.utils.data import DataLoader, TensorDataset
+from utils import BatchGenerator
 
 
 def get_hidden_reps(source:str='SubjQA'):
@@ -51,14 +53,37 @@ def cosine_sim(u:np.ndarray, v:np.ndarray):
     denom = np.linalg.norm(u) * np.linalg.norm(v) # default is Frobenius norm (i.e., L2 norm)
     return num / denom
 
-def compute_ans_similarities(a_hiddens:np.ndarray, metric:str):
+def compute_ans_similarities(
+                             a_hiddens:np.ndarray,
+                             metric:str,
+                             training:bool=False,
+                             ):
     a_dists = []
     for i, a_i in enumerate(a_hiddens):
         for j, a_j in enumerate(a_hiddens):
             #NOTE: we don't want to compute cosine sim of a vector with itself (i.e., cos_sim(u, u) = 1)
             if i != j and j > i:
                 a_dists.append(cosine_sim(u=a_i, v=a_j))
-    return np.mean(a_dists), np.std(a_dists)
+    if training:
+        return np.max(a_dists), np.min(a_dists), mp.mean(a_dists), np.std(a_dists)
+    else:
+        return np.mean(a_dists), np.std(a_dists)
+
+
+def create_tensor_dataset(X:np.ndarray, y:np.ndarray): return TensorDataset(torch.tensor(X), torch.tensor(y, dtype=torch.long))
+
+def train(
+          model,
+          train_dl,
+          batch_size:int,
+          args:dict,
+          y_weights:torch.Tensors,
+          early_stopping:bool=True,
+):
+    assert isinstance(y_weights, torch.Tensor), 'Tensor of weights w.r.t. model predictions is not provided'
+    loss_func = nn.BCEWithLogitsLoss(pos_weight=y_weights.to(device))
+
+
 
 
 def plot_cosine_boxplots(
@@ -178,30 +203,46 @@ def compute_similarities_across_layers(
                                        metric:str,
                                        dim:str,
                                        rnd_state:int=42,
+                                       training:bool=False,
+                                       layers=None,
 ):
-    if dim == 'high':
-        p_components = .95 #retain 90% or 95% of the hidden rep's variance (95% = top 57 principal components)
-        cos_thresh = .45 if source.lower() == 'subjqa' else .50
-        est_layers = [4, 5, 6] if source.lower() == 'subjqa' else [5, 6]
+    p_components = .95 #retain 90% or 95% of the hidden rep's variance (95% = top 57 principal components)
+    N = len(pred_indices)    
+    
+    if training:
+        if layers == 'bottom_three_layers':
+            L = 3
+            est_layers = list(range(1, 4))
+
+        elif layers == 'top_three_layers':
+            L = 3
+            est_layers = list(range(4, 7))
+
+        elif layers == 'all_layers':
+            L =  6
+            est_layers = list(range(1, 7))
+
+        j = 0
+        M = 4 # number of features (i.e., min(cos(h_a)), max(cos(h_a)), mean(cos(h_a)), std(cos(h_a)))
+        X = np.zeros((N, M*L))
+        y = np.zeros(N, dtype=int)
     else:
-        p_components = 2 #keep top two or three principal components (analog to 2D / 3D plots)
-        cos_thresh = .85 if source.lower() == 'subjqa' else .82
-        std_thresh = .20
-        est_layers = [4, 5, 6]
+        cos_thresh = .45 if source.lower() == 'subjqa' else .50
+        est_layers = [4, 5, 6] if source.lower() == 'subjqa' else [5, 6] # answer separation starts later in space for objective compared to subjective questions
+        ans_similarities = defaultdict(dict)
+        est_preds = []
 
     # initialise PCA (we need to apply PCA to remove noise from the feature representations)
     pca = PCA(n_components=p_components, svd_solver='auto', random_state=rnd_state)
-
-    ans_similarities = defaultdict(dict)
-    N = len(pred_indices)    
-    est_preds = []
-    #est_preds = np.zeros(N)
+    
     for l, hiddens_all_sents in feat_reps.items():
         layer_no = int(l.lstrip('Layer' + '_'))
         correct_preds_dists, incorrect_preds_dists = [], []
         k = 0
-        if layer_no in est_layers:
-           est_preds_current = np.zeros(N)
+
+        if not training:
+            if layer_no in est_layers:
+               est_preds_current = np.zeros(N)
 
         for i, hiddens in enumerate(hiddens_all_sents):
             if i in pred_indices:
@@ -225,77 +266,89 @@ def compute_similarities_across_layers(
                 #a_hiddens = hiddens[true_start_pos[i]-2:true_end_pos[i]-1, :] # move ans span indices two positions to the left
                 a_hiddens = hiddens[true_start_pos[i]:true_end_pos[i]+1, :]
 
-                # compute cosine similarities among hidden reps w.r.t. answer span
-                a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens, metric)
+                if training:
+                    # compute cosine similarities among hidden reps w.r.t. answer span
+                    a_max_cos, a_min_cos, a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens, metric, training)
 
-                if true_preds[pred_indices == i] == 1:
-                    correct_preds_dists.append((a_mean_cos, a_std_cos))
-                else:
-                    incorrect_preds_dists.append((a_mean_cos, a_std_cos))
+                    if layer_no in est_layers:
+                        X[k, M*j:M*j+M] += np.array([a_max_cos, a_min_cos, a_mean_cos, a_std_cos])
+                        y[k] += true_preds[pred_indices == i]
+                        j += 1
+                else: 
+                    # compute cosine similarities among hidden reps w.r.t. answer span
+                    a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens, metric)
 
-                # estimate model predictions w.r.t. avg cosine similarities among answer hidden reps in the penultimate transformer layer
-                if layer_no in est_layers:
-                    if dim == 'high':
-                        if a_mean_cos > cos_thresh: 
-                            est_preds_current[k] += 1
+                    if true_preds[pred_indices == i] == 1:
+                        correct_preds_dists.append((a_mean_cos, a_std_cos))
                     else:
-                        if layer_no == 6:
-                            cos_thresh -= .20
-                        if a_mean_cos > cos_thresh and a_std_cos < std_thresh:
+                        incorrect_preds_dists.append((a_mean_cos, a_std_cos))
+
+                    # estimate model predictions w.r.t. avg cosine similarities among answer hidden reps in the penultimate transformer layer
+                    if layer_no in est_layers:
+                        if a_mean_cos > cos_thresh: 
                             est_preds_current[k] += 1
                 k += 1
 
-        # unzip means and stds w.r.t. cosine similarities
-        a_correct_cosines_mean, a_correct_cosines_std = zip(*correct_preds_dists)
-        a_incorrect_cosines_mean, a_incorrect_cosines_std = zip(*incorrect_preds_dists)
+        if not training:
+            # unzip means and stds w.r.t. cosine similarities
+            a_correct_cosines_mean, a_correct_cosines_std = zip(*correct_preds_dists)
+            a_incorrect_cosines_mean, a_incorrect_cosines_std = zip(*incorrect_preds_dists)
 
-        ans_similarities[l]['correct_preds'] = {}
-        ans_similarities[l]['correct_preds']['mean_cos_ha'] = np.mean(a_correct_cosines_mean)
-        #ans_similarities[l]['correct_preds']['std_cos_ha'] = np.mean(a_correct_cosines_std)
-        ans_similarities[l]['correct_preds']['std_cos_ha'] = np.std(a_correct_cosines_mean)
-        
-        ans_similarities[l]['incorrect_preds'] = {}
-        ans_similarities[l]['incorrect_preds']['mean_cos_ha'] = np.mean(a_incorrect_cosines_mean)
-        #ans_similarities[l]['incorrect_preds']['std_cos_ha'] = np.mean(a_incorrect_cosines_std)
-        ans_similarities[l]['incorrect_preds']['std_cos_ha'] = np.std(a_incorrect_cosines_mean)
+            ans_similarities[l]['correct_preds'] = {}
+            ans_similarities[l]['correct_preds']['mean_cos_ha'] = np.mean(a_correct_cosines_mean)
+            #ans_similarities[l]['correct_preds']['std_cos_ha'] = np.mean(a_correct_cosines_std)
+            ans_similarities[l]['correct_preds']['std_cos_ha'] = np.std(a_correct_cosines_mean)
+            
+            ans_similarities[l]['incorrect_preds'] = {}
+            ans_similarities[l]['incorrect_preds']['mean_cos_ha'] = np.mean(a_incorrect_cosines_mean)
+            #ans_similarities[l]['incorrect_preds']['std_cos_ha'] = np.mean(a_incorrect_cosines_std)
+            ans_similarities[l]['incorrect_preds']['std_cos_ha'] = np.std(a_incorrect_cosines_mean)
 
-        #TODO: figure out whether equal_var should be set to False
-        ans_similarities[l]['ttest_p_val'] = ttest_ind(a_correct_cosines_mean, a_incorrect_cosines_mean, equal_var=True)[1]
-        ans_similarities[l]['anova_p_val'] = f_oneway(a_correct_cosines_mean, a_incorrect_cosines_mean)[1]
+            #TODO: figure out whether equal_var should be set to False for independent t-test
+            ans_similarities[l]['ttest_p_val'] = ttest_ind(a_correct_cosines_mean, a_incorrect_cosines_mean, equal_var=True)[1]
+            ans_similarities[l]['anova_p_val'] = f_oneway(a_correct_cosines_mean, a_incorrect_cosines_mean)[1]
 
 
-        # plot the cosine similarity distributions for both correct and incorrect model predictions across all transformer layers
-        plot_cosine_distrib(
-                            a_correct_cosines_mean=np.array(a_correct_cosines_mean),
-                            a_incorrect_cosines_mean=np.array(a_incorrect_cosines_mean),
-                            source=source,
-                            dim=dim,
-                            layer_no=str(layer_no),
-                            )
-
-        for boxplot_version in ['seaborn', 'matplotlib']:
-            plot_cosine_boxplots(
+            # plot the cosine similarity distributions for both correct and incorrect model predictions across all transformer layers
+            plot_cosine_distrib(
                                 a_correct_cosines_mean=np.array(a_correct_cosines_mean),
                                 a_incorrect_cosines_mean=np.array(a_incorrect_cosines_mean),
                                 source=source,
                                 dim=dim,
                                 layer_no=str(layer_no),
-                                boxplot_version=boxplot_version,
                                 )
 
-        if layer_no in est_layers:
-            est_preds.append(est_preds_current)
+            for boxplot_version in ['seaborn', 'matplotlib']:
+                plot_cosine_boxplots(
+                                    a_correct_cosines_mean=np.array(a_correct_cosines_mean),
+                                    a_incorrect_cosines_mean=np.array(a_incorrect_cosines_mean),
+                                    source=source,
+                                    dim=dim,
+                                    layer_no=str(layer_no),
+                                    boxplot_version=boxplot_version,
+                                    )
 
-    est_preds = np.stack(est_preds, axis=1)
-    #if all estimations w.r.t. both layer 4, 5 and 6 yield correct pred we assume a correct model pred else incorrect
-    est_preds = np.array([1 if len(np.unique(row)) == 1 and np.unique(row)[0] == 1 else 0 for row in est_preds])
-    return ans_similarities, est_preds
+            if layer_no in est_layers:
+                est_preds.append(est_preds_current)
+
+    if training:
+        return X, y
+
+    else:
+        est_preds = np.stack(est_preds, axis=1)
+        #if all estimations w.r.t. both layer 4, 5 and 6 yield correct pred we assume a correct model pred else incorrect
+        est_preds = np.array([1 if len(np.unique(row)) == 1 and np.unique(row)[0] == 1 else 0 for row in est_preds])
+        return ans_similarities, est_preds
 
 def evaluate_estimations_and_cosines(
                                      test_results:dict,
                                      source:str,
                                      metric:str,
                                      dim:str,
+                                     prediction:str,
+                                     version=None,
+                                     batch_size=None,
+                                     layers=None,
 ):
     pred_answers = test_results['predicted_answers']
     true_answers = test_results['true_answers']
@@ -332,48 +385,73 @@ def evaluate_estimations_and_cosines(
 
     # compute (dis-)similarities among hidden reps in H_a for both correct and erroneous model predictions at each layer
     # AND estimate model predictions w.r.t. hidden reps in the penultimate layer
-    ans_similarities, est_preds = compute_similarities_across_layers(
-                                                                     feat_reps=feat_reps,
-                                                                     true_start_pos=true_start_pos,
-                                                                     true_end_pos=true_end_pos,
-                                                                     sent_pairs=sent_pairs,
-                                                                     pred_indices=pred_indices,
-                                                                     true_preds=true_preds,
-                                                                     source=source,
-                                                                     metric=metric,
-                                                                     dim=dim,
-                                                                  )
+    if prediction == 'automatic':
+        assert isinstance(version, str), 'Version must be one of {train, test}'
+        assert isinstance(layers, str), 'Layers for which we want to store statistical features must be specified'
+        assert isinstance(batch_size, int), 'Batch size must be defined'
+        X, y = compute_similarities_across_layers(
+                                                 feat_reps=feat_reps,
+                                                 true_start_pos=true_start_pos,
+                                                 true_end_pos=true_end_pos,
+                                                 sent_pairs=sent_pairs,
+                                                 pred_indices=pred_indices,
+                                                 true_preds=true_preds,
+                                                 source=source,
+                                                 metric=metric,
+                                                 dim=dim,
+                                                 training=training,
+                                                 layers=layers,
+                                                 )
 
-    est_accs = {}
-    est_accs['correct_preds'] = (true_preds[true_preds == 1] == est_preds[true_preds == 1]).mean() * 100
-    est_accs['incorrect_preds'] = (true_preds[true_preds == 0] == est_preds[true_preds == 0]).mean() * 100
-    est_accs['total_preds'] = {} 
-    est_accs['total_preds']['acc'] = (true_preds == est_preds).mean() * 100
-    est_accs['total_preds']['f1_weighted'] = f1_score(true_preds, est_preds, average='weighted') * 100
-    #est_accs = {'Layer' + '_' + str(l + 1): (est_preds == true_preds).mean() * 100 for l, est_preds in enumerate(est_preds_top_layers)}
-    return est_accs, ans_similarities
+        tensor_ds_train = create_tensor_dataset(X, y)
+        train_dl = BatchGenerator(dataset=tensor_ds_train, batch_size=batch_size)
+
+        return X, y 
+    else:
+        ans_similarities, est_preds = compute_similarities_across_layers(
+                                                                         feat_reps=feat_reps,
+                                                                         true_start_pos=true_start_pos,
+                                                                         true_end_pos=true_end_pos,
+                                                                         sent_pairs=sent_pairs,
+                                                                         pred_indices=pred_indices,
+                                                                         true_preds=true_preds,
+                                                                         source=source,
+                                                                         metric=metric,
+                                                                         dim=dim,
+                                                                         )
+
+        est_accs = {}
+        est_accs['correct_preds'] = (true_preds[true_preds == 1] == est_preds[true_preds == 1]).mean() * 100
+        est_accs['incorrect_preds'] = (true_preds[true_preds == 0] == est_preds[true_preds == 0]).mean() * 100
+        est_accs['total_preds'] = {} 
+        est_accs['total_preds']['acc'] = (true_preds == est_preds).mean() * 100
+        est_accs['total_preds']['f1_weighted'] = f1_score(true_preds, est_preds, average='weighted') * 100
+        return est_accs, ans_similarities
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--source', type=str, default='SubjQA',
         help='Estimate model predictions (i.e., correct or erroneous) w.r.t. hidden reps obtained from fine-tuning (and evaluating) on *source*.')
+    parser.add_argument('--training', action='store_true',
+        help='If provided, compute features matrix X and labels vector y w.r.t. cosine sim among answer hidden reps obtained from fine-tuning on *source*')
     args = parser.parse_args()
    
     # set variables
     source = args.source
+    training = args.training
     metric = 'cosine'
-    dims = ['high', 'low']
+    dim = 'high'
 
     # get feat reps
     test_results, model_name = get_hidden_reps(source=source)
 
     # estimate model predictions w.r.t. answer and context hidden reps in latent space (per transformer layer) AND
     # compute (dis-)similarities among hidden representations in h_a for both correct and erroneous model predictions (at each layer)
-    ests_and_cosines  = {dim: evaluate_estimations_and_cosines(test_results=test_results, source=source, metric=metric, dim=dim) for dim in dims}
+    estimations, cosine_similarities  = evaluate_estimations_and_cosines(test_results=test_results, source=source, metric=metric, dim=dim)
 
     hidden_reps_results = {}
-    hidden_reps_results['estimations'] = {dim: results[0] for dim, results in ests_and_cosines.items()}
-    hidden_reps_results['cos_similarities'] = {dim: results[1] for dim, results in ests_and_cosines.items()}
+    hidden_reps_results['estimations'] = estimations
+    hidden_reps_results['cos_similarities'] = cosine_similarities
 
     print()
     print(hidden_reps_results)
