@@ -26,11 +26,12 @@ from models.modules.NN import *
 
 
 def get_hidden_reps(source:str='SubjQA', version:str='train'):
+    
     # set folder and subdirectories
     folder = '/results_test/'
     subdir = '/feat_reps/'
     subsubdir = '/qa_per_token/'
-    task = subsubdir.lstrip('/').rstrip('/').lower()
+    task = 'ans_pred'
 
     # create PATH
     cwd = '.'
@@ -40,7 +41,7 @@ def get_hidden_reps(source:str='SubjQA', version:str='train'):
 
     if not os.path.exists(PATH):
         os.makedirs(PATH)
-        raise FileNotFoundError('PATH was not correctly defined. Move files to PATH.')
+        raise FileNotFoundError('PATH was not correctly defined. Move files to PATH before executing script again.')
 
     # we want to exclusively capture .json files
     files = [file for file in os.listdir(PATH) if file.endswith('.json')]
@@ -49,7 +50,7 @@ def get_hidden_reps(source:str='SubjQA', version:str='train'):
     # load file
     with open(PATH + f) as json_file:
         results = json.load(json_file)
-        file_name = 'hidden_rep_distances' + '_' + task
+        file_name = 'hidden_rep_cosines' + '_' +  task + '_' + version
         print("===============================================================")
         print("======= File loaded: {} =======".format(file_name))
         print("===============================================================")
@@ -222,8 +223,13 @@ def plot_cosine_boxplots(
         plt.ylabel('cosine similarities', fontsize=lab_fontsize)
 
     plt.tight_layout()
-    plt.savefig('./plots/hidden_reps/cosine_distributions/' + source.lower() + '/' + version + '/' + 'boxplots' + '/' + 'layer' + '_' + layer_no +  '_' + boxplot_version + '.png')
-    plt.clf()
+
+    PATH = './plots/hidden_reps/cosine_distributions/' + source.lower() + '/' + version + '/' + 'boxplots' + '/'
+   
+    if not os.path.exists(PATH):
+        os.makedirs(PATH)
+    
+    plt.savefig(PATH + 'layer' + '_' + layer_no +  '_' + boxplot_version + '.png')
     plt.close()
 
 def plot_cosine_distrib(
@@ -256,7 +262,13 @@ def plot_cosine_distrib(
     plt.ylabel('probability density', fontsize=lab_fontsize)
     plt.legend(fancybox=True, shadow=True, loc='best', fontsize=legend_fontsize)
     plt.tight_layout()
-    plt.savefig('./plots/hidden_reps/cosine_distributions/' + source.lower() + '/' + version + '/' + 'density_plots' + '/' + 'layer' + '_' + layer_no + '.png')
+
+    PATH = './plots/hidden_reps/cosine_distributions/' + source.lower() + '/' + version + '/' + 'density_plots' + '/'
+    
+    if not os.path.exists(PATH):
+        os.makedirs(PATH)
+
+    plt.savefig(PATH + 'layer' + '_' + layer_no + '.png')
     plt.close()
 
 def compute_similarities_across_layers(
@@ -523,13 +535,13 @@ if __name__ == "__main__":
         help='Must be one of {train, test}')
     parser.add_argument('--prediction', type=str, default='learned',
         help='If "learned", compute feature matrix X and labels vector y w.r.t. cos(h_a) obtained from fine-tuning on *source*')
-    parser.add_argument('--model_dir', type=str, default='saved_models/ans_pred',
+    parser.add_argument('--model_dir', type=str, default='./saved_models/ans_pred',
         help='Set model save directory for ans prediction model. Only necessary if args.prediction == learned.')
     parser.add_argument('--batch_size', type=int, default=8,
         help='Specify mini-batch size. Only necessary if args.prediction == learned.')
     parser.add_argument('--n_epochs', type=int, default=5,
         help='Set number of epochs model should be trained for. Only necessary if args.prediction == learned.')
-    parser.add_argument('--layers', type=str, default='all_layers',
+    parser.add_argument('--layers', type=str, default='',
         help='Must be one of {all_layers, bottom_three_layers, top_three_layers}. Only necessary if args.prediction == learned.')
 
     args = parser.parse_args()
@@ -554,15 +566,16 @@ if __name__ == "__main__":
                                                                              )
         hidden_reps_results['estimations'] = estimations
     else:
-        assert isinstance(args.layers, str), 'Layers for which we want to store statistical characteristics w.r.t. cos(h_a) must be specified'
+        assert isinstance(args.layers, str) and len(args.layers) > 0, 'Layers for which we want to store statistical characteristics w.r.t. cos(h_a) must be specified'
         assert isinstance(args.batch_size, int), 'Batch size must be defined'
         assert isinstance(args.model_dir, str), 'Directory to save and load weights of model must be defined'
         
-        if not os.path.exists(args.model_dir):
-            os.makedirs(args.model_dir)
-
         if version == 'train':
             assert isinstance(n_epochs, int), 'Number of epochs must be defined'
+            
+            if not os.path.exists(args.model_dir):
+                os.makedirs(args.model_dir)
+            
             ans_similarities, losses, f1_scores  = evaluate_estimations_and_cosines(
                                                                                     test_results=results,
                                                                                     source=args.source, 
@@ -591,7 +604,11 @@ if __name__ == "__main__":
     
     hidden_reps_results['cos_similarities'] = cosine_similarities
 
+    PATH = './results_hidden_reps/' + '/' + source.lower() + '/' + args.prediction + '/'
+    
+    if not os.path.exists(PATH):
+        os.makedirs(PATH)
     # save results
-    with open('./results_hidden_reps/' + '/' + source.lower() + '/' + file_name + '.json', 'w') as json_file:
+    with open(PATH + file_name + '_' + args.layers + '.json', 'w') as json_file:
         json.dump(hidden_reps_results, json_file)
 
