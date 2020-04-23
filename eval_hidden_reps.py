@@ -556,7 +556,7 @@ if __name__ == "__main__":
     # compute (dis-)similarities among hidden representations in h_a for both correct and erroneous model predictions (at each layer)
 
     hidden_reps_results = {}
-    if prediction == 'hand_engineered':
+    if args.prediction == 'hand_engineered':
         estimations, cosine_similarities  = evaluate_estimations_and_cosines(
                                                                              test_results=results,
                                                                              source=args.source, 
@@ -573,7 +573,7 @@ if __name__ == "__main__":
         assert isinstance(args.batch_size, int), 'Batch size must be defined'
         assert isinstance(args.model_dir, str), 'Directory to save and load weights of model must be defined'
         
-        if version == 'train':
+        if args.version == 'train':
             assert isinstance(n_epochs, int), 'Number of epochs must be defined'
             
             if not os.path.exists(args.model_dir):
@@ -611,7 +611,7 @@ if __name__ == "__main__":
     
     if not os.path.exists(PATH):
         os.makedirs(PATH)
-        
+
     # save results
     with open(PATH + file_name + '_' + args.layers + '.json', 'w') as json_file:
         json.dump(hidden_reps_results, json_file)
