@@ -96,10 +96,6 @@ def test(model, test_dl):
             test_f1 += f1(probas=torch.sigmoid(logits), y_true=y, task='binary')
             test_steps += 1
         test_f1 /= train_steps
-        print("============================")
-        print("======= Inference ==========")
-        print("======= F1: {} =============".format(round(test_f1, 3)))
-        print("============================")
     return test_f1
 
 def train(
@@ -138,14 +134,17 @@ def train(
             optim.zero_grad()
             train_steps += 1
             train_loss += loss.item()
+
         losses.append(train_loss / train_steps)
         f1_scores.append(train_f1 / train_steps)
+
         print("=============================")
         print("======= Epoch: {} =========".format(epoch + 1))
         print("======= Loss: {} ========".format(round(losses[-1], 3)))
         print("======= F1: {} ==========".format(round(f1_scores[-1], 3)))
-        print("=========================")
+        print("============================")
         print()
+
         if early_stopping:
             if losses[-1] >= losses[-2]:
                 print("===========================================")
@@ -153,6 +152,7 @@ def train(
                 print("===========================================")
                 print()
                 break
+
     model.eval()
     return losses, f1_scores, model
 
@@ -611,6 +611,7 @@ if __name__ == "__main__":
     
     if not os.path.exists(PATH):
         os.makedirs(PATH)
+        
     # save results
     with open(PATH + file_name + '_' + args.layers + '.json', 'w') as json_file:
         json.dump(hidden_reps_results, json_file)
