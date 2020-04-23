@@ -13,7 +13,7 @@ __all__ = [
            'train_all',
            'val',
            'test',
-]
+           ]
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt

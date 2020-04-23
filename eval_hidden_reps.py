@@ -21,8 +21,11 @@ from torch.utils.data import DataLoader, TensorDataset
 from torch.optim import Adam 
 from utils import BatchGenerator
 
-from models.utils import f1
-from models.modules.NN import *
+try:
+    from models.utils import to_cpu, f1
+    from models.modules.NN import *
+except ImportError:
+    pass
 
 
 def get_hidden_reps(source:str='SubjQA', version:str='train'):
