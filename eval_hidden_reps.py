@@ -4,7 +4,8 @@ import argparse
 import matplotlib
 import json
 import os
-import re 
+import re
+import torch
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -77,14 +78,11 @@ def train(
           train_dl,
           batch_size:int,
           args:dict,
-          y_weights:torch.Tensors,
+          y_weights:torch.Tensor,
           early_stopping:bool=True,
 ):
     assert isinstance(y_weights, torch.Tensor), 'Tensor of weights w.r.t. model predictions is not provided'
     loss_func = nn.BCEWithLogitsLoss(pos_weight=y_weights.to(device))
-
-
-
 
 def plot_cosine_boxplots(
                          a_correct_cosines_mean:np.ndarray,
