@@ -16,11 +16,16 @@ from eval_squad import compute_exact
 from scipy.stats import f_oneway, mode, ttest_ind
 from sklearn.decomposition import PCA
 from sklearn.metrics import f1_score
+from tqdm import trange, tqdm
 from torch.utils.data import DataLoader, TensorDataset
+from torch.optim import Adam 
 from utils import BatchGenerator
 
+from models.utils import f1
+from models.modules.NN import *
 
-def get_hidden_reps(source:str='SubjQA'):
+
+def get_hidden_reps(source:str='SubjQA', version:str='train'):
     # set folder and subdirectories
     folder = '/results_test/'
     subdir = '/feat_reps/'
@@ -30,7 +35,12 @@ def get_hidden_reps(source:str='SubjQA'):
     # create PATH
     cwd = '.'
     PATH = cwd + folder + subdir + subsubdir
-    PATH += '/bert_stl_finetuned_subjqa/' if source == 'SubjQA' else '/bert_stl_finetuned_squad/'
+    PATH += '/bert_finetuned_subjqa/' if source == 'SubjQA' else '/bert_finetuned_squad/'
+    PATH += '/dev/' if version == 'train' else '/test/'
+
+    if not os.path.exists(PATH):
+        os.makedirs(PATH)
+        raise FileNotFoundError('PATH was not correctly defined. Move files to PATH.')
 
     # we want to exclusively capture .json files
     files = [file for file in os.listdir(PATH) if file.endswith('.json')]
@@ -38,14 +48,14 @@ def get_hidden_reps(source:str='SubjQA'):
 
     # load file
     with open(PATH + f) as json_file:
-        test_results = json.load(json_file)
-        model_name = 'hidden_rep_distances' + '_' + task
+        results = json.load(json_file)
+        file_name = 'hidden_rep_distances' + '_' + task
         print("===============================================================")
-        print("======= File loaded: {} =======".format(model_name))
+        print("======= File loaded: {} =======".format(file_name))
         print("===============================================================")
         print()
 
-    return test_results, model_name
+    return results, file_name
 
 def euclidean_dist(u:np.ndarray, v:np.ndarray): return np.linalg.norm(u-v) # default is L2 norm
 
@@ -54,18 +64,14 @@ def cosine_sim(u:np.ndarray, v:np.ndarray):
     denom = np.linalg.norm(u) * np.linalg.norm(v) # default is Frobenius norm (i.e., L2 norm)
     return num / denom
 
-def compute_ans_similarities(
-                             a_hiddens:np.ndarray,
-                             metric:str,
-                             training:bool=False,
-                             ):
+def compute_ans_similarities(a_hiddens:np.ndarray, prediction:str):
     a_dists = []
     for i, a_i in enumerate(a_hiddens):
         for j, a_j in enumerate(a_hiddens):
             #NOTE: we don't want to compute cosine sim of a vector with itself (i.e., cos_sim(u, u) = 1)
             if i != j and j > i:
                 a_dists.append(cosine_sim(u=a_i, v=a_j))
-    if training:
+    if prediction == 'learned':
         return np.max(a_dists), np.min(a_dists), mp.mean(a_dists), np.std(a_dists)
     else:
         return np.mean(a_dists), np.std(a_dists)
@@ -73,22 +79,85 @@ def compute_ans_similarities(
 
 def create_tensor_dataset(X:np.ndarray, y:np.ndarray): return TensorDataset(torch.tensor(X), torch.tensor(y, dtype=torch.long))
 
+def test(model, test_dl):
+    n_iters = len(test_dl)
+    test_f1 = 0
+    test_steps = 0
+    model.eval()
+    with torch.no_grad():
+        for step, batch in enumerate(test_dl):
+            batch = tuple(t.to(device) for t in batch)
+            X, y = batch
+            logits = model(X)
+            test_f1 += f1(probas=torch.sigmoid(logits), y_true=y, task='binary')
+            test_steps += 1
+        test_f1 /= train_steps
+        print("============================")
+        print("======= Inference ==========")
+        print("======= F1: {} =============".format(round(test_f1, 3)))
+        print("============================")
+    return test_f1
+
 def train(
           model,
           train_dl,
+          n_epochs:int,
           batch_size:int,
-          args:dict,
           y_weights:torch.Tensor,
           early_stopping:bool=True,
 ):
+    n_steps = len(train_dl)
+    n_iters = n_steps * n_epochs
     assert isinstance(y_weights, torch.Tensor), 'Tensor of weights w.r.t. model predictions is not provided'
     loss_func = nn.BCEWithLogitsLoss(pos_weight=y_weights.to(device))
+    optim = Adam(model.parameters())
+    max_grad_norm = 10
+    losses = []
+    f1_scores = []
+
+    for epoch in trange(n_epochs,  desc="Epoch"):
+        model.train()
+        train_f1 = 0
+        train_steps = 0
+        train_loss = 0
+        for step, batch in enumerate(train_dl):
+            loss = 0
+            batch = tuple(t.to(device) for t in batch)
+            X, y = batch
+            logits = model(X)
+            y.type_as(logits)
+            loss += loss_func(logits, y)
+            train_f1 += f1(probas=torch.sigmoid(logits), y_true=y, task='binary')
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
+            optim.step()
+            optim.zero_grad()
+            train_steps += 1
+            train_loss += loss.item()
+        losses.append(train_loss / train_steps)
+        f1_scores.append(train_f1 / train_steps)
+        print("=============================")
+        print("======= Epoch: {} =========".format(epoch + 1))
+        print("======= Loss: {} ========".format(round(losses[-1], 3)))
+        print("======= F1: {} ==========".format(round(f1_scores[-1], 3)))
+        print("=========================")
+        print()
+        if early_stopping:
+            if losses[-1] >= losses[-2]:
+                print("===========================================")
+                print("==== Early stopping after {} epochs =====".format(epoch + 1))
+                print("===========================================")
+                print()
+                break
+    model.eval()
+    return losses, f1_scores, model
+
 
 def plot_cosine_boxplots(
                          a_correct_cosines_mean:np.ndarray,
                          a_incorrect_cosines_mean:np.ndarray,
                          source:str,
-                         dim:str,
+                         version:str,
                          layer_no:str,
                          boxplot_version:str,
 ):
@@ -153,7 +222,7 @@ def plot_cosine_boxplots(
         plt.ylabel('cosine similarities', fontsize=lab_fontsize)
 
     plt.tight_layout()
-    plt.savefig('./plots/hidden_reps/cosine_distributions/' + source.lower() + '/' + dim + '_' + 'dim' + '/' + 'boxplots' + '/' + 'layer' + '_' + layer_no +  '_' + boxplot_version + '.png')
+    plt.savefig('./plots/hidden_reps/cosine_distributions/' + source.lower() + '/' + version + '/' + 'boxplots' + '/' + 'layer' + '_' + layer_no +  '_' + boxplot_version + '.png')
     plt.clf()
     plt.close()
 
@@ -161,7 +230,7 @@ def plot_cosine_distrib(
                         a_correct_cosines_mean:np.ndarray,
                         a_incorrect_cosines_mean:np.ndarray,
                         source:str,
-                        dim:str,
+                        version:str,
                         layer_no:str,
 ):
     # the higher the dpi, the better is the resolution of the plot (don't set dpi too high)
@@ -187,7 +256,7 @@ def plot_cosine_distrib(
     plt.ylabel('probability density', fontsize=lab_fontsize)
     plt.legend(fancybox=True, shadow=True, loc='best', fontsize=legend_fontsize)
     plt.tight_layout()
-    plt.savefig('./plots/hidden_reps/cosine_distributions/' + source.lower() + '/' + dim + '_' + 'dim' + '/' + 'density_plots' + '/' + 'layer' + '_' + layer_no + '.png')
+    plt.savefig('./plots/hidden_reps/cosine_distributions/' + source.lower() + '/' + version + '/' + 'density_plots' + '/' + 'layer' + '_' + layer_no + '.png')
     plt.close()
 
 def compute_similarities_across_layers(
@@ -198,16 +267,16 @@ def compute_similarities_across_layers(
                                        pred_indices:list,
                                        true_preds:np.ndarray,
                                        source:str,
-                                       metric:str,
-                                       dim:str,
-                                       rnd_state:int=42,
-                                       training:bool=False,
+                                       prediction:str,
+                                       version:str,
                                        layers=None,
 ):
     p_components = .95 #retain 90% or 95% of the hidden rep's variance (95% = top 57 principal components)
-    N = len(pred_indices)    
+    rnd_state = 42
+    N = len(pred_indices)
+    ans_similarities = defaultdict(dict)    
     
-    if training:
+    if prediction == 'learned':
         if layers == 'bottom_three_layers':
             L = 3
             est_layers = list(range(1, 4))
@@ -224,21 +293,23 @@ def compute_similarities_across_layers(
         M = 4 # number of features (i.e., min(cos(h_a)), max(cos(h_a)), mean(cos(h_a)), std(cos(h_a)))
         X = np.zeros((N, M*L))
         y = np.zeros(N, dtype=int)
-    else:
+
+    elif prediction == 'hand_engineered':
+        # set threshold w.r.t. cos(a) above which we assume a correct answer prediction
         cos_thresh = .45 if source.lower() == 'subjqa' else .50
-        est_layers = [4, 5, 6] if source.lower() == 'subjqa' else [5, 6] # answer separation starts later in space for objective compared to subjective questions
-        ans_similarities = defaultdict(dict)
+        # separation of answer from context starts later in latent space for objective compared to subjective questions
+        est_layers = [4, 5, 6] if source.lower() == 'subjqa' else [5, 6] 
         est_preds = []
 
     # initialise PCA (we need to apply PCA to remove noise from the feature representations)
     pca = PCA(n_components=p_components, svd_solver='auto', random_state=rnd_state)
     
     for l, hiddens_all_sents in feat_reps.items():
-        layer_no = int(l.lstrip('Layer' + '_'))
         correct_preds_dists, incorrect_preds_dists = [], []
+        layer_no = int(l.lstrip('Layer' + '_'))
         k = 0
 
-        if not training:
+        if prediction == 'hand_engineered':
             if layer_no in est_layers:
                est_preds_current = np.zeros(N)
 
@@ -264,30 +335,32 @@ def compute_similarities_across_layers(
                 #a_hiddens = hiddens[true_start_pos[i]-2:true_end_pos[i]-1, :] # move ans span indices two positions to the left
                 a_hiddens = hiddens[true_start_pos[i]:true_end_pos[i]+1, :]
 
-                if training:
+                if prediction == 'learned':
                     # compute cosine similarities among hidden reps w.r.t. answer span
-                    a_max_cos, a_min_cos, a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens, metric, training)
+                    a_max_cos, a_min_cos, a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens, prediction)
 
                     if layer_no in est_layers:
+                        # create feature matrix and labels vector w.r.t. statistical properties to train neural network
                         X[k, M*j:M*j+M] += np.array([a_max_cos, a_min_cos, a_mean_cos, a_std_cos])
                         y[k] += true_preds[pred_indices == i]
                         j += 1
-                else: 
+
+                elif prediction == 'hand_engineered': 
                     # compute cosine similarities among hidden reps w.r.t. answer span
-                    a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens, metric)
-
-                    if true_preds[pred_indices == i] == 1:
-                        correct_preds_dists.append((a_mean_cos, a_std_cos))
-                    else:
-                        incorrect_preds_dists.append((a_mean_cos, a_std_cos))
-
-                    # estimate model predictions w.r.t. avg cosine similarities among answer hidden reps in the penultimate transformer layer
+                    a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens, prediction)
+                    # estimate model predictions w.r.t. avg cosine similarities among answer hidden reps in the penultimate and last transformer layer
                     if layer_no in est_layers:
                         if a_mean_cos > cos_thresh: 
                             est_preds_current[k] += 1
+                
+                if true_preds[pred_indices == i] == 1:
+                    correct_preds_dists.append((a_mean_cos, a_std_cos))
+                else:
+                    incorrect_preds_dists.append((a_mean_cos, a_std_cos))
+
+
                 k += 1
 
-        if not training:
             # unzip means and stds w.r.t. cosine similarities
             a_correct_cosines_mean, a_correct_cosines_std = zip(*correct_preds_dists)
             a_incorrect_cosines_mean, a_incorrect_cosines_std = zip(*incorrect_preds_dists)
@@ -312,39 +385,40 @@ def compute_similarities_across_layers(
                                 a_correct_cosines_mean=np.array(a_correct_cosines_mean),
                                 a_incorrect_cosines_mean=np.array(a_incorrect_cosines_mean),
                                 source=source,
-                                dim=dim,
+                                version=version,
                                 layer_no=str(layer_no),
                                 )
 
             for boxplot_version in ['seaborn', 'matplotlib']:
                 plot_cosine_boxplots(
-                                    a_correct_cosines_mean=np.array(a_correct_cosines_mean),
-                                    a_incorrect_cosines_mean=np.array(a_incorrect_cosines_mean),
-                                    source=source,
-                                    dim=dim,
-                                    layer_no=str(layer_no),
-                                    boxplot_version=boxplot_version,
+                                     a_correct_cosines_mean=np.array(a_correct_cosines_mean),
+                                     a_incorrect_cosines_mean=np.array(a_incorrect_cosines_mean),
+                                     source=source,
+                                     version=version,
+                                     layer_no=str(layer_no),
+                                     boxplot_version=boxplot_version,
                                     )
 
-            if layer_no in est_layers:
-                est_preds.append(est_preds_current)
+            if prediction == 'hand_engineered':
+                if layer_no in est_layers:
+                    est_preds.append(est_preds_current)
 
-    if training:
-        return X, y
+    if prediction == 'learned':
+        return ans_similarities, X, y
 
     else:
         est_preds = np.stack(est_preds, axis=1)
-        #if all estimations w.r.t. both layer 4, 5 and 6 yield correct pred we assume a correct model pred else incorrect
+        #if all estimations w.r.t. both layer 5 and 6 yield correct pred we assume a correct model pred else incorrect
         est_preds = np.array([1 if len(np.unique(row)) == 1 and np.unique(row)[0] == 1 else 0 for row in est_preds])
         return ans_similarities, est_preds
 
 def evaluate_estimations_and_cosines(
                                      test_results:dict,
                                      source:str,
-                                     metric:str,
-                                     dim:str,
                                      prediction:str,
                                      version=None,
+                                     model_dir=None,
+                                     n_epochs=None,
                                      batch_size=None,
                                      layers=None,
 ):
@@ -383,29 +457,44 @@ def evaluate_estimations_and_cosines(
 
     # compute (dis-)similarities among hidden reps in H_a for both correct and erroneous model predictions at each layer
     # AND estimate model predictions w.r.t. hidden reps in the penultimate layer
-    if prediction == 'automatic':
-        assert isinstance(version, str), 'Version must be one of {train, test}'
-        assert isinstance(layers, str), 'Layers for which we want to store statistical features must be specified'
-        assert isinstance(batch_size, int), 'Batch size must be defined'
-        X, y = compute_similarities_across_layers(
-                                                 feat_reps=feat_reps,
-                                                 true_start_pos=true_start_pos,
-                                                 true_end_pos=true_end_pos,
-                                                 sent_pairs=sent_pairs,
-                                                 pred_indices=pred_indices,
-                                                 true_preds=true_preds,
-                                                 source=source,
-                                                 metric=metric,
-                                                 dim=dim,
-                                                 training=training,
-                                                 layers=layers,
-                                                 )
+    if prediction == 'learned':
+        ans_similarities, X, y = compute_similarities_across_layers(
+                                                                    feat_reps=feat_reps,
+                                                                    true_start_pos=true_start_pos,
+                                                                    true_end_pos=true_end_pos,
+                                                                    sent_pairs=sent_pairs,
+                                                                    pred_indices=pred_indices,
+                                                                    true_preds=true_preds,
+                                                                    source=source,
+                                                                    prediction=prediction,
+                                                                    version=version,
+                                                                    layers=layers,
+                                                                    )
 
-        tensor_ds_train = create_tensor_dataset(X, y)
-        train_dl = BatchGenerator(dataset=tensor_ds_train, batch_size=batch_size)
 
-        return X, y 
-    else:
+        M = X.shape[1]
+        tensor_ds = create_tensor_dataset(X, y)
+        dl = BatchGenerator(dataset=tensor_ds, batch_size=batch_size)
+        model_name = 'fc_nn' + '_' + layers
+
+        if version == 'train':
+            y_distrib = Counter(y)
+            y_weights = torch.tensor(y_distrib[0]/y_distrib[1], dtype=torch.float)
+            model = FFNN(in_size=M)
+            model.to(device)
+            losses, f1_scores, model = train(model=model, train_dl=dl, n_epochs=n_epochs, batch_size=batch_size, y_weights=y_weights)
+            torch.save(model.state_dict(), model_dir + '/%s' % (model_name))
+            return ans_similarities, losses, f1_scores
+
+        else:
+            model = FFNN(in_size=M)
+            # load model
+            model.load_state_dict(torch.load(model_dir + '/%s' % (model_name)))
+            model.to(device)
+            test_f1 = test(model=model, test_dl=dl)
+            return ans_similarities, test_f1
+    
+    elif prediction == 'hand_engineered':
         ans_similarities, est_preds = compute_similarities_across_layers(
                                                                          feat_reps=feat_reps,
                                                                          true_start_pos=true_start_pos,
@@ -414,8 +503,8 @@ def evaluate_estimations_and_cosines(
                                                                          pred_indices=pred_indices,
                                                                          true_preds=true_preds,
                                                                          source=source,
-                                                                         metric=metric,
-                                                                         dim=dim,
+                                                                         prediction=prediction,
+                                                                         version=version,
                                                                          )
 
         est_accs = {}
@@ -423,39 +512,86 @@ def evaluate_estimations_and_cosines(
         est_accs['incorrect_preds'] = (true_preds[true_preds == 0] == est_preds[true_preds == 0]).mean() * 100
         est_accs['total_preds'] = {} 
         est_accs['total_preds']['acc'] = (true_preds == est_preds).mean() * 100
-        est_accs['total_preds']['f1_weighted'] = f1_score(true_preds, est_preds, average='weighted') * 100
+        est_accs['total_preds']['f1_macro'] = f1_score(true_preds, est_preds, average='macro') * 100
         return est_accs, ans_similarities
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--source', type=str, default='SubjQA',
         help='Estimate model predictions (i.e., correct or erroneous) w.r.t. hidden reps obtained from fine-tuning (and evaluating) on *source*.')
-    parser.add_argument('--training', action='store_true',
-        help='If provided, compute features matrix X and labels vector y w.r.t. cosine sim among answer hidden reps obtained from fine-tuning on *source*')
-    args = parser.parse_args()
-   
-    # set variables
-    source = args.source
-    training = args.training
-    metric = 'cosine'
-    dim = 'high'
+    parser.add_argument('--version', type=str, default='train',
+        help='Must be one of {train, test}')
+    parser.add_argument('--prediction', type=str, default='learned',
+        help='If "learned", compute feature matrix X and labels vector y w.r.t. cos(h_a) obtained from fine-tuning on *source*')
+    parser.add_argument('--model_dir', type=str, default='saved_models/ans_pred',
+        help='Set model save directory for ans prediction model. Only necessary if args.prediction == learned.')
+    parser.add_argument('--batch_size', type=int, default=8,
+        help='Specify mini-batch size. Only necessary if args.prediction == learned.')
+    parser.add_argument('--n_epochs', type=int, default=5,
+        help='Set number of epochs model should be trained for. Only necessary if args.prediction == learned.')
+    parser.add_argument('--layers', type=str, default='all_layers',
+        help='Must be one of {all_layers, bottom_three_layers, top_three_layers}. Only necessary if args.prediction == learned.')
 
+    args = parser.parse_args()
+    assert isinstance(args.version, str), 'Version must be one of {train, test}'
     # get feat reps
-    test_results, model_name = get_hidden_reps(source=source)
+    results, file_name = get_hidden_reps(source=args.source, version=args.version)
 
     # estimate model predictions w.r.t. answer and context hidden reps in latent space (per transformer layer) AND
     # compute (dis-)similarities among hidden representations in h_a for both correct and erroneous model predictions (at each layer)
-    estimations, cosine_similarities  = evaluate_estimations_and_cosines(test_results=test_results, source=source, metric=metric, dim=dim)
 
     hidden_reps_results = {}
-    hidden_reps_results['estimations'] = estimations
+    if prediction == 'hand_engineered':
+        estimations, cosine_similarities  = evaluate_estimations_and_cosines(
+                                                                             test_results=results,
+                                                                             source=args.source, 
+                                                                             prediction=args.prediction,
+                                                                             version=args.version,
+                                                                             model_dir=args.model_dir,
+                                                                             batch_size=args.batch_size,
+                                                                             n_epochs=args.n_epochs,
+                                                                             layers=args.layers,
+                                                                             )
+        hidden_reps_results['estimations'] = estimations
+    else:
+        assert isinstance(args.layers, str), 'Layers for which we want to store statistical characteristics w.r.t. cos(h_a) must be specified'
+        assert isinstance(args.batch_size, int), 'Batch size must be defined'
+        assert isinstance(args.model_dir, str), 'Directory to save and load weights of model must be defined'
+        
+        if not os.path.exists(args.model_dir):
+            os.makedirs(args.model_dir)
+
+        if version == 'train':
+            assert isinstance(n_epochs, int), 'Number of epochs must be defined'
+            ans_similarities, losses, f1_scores  = evaluate_estimations_and_cosines(
+                                                                                    test_results=results,
+                                                                                    source=args.source, 
+                                                                                    prediction=args.prediction,
+                                                                                    version=args.version,
+                                                                                    model_dir=args.model_dir,
+                                                                                    batch_size=args.batch_size,
+                                                                                    n_epochs=args.n_epochs,
+                                                                                    layers=args.layers,
+                                                                                    )
+            hidden_reps_results['train_losses'] = losses
+            hidden_reps_results['train_f1s'] = f1_scores
+
+        else:
+            ans_similarities, test_f1 = evaluate_estimations_and_cosines(
+                                                                         test_results=results,
+                                                                         source=args.source, 
+                                                                         prediction=args.prediction,
+                                                                         version=args.version,
+                                                                         model_dir=args.model_dir,
+                                                                         batch_size=args.batch_size,
+                                                                         n_epochs=args.n_epochs,
+                                                                         layers=args.layers,
+                                                                         )
+            hidden_reps_results['test_f1'] = test_f1
+    
     hidden_reps_results['cos_similarities'] = cosine_similarities
 
-    print()
-    print(hidden_reps_results)
-    print()
-
     # save results
-    with open('./results_hidden_reps/' + '/' + source.lower() + '/' + model_name + '.json', 'w') as json_file:
+    with open('./results_hidden_reps/' + '/' + source.lower() + '/' + file_name + '.json', 'w') as json_file:
         json.dump(hidden_reps_results, json_file)
 

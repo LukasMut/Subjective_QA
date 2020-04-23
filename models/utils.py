@@ -87,11 +87,11 @@ def compute_batch_score_per_domain(
   b_domains = to_cpu(b_domains)
   for i, (true_ans, pred_ans) in enumerate(zip(b_true_answers, b_pred_answers)):
     try:
-      results_per_domain[b_domains[i]]['freq'] += 1
+      results_per_domain[idx_to_domain[b_domains[i]]]['freq'] += 1
     except KeyError:
-      results_per_domain[b_domains[i]]['freq'] = 1
-      results_per_domain[b_domains[i]]['correct'] = 0
-    results_per_domain[b_domains[i]]['correct'] += compute_exact(true_ans, pred_ans)
+      results_per_domain[idx_to_domain[b_domains[i]]]['freq'] = 1
+      results_per_domain[idx_to_domain[b_domains[i]]]['correct'] = 0
+    results_per_domain[idx_to_domain[b_domains[i]]]['correct'] += compute_exact(true_ans, pred_ans)
   return results_per_domain
 
 def compute_batch_score_per_q_word(
@@ -1598,7 +1598,7 @@ def test(
                       if output_all_hiddens: # 2D matrix
                         #NOTE: for now, we just want to store correct and incorrect (answer span) predictions w.r.t answerable (!) questions
                         #if compute_exact(b_true_answers[i], b_pred_answers[i]) and b_true_answers[i].strip() != '[CLS]': # exclusively correct answers
-                        if b_true_answers[i].strip() != '[CLS]':
+                        if b_true_answers[i].strip() != '[CLS]' and len(b_true_answers[i].strip().split()) > 1:
                           feat_reps['Layer' + '_' + str(l + 1)].append(hidden[:b_input_lengths[i], :].tolist()) # remove PAD token vector representations
                           if l == 0:
                             # store both true and predicted answer spans for respective word sequences only once (NOT FOR EVERY LAYER)
@@ -1880,14 +1880,6 @@ def test(
             print("----- Current batch F1: {} % -----".format(round(current_batch_f1, 3)))
             print("--------------------------------------------")
             print()
-
-            #NOTE: uncomment code block below, if you want to store correct and incorrect (answer span) predictions w.r.t. both answerable and unanswerable questions
-            
-            #if task == 'QA' and output_all_hiddens:
-              #it seems as if we cannot load all hidden representations into memory (lets load (n_steps // 2) * batch_size * n_layers * tensors of shape [seq_len, hidden_size] for now)
-              #if n == n_steps // 2:
-                  #break
-            
             
     test_loss /= nb_test_steps
 
