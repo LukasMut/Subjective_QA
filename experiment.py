@@ -73,7 +73,7 @@ if __name__ == '__main__':
             help='Define mini-batch size.')
     parser.add_argument('--n_epochs', type=int, default=3,
             help='Set number of epochs model should be fine-tuned for. If we fine-tune on SubjQA or combined, an additional epoch will be added.')
-    parser.add_argument('--sd', type=str, default='saved_models',
+    parser.add_argument('--sd', type=str, default='./saved_models/QA',
             help='Set model save directory for QA model.')
     parser.add_argument('--not_finetuned', action='store_true',
             help='If provided, test DistilBERT model previously pre-trained on SQuAD on SubjQA (no prior task-specific fine-tuning); only possible in test version.')
