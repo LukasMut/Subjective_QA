@@ -1163,7 +1163,7 @@ if __name__ == '__main__':
                 
                 _, squad_examples_dev = split_into_train_and_dev(squad_examples_train)
 
-                squad_examples_test = squad_examples_dev[:len(squad_examples_dev)//2] #squad_examples_dev[len(squad_examples_dev)//2:]
+                squad_examples_test = squad_examples_dev[len(squad_examples_dev)//2:]
 
                 squad_features_test = convert_examples_to_features(
                                                                     squad_examples_test, 
@@ -1184,7 +1184,7 @@ if __name__ == '__main__':
         
                 subjqa_data_test_df, hidden_domain_idx_test = get_data(
                                                                        source='/SubjQA/',
-                                                                       split='/dev',
+                                                                       split='/test',
                                                                        domain='all',
                 )
                 
