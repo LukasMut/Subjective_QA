@@ -13,6 +13,7 @@ import seaborn as sns
 
 from collections import defaultdict, Counter
 from eval_squad import compute_exact
+from statsmodels.stats.multitest import multipletests
 from scipy.stats import f_oneway, mode, ttest_ind
 from sklearn.decomposition import PCA
 from sklearn.metrics import f1_score
@@ -61,7 +62,7 @@ def get_hidden_reps(source:str='SubjQA', version:str='train'):
     files = [file for file in os.listdir(PATH) if file.endswith('.json')]
     f = files.pop()
 
-    # load file
+    # load hidden representations into memory
     with open(PATH + f) as json_file:
         results = json.load(json_file)
         file_name = 'hidden_rep_cosines' + '_' +  task + '_' + version
@@ -91,6 +92,16 @@ def compute_ans_similarities(a_hiddens:np.ndarray, prediction:str):
     else:
         return np.mean(a_dists), np.std(a_dists)
 
+def correct_p_values(
+                     ans_similarities:dict,
+                     alpha=.05,
+                     adjustment='bonferroni',
+                     ):
+    uncorrected_p_vals = np.array([vals['ttest_p_val'] for l, vals in ans_similarities.items()])
+    corrected_p_vals = multipletests(pvals=uncorrected_p_vals, alpha=alpha, method=adjustment, returnsorted=False)[1]
+    for l, p_val in enumerate(corrected_p_vals):
+        ans_similarities['Layer'+'_'+str(l+1)]['ttest_p_val'] = p_val
+    return ans_similarities
 
 def create_tensor_dataset(X:np.ndarray, y:np.ndarray): return TensorDataset(torch.tensor(X), torch.tensor(y, dtype=torch.long))
 
@@ -157,7 +168,7 @@ def train(
         print()
 
         if early_stopping:
-            if losses[-1] >= losses[-2]:
+            if losses[-1] >= losses[-2] or f1_scores[-1] <= f1_scores[-2]:
                 print("===========================================")
                 print("==== Early stopping after {} epochs =====".format(epoch + 1))
                 print("===========================================")
@@ -166,7 +177,6 @@ def train(
 
     model.eval()
     return losses, f1_scores, model
-
 
 def plot_cosine_boxplots(
                          a_correct_cosines_mean:np.ndarray,
@@ -298,27 +308,25 @@ def compute_similarities_across_layers(
                                        layers=None,
 ):
     p_components = .95 #retain 90% or 95% of the hidden rep's variance (95% = top 57 principal components)
-    rnd_state = 42
+    rnd_state = 42 # set random seed for reproducibility
     N = len(pred_indices)
     ans_similarities = defaultdict(dict)    
     
     if prediction == 'learned':
         if layers == 'bottom_three_layers':
-            L = 3
             est_layers = list(range(1, 4))
 
         elif layers == 'top_three_layers':
-            L = 3
             est_layers = list(range(4, 7))
 
         elif layers == 'all_layers':
-            L =  6
             est_layers = list(range(1, 7))
 
-        j = 0
-        M = 4 # number of features (i.e., min(cos(h_a)), max(cos(h_a)), mean(cos(h_a)), std(cos(h_a)))
+        L = len(est_layers) # total number of layers
+        M = 4 # number of statistical features (i.e., min(cos(h_a)), max(cos(h_a)), mean(cos(h_a)), std(cos(h_a)))
         X = np.zeros((N, M*L))
         y = np.zeros(N, dtype=int)
+        j = 0 # running idx to update X_i for each l in L
 
     elif prediction == 'hand_engineered':
         # set threshold w.r.t. cos(a) above which we assume a correct answer prediction
@@ -334,7 +342,7 @@ def compute_similarities_across_layers(
         correct_preds_dists, incorrect_preds_dists = [], []
         layer_no = int(l.lstrip('Layer' + '_'))
         k = 0
-
+        
         if prediction == 'hand_engineered':
             if layer_no in est_layers:
                est_preds_current = np.zeros(N)
@@ -366,7 +374,7 @@ def compute_similarities_across_layers(
                     a_max_cos, a_min_cos, a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens, prediction)
 
                     if layer_no in est_layers:
-                        # create feature matrix and labels vector w.r.t. statistical properties to train neural network
+                        # create feature matrix and labels vector w.r.t. statistical properties of cos(h_a) to train neural network
                         X[k, M*j:M*j+M] += np.array([a_max_cos, a_min_cos, a_mean_cos, a_std_cos])
                         y[k] += true_preds[pred_indices == i]
                         j += 1
@@ -401,9 +409,13 @@ def compute_similarities_across_layers(
             #ans_similarities[l]['incorrect_preds']['std_cos_ha'] = np.mean(a_incorrect_cosines_std)
             ans_similarities[l]['incorrect_preds']['std_cos_ha'] = np.std(a_incorrect_cosines_mean)
 
+            # the following step is necessary since number of incorrect model predicitions is significantly higher than the number of correct model predictions
+            # draw different random samples without replacement 
+            rnd_samples_incorrect_means = [np.random.choice(a_incorrect_cosines_mean, size=len(a_correct_cosines_mean), replace=False) for _ in range(5)]
+
             #TODO: figure out whether equal_var should be set to False for independent t-test
-            ans_similarities[l]['ttest_p_val'] = ttest_ind(a_correct_cosines_mean, a_incorrect_cosines_mean, equal_var=True)[1]
-            ans_similarities[l]['anova_p_val'] = f_oneway(a_correct_cosines_mean, a_incorrect_cosines_mean)[1]
+            ans_similarities[l]['ttest_p_val'] = np.mean([ttest_ind(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means])
+            ans_similarities[l]['anova_p_val'] = np.mean([f_oneway(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means])
 
 
             # plot the cosine similarity distributions for both correct and incorrect model predictions across all transformer layers
@@ -430,11 +442,13 @@ def compute_similarities_across_layers(
                     est_preds.append(est_preds_current)
 
     if prediction == 'learned':
+        ans_similarities = correct_p_values(ans_similarities)
         return ans_similarities, X, y
 
     else:
+        ans_similarities = correct_p_values(ans_similarities)
         est_preds = np.stack(est_preds, axis=1)
-        #if all estimations w.r.t. both layer 5 and 6 yield correct pred we assume a correct model pred else incorrect
+        #if estimations w.r.t. both layer 5 and 6 yield correct pred we assume a correct model pred else incorrect
         est_preds = np.array([1 if len(np.unique(row)) == 1 and np.unique(row)[0] == 1 else 0 for row in est_preds])
         return ans_similarities, est_preds
 
