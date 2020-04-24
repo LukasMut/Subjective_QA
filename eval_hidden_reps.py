@@ -511,7 +511,7 @@ def evaluate_estimations_and_cosines(
                                                                 )
         y = true_preds
         M = X.shape[1]
-        X, y = shuffle(X, y, random_state=42) if version == 'train' else X, y # shuffle order of examples only during training
+        X, y = shuffle(X, y, random_state=42) if version == 'train' else X, y #shuffle order of examples during training (not necessary at inference time)
         tensor_ds = create_tensor_dataset(X, y)
         dl = BatchGenerator(dataset=tensor_ds, batch_size=batch_size)
         model_name = 'fc_nn' + '_' + layers
