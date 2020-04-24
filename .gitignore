@@ -85,3 +85,4 @@ emnlp_2020_paper/emnlp2020-templates/__MACOSX/._emnlp2020-templates
 emnlp_2020_paper/emnlp2020-templates.zip
 plotting_attempts.ipynb
 .ipynb_checkpoints/plotting_attempts-checkpoint.ipynb
+saved_models/ans_pred/fc_nn_all_layers

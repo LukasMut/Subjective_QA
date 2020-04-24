@@ -129,7 +129,12 @@ def test(model, test_dl):
             logits = model(X)
             test_f1 += f1(probas=torch.sigmoid(logits), y_true=y, task='binary')
             test_steps += 1
-        test_f1 /= train_steps
+        test_f1 /= test_steps
+    print("===================")
+    print("==== Inference ====".format(epoch + 1))
+    print("==== F1: {} ====".format(round(test_f1, 3)))
+    print("===================")
+    print()
     return test_f1
 
 def train(
@@ -172,7 +177,7 @@ def train(
         losses.append(train_loss / train_steps)
         f1_scores.append(train_f1 / train_steps)
 
-        print("============================")
+        print("=============================")
         print("======== Epoch: {} ==========".format(epoch + 1))
         print("======= Loss: {} ========".format(round(losses[-1], 3)))
         print("======= F1: {} ==========".format(round(f1_scores[-1], 3)))
@@ -181,7 +186,7 @@ def train(
 
         if epoch > 1:
             if early_stopping:
-                if losses[-1] >= losses[-2] or f1_scores[-1] <= f1_scores[-2]:
+                if losses[-1] > losses[-2]:
                     print("===========================================")
                     print("==== Early stopping after {} epochs =====".format(epoch + 1))
                     print("===========================================")
@@ -575,7 +580,7 @@ if __name__ == "__main__":
         help='Set model save directory for ans prediction model. Only necessary if args.prediction == learned.')
     parser.add_argument('--batch_size', type=int, default=8,
         help='Specify mini-batch size. Only necessary if args.prediction == learned.')
-    parser.add_argument('--n_epochs', type=int, default=5,
+    parser.add_argument('--n_epochs', type=int, default=10,
         help='Set number of epochs model should be trained for. Only necessary if args.prediction == learned.')
     parser.add_argument('--layers', type=str, default='',
         help='Must be one of {all_layers, bottom_three_layers, top_three_layers}. Only necessary if args.prediction == learned.')
@@ -590,16 +595,16 @@ if __name__ == "__main__":
 
     hidden_reps_results = {}
     if args.prediction == 'hand_engineered':
-        estimations, cosine_similarities  = evaluate_estimations_and_cosines(
-                                                                             test_results=results,
-                                                                             source=args.source, 
-                                                                             prediction=args.prediction,
-                                                                             version=args.version,
-                                                                             model_dir=args.model_dir,
-                                                                             batch_size=args.batch_size,
-                                                                             n_epochs=args.n_epochs,
-                                                                             layers=args.layers,
-                                                                             )
+        estimations, ans_similarities  = evaluate_estimations_and_cosines(
+                                                                         test_results=results,
+                                                                         source=args.source, 
+                                                                         prediction=args.prediction,
+                                                                         version=args.version,
+                                                                         model_dir=args.model_dir,
+                                                                         batch_size=args.batch_size,
+                                                                         n_epochs=args.n_epochs,
+                                                                         layers=args.layers,
+                                                                         )
         hidden_reps_results['estimations'] = estimations
 
     elif args.prediction == 'learned':
@@ -640,7 +645,7 @@ if __name__ == "__main__":
     else:
         raise ValueError('Prediction must be one of {hand_engineered, learned}')
     
-    hidden_reps_results['cos_similarities'] = cosine_similarities
+    hidden_reps_results['cos_similarities'] = ans_similarities
 
     PATH = './results_hidden_reps/' + '/' + source.lower() + '/' + args.prediction + '/'
     
