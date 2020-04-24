@@ -625,6 +625,8 @@ if __name__ == "__main__":
                                                                          layers=args.layers,
                                                                          )
             hidden_reps_results['test_f1'] = test_f1
+    else:
+        raise ValueError('Prediction must be one of {hand_engineered, learned}')
     
     hidden_reps_results['cos_similarities'] = cosine_similarities
 
