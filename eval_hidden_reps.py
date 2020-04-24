@@ -438,7 +438,6 @@ def compute_similarities_across_layers(
             if layer_no in est_layers:
                 est_preds.append(est_preds_current)
         else:
-            # update running idx j for each l in L_est
             if layer_no in est_layers:
                 j += 1
 
