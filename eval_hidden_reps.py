@@ -307,7 +307,7 @@ def compute_similarities_across_layers(
                                        version:str,
                                        layers=None,
 ):
-    p_components = .95 #retain 90% or 95% of the hidden rep's variance (95% = top 57 principal components)
+    retained_var = .95 #retain 90% or 95% of the hidden rep's variance (95% = top 57 principal components)
     rnd_state = 42 # set random seed for reproducibility
     N = len(pred_indices)
     ans_similarities = defaultdict(dict)    
@@ -336,7 +336,7 @@ def compute_similarities_across_layers(
         est_preds = []
 
     #initialise PCA (we need to apply PCA to remove noise from the feature representations)
-    pca = PCA(n_components=p_components, svd_solver='auto', random_state=rnd_state)
+    pca = PCA(n_components=retained_var, svd_solver='auto', random_state=rnd_state)
     
     for l, hiddens_all_sents in feat_reps.items():
         correct_preds_dists, incorrect_preds_dists = [], []
@@ -391,7 +391,7 @@ def compute_similarities_across_layers(
                     correct_preds_dists.append((a_mean_cos, a_std_cos))
                 else:
                     incorrect_preds_dists.append((a_mean_cos, a_std_cos))
-                    
+
                 k += 1
 
             # unzip means and stds w.r.t. cosine similarities
