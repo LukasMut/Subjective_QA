@@ -94,7 +94,7 @@ def compute_ans_similarities(a_hiddens:np.ndarray, prediction:str):
 
 def correct_p_values(
                      ans_similarities:dict,
-                     alpha=.05,
+                     alpha=.05, #.01
                      adjustment='bonferroni',
                      ):
     uncorrected_p_vals = np.array([vals['ttest_p_val'] for l, vals in ans_similarities.items()])
