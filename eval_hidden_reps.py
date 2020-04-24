@@ -390,56 +390,55 @@ def compute_similarities_across_layers(
                 if true_preds[pred_indices == i] == 1:
                     correct_preds_dists.append((a_mean_cos, a_std_cos))
                 else:
-                    #print("=== Storing mean and std w.r.t. cos(h_a) for correct model predictions ===")
                     incorrect_preds_dists.append((a_mean_cos, a_std_cos))
 
                 k += 1
 
-            # unpack means and stds w.r.t. cosine similarities
-            a_correct_cosines_mean, a_correct_cosines_std = zip(*correct_preds_dists)
-            a_incorrect_cosines_mean, a_incorrect_cosines_std = zip(*incorrect_preds_dists)
+        # unpack means and stds w.r.t. cosine similarities
+        a_correct_cosines_mean, a_correct_cosines_std = zip(*correct_preds_dists)
+        a_incorrect_cosines_mean, a_incorrect_cosines_std = zip(*incorrect_preds_dists)
 
-            ans_similarities[l]['correct_preds'] = {}
-            ans_similarities[l]['correct_preds']['mean_cos_ha'] = np.mean(a_correct_cosines_mean)
-            ans_similarities[l]['correct_preds']['std_cos_ha'] = np.std(a_correct_cosines_mean)
-            ans_similarities[l]['correct_preds']['mean_std_cos_ha'] = np.mean(a_correct_cosines_std)
-            
-            ans_similarities[l]['incorrect_preds'] = {}
-            ans_similarities[l]['incorrect_preds']['mean_cos_ha'] = np.mean(a_incorrect_cosines_mean)
-            ans_similarities[l]['incorrect_preds']['std_cos_ha'] = np.std(a_incorrect_cosines_mean)
-            ans_similarities[l]['incorrect_preds']['mean_std_cos_ha'] = np.mean(a_incorrect_cosines_std)
+        ans_similarities[l]['correct_preds'] = {}
+        ans_similarities[l]['correct_preds']['mean_cos_ha'] = np.mean(a_correct_cosines_mean)
+        ans_similarities[l]['correct_preds']['std_cos_ha'] = np.std(a_correct_cosines_mean)
+        ans_similarities[l]['correct_preds']['mean_std_cos_ha'] = np.mean(a_correct_cosines_std)
+        
+        ans_similarities[l]['incorrect_preds'] = {}
+        ans_similarities[l]['incorrect_preds']['mean_cos_ha'] = np.mean(a_incorrect_cosines_mean)
+        ans_similarities[l]['incorrect_preds']['std_cos_ha'] = np.std(a_incorrect_cosines_mean)
+        ans_similarities[l]['incorrect_preds']['mean_std_cos_ha'] = np.mean(a_incorrect_cosines_std)
 
-            # the following step is necessary since number of incorrect model predicitions is significantly higher than the number of correct model predictions
-            # draw different random samples from the set of cos(h_a) w.r.t. incorrect answer predictions without (!) replacement 
-            rnd_samples_incorrect_means = [np.random.choice(a_incorrect_cosines_mean, size=len(a_correct_cosines_mean), replace=False) for _ in range(5)]
+        # the following step is necessary since number of incorrect model predicitions is significantly higher than the number of correct model predictions
+        # draw different random samples from the set of cos(h_a) w.r.t. incorrect answer predictions without (!) replacement 
+        rnd_samples_incorrect_means = [np.random.choice(a_incorrect_cosines_mean, size=len(a_correct_cosines_mean), replace=False) for _ in range(5)]
 
-            #TODO: figure out whether equal_var should be set to False for independent t-test (do we assume equal variances w.r.t. cos(h_a) across predictions?)
-            ans_similarities[l]['ttest_p_val'] = np.mean([ttest_ind(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means])
-            ans_similarities[l]['anova_p_val'] = np.mean([f_oneway(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means])
+        #TODO: figure out whether equal_var should be set to False for independent t-test (do we assume equal variances w.r.t. cos(h_a) across predictions?)
+        ans_similarities[l]['ttest_p_val'] = np.mean([ttest_ind(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means])
+        ans_similarities[l]['anova_p_val'] = np.mean([f_oneway(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means])
 
 
-            # plot the cosine similarity distributions for both correct and incorrect model predictions across all transformer layers
-            plot_cosine_distrib(
-                                a_correct_cosines_mean=np.array(a_correct_cosines_mean),
-                                a_incorrect_cosines_mean=np.array(a_incorrect_cosines_mean),
-                                source=source,
-                                version=version,
-                                layer_no=str(layer_no),
+        # plot the cosine similarity distributions for both correct and incorrect model predictions across all transformer layers
+        plot_cosine_distrib(
+                            a_correct_cosines_mean=np.array(a_correct_cosines_mean),
+                            a_incorrect_cosines_mean=np.array(a_incorrect_cosines_mean),
+                            source=source,
+                            version=version,
+                            layer_no=str(layer_no),
+                            )
+
+        for boxplot_version in ['seaborn', 'matplotlib']:
+            plot_cosine_boxplots(
+                                 a_correct_cosines_mean=np.array(a_correct_cosines_mean),
+                                 a_incorrect_cosines_mean=np.array(a_incorrect_cosines_mean),
+                                 source=source,
+                                 version=version,
+                                 layer_no=str(layer_no),
+                                 boxplot_version=boxplot_version,
                                 )
 
-            for boxplot_version in ['seaborn', 'matplotlib']:
-                plot_cosine_boxplots(
-                                     a_correct_cosines_mean=np.array(a_correct_cosines_mean),
-                                     a_incorrect_cosines_mean=np.array(a_incorrect_cosines_mean),
-                                     source=source,
-                                     version=version,
-                                     layer_no=str(layer_no),
-                                     boxplot_version=boxplot_version,
-                                    )
-
-            if prediction == 'hand_engineered':
-                if layer_no in est_layers:
-                    est_preds.append(est_preds_current)
+        if prediction == 'hand_engineered':
+            if layer_no in est_layers:
+                est_preds.append(est_preds_current)
 
     if prediction == 'learned':
         ans_similarities = correct_p_values(ans_similarities)
