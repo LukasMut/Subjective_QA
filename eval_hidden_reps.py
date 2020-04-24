@@ -391,8 +391,7 @@ def compute_similarities_across_layers(
                     correct_preds_dists.append((a_mean_cos, a_std_cos))
                 else:
                     incorrect_preds_dists.append((a_mean_cos, a_std_cos))
-
-
+                    
                 k += 1
 
             # unzip means and stds w.r.t. cosine similarities
