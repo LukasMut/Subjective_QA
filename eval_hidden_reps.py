@@ -326,7 +326,7 @@ def compute_similarities_across_layers(
         M = 4 # number of statistical features (i.e., min(cos(h_a)), max(cos(h_a)), mean(cos(h_a)), std(cos(h_a)))
         X = np.zeros((N, M*L))
         y = np.zeros(N, dtype=int)
-        j = 0 # running idx to update X_i for each l in L
+        j = 0 # running idx to update X_i for each l in L_est
 
     elif prediction == 'hand_engineered':
         # set threshold w.r.t. cos(a) above which we assume a correct answer prediction
