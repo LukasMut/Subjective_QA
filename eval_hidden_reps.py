@@ -17,6 +17,7 @@ from statsmodels.stats.multitest import multipletests
 from scipy.stats import f_oneway, mode, ttest_ind
 from sklearn.decomposition import PCA
 from sklearn.metrics import f1_score
+from sklearn.utils import shuffle
 from tqdm import trange, tqdm
 from torch.utils.data import DataLoader, TensorDataset
 from torch.optim import Adam 
@@ -510,6 +511,7 @@ def evaluate_estimations_and_cosines(
                                                                 )
         y = true_preds
         M = X.shape[1]
+        X, y = shuffle(X, y, random_state=42)
         tensor_ds = create_tensor_dataset(X, y)
         dl = BatchGenerator(dataset=tensor_ds, batch_size=batch_size)
         model_name = 'fc_nn' + '_' + layers
