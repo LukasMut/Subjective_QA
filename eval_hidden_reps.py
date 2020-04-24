@@ -560,7 +560,7 @@ if __name__ == "__main__":
     parser.add_argument('--version', type=str, default='train',
         help='Must be one of {train, test}')
     parser.add_argument('--prediction', type=str, default='learned',
-        help='If "learned", compute feature matrix X and labels vector y w.r.t. cos(h_a) obtained from fine-tuning on *source*')
+        help='If "learned", compute feature matrix X and labels vector y w.r.t. cos(h_a) obtained from fine-tuning on *source* to train feed-forward neural net')
     parser.add_argument('--model_dir', type=str, default='./saved_models/ans_pred',
         help='Set model save directory for ans prediction model. Only necessary if args.prediction == learned.')
     parser.add_argument('--batch_size', type=int, default=8,
