@@ -23,4 +23,5 @@ class FFNN(nn.Module):
 	def forward(self, X):
 		out = self.dropout(self.fc_1(X))
 		logits = self.fc_2(out)
+		logits = logits.squeeze(-1)
 		return logits
