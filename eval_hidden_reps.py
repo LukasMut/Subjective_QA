@@ -115,7 +115,7 @@ def shuffle_arrays(X:np.ndarray, y:np.ndarray):
     perm = np.random.permutation(X.shape[0])
     return X[perm], y[perm]
 
-def create_tensor_dataset(X:np.ndarray, y:np.ndarray): return TensorDataset(torch.tensor(X), torch.tensor(y, dtype=torch.long))
+def create_tensor_dataset(X:np.ndarray, y:np.ndarray): return TensorDataset(torch.tensor(X, dtype=torch.float), torch.tensor(y, dtype=torch.long))
 
 def test(model, test_dl):
     n_iters = len(test_dl)
