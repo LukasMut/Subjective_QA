@@ -370,14 +370,14 @@ def compute_similarities_across_layers(
                 a_hiddens = hiddens[true_start_pos[i]:true_end_pos[i]+1, :]
 
                 if prediction == 'learned':
-                    # compute cosine similarities among hidden reps w.r.t. answer span (i.e., cos(h_a))
+                    # compute cos(h_a)
                     a_max_cos, a_min_cos, a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens, prediction)
                     
                     if layer_no in est_layers:
                         X[k, M*j:M*j+M] += np.array([a_max_cos, a_min_cos, a_mean_cos, a_std_cos])
 
                 elif prediction == 'hand_engineered': 
-                    # compute cosine similarities among hidden reps w.r.t. answer span
+                    # compute cos(h_a)
                     a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens, prediction)
                     # estimate model predictions w.r.t. avg cosine similarities among answer hidden reps in the penultimate and last transformer layer
                     if layer_no in est_layers:
