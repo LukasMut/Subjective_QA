@@ -366,7 +366,7 @@ def compute_similarities_across_layers(
                     print()
 
                 # extract hidden reps for answer span
-                #a_hiddens = hiddens[true_start_pos[i]-2:true_end_pos[i]-1, :] # move ans span indices two positions to the left
+                #a_hiddens = hiddens[true_start_pos[i]-2:true_end_pos[i]-1, :] # move ans span indices two positions to the left (accounting for [CLS] and [SEP])
                 a_hiddens = hiddens[true_start_pos[i]:true_end_pos[i]+1, :]
 
                 if prediction == 'learned':
@@ -417,7 +417,7 @@ def compute_similarities_across_layers(
         ans_similarities[l]['anova_p_val'] = np.mean([f_oneway(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means])
 
 
-        # plot the cosine similarity distributions for both correct and incorrect model predictions across all transformer layers
+        # plot cos(h_a) distributions for both correct and erroneous model predictions across all transformer layers
         plot_cosine_distrib(
                             a_correct_cosines_mean=np.array(a_correct_cosines_mean),
                             a_incorrect_cosines_mean=np.array(a_incorrect_cosines_mean),
@@ -435,7 +435,6 @@ def compute_similarities_across_layers(
                                  layer_no=str(layer_no),
                                  boxplot_version=boxplot_version,
                                 )
-
         if prediction == 'hand_engineered':
             if layer_no in est_layers:
                 est_preds.append(est_preds_current)
