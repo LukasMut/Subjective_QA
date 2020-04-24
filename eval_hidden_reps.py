@@ -37,10 +37,10 @@ try:
 except ImportError:
     pass
 
-# move model and tensors to GPU, if GPU is available (device must be defined)
+#move model and tensors to GPU, if GPU is available (device must be defined)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# set random seeds for reproducibility
+#set random seeds for reproducibility
 np.random.seed(42)
 torch.manual_seed(42)
 
