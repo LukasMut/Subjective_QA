@@ -27,6 +27,17 @@ try:
 except ImportError:
     pass
 
+# move model and tensors to GPU, if GPU is available (device must be defined)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# set random seeds for reproducibility
+np.random.seed(42)
+torch.manual_seed(42)
+
+try:
+    torch.cuda.manual_seed_all(42)
+except:
+    pass
 
 def get_hidden_reps(source:str='SubjQA', version:str='train'):
     
@@ -498,13 +509,12 @@ def evaluate_estimations_and_cosines(
             model = FFNN(in_size=M)
             model.to(device)
             losses, f1_scores, model = train(model=model, train_dl=dl, n_epochs=n_epochs, batch_size=batch_size, y_weights=y_weights)
-            torch.save(model.state_dict(), model_dir + '/%s' % (model_name))
+            torch.save(model.state_dict(), model_dir + '/%s' % (model_name)) # save model's weights
             return ans_similarities, losses, f1_scores
 
         else:
             model = FFNN(in_size=M)
-            # load model
-            model.load_state_dict(torch.load(model_dir + '/%s' % (model_name)))
+            model.load_state_dict(torch.load(model_dir + '/%s' % (model_name))) # load model's weights
             model.to(device)
             test_f1 = test(model=model, test_dl=dl)
             return ans_similarities, test_f1
