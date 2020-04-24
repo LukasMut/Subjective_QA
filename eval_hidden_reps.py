@@ -66,6 +66,7 @@ def get_hidden_reps(source:str='SubjQA', version:str='train'):
     with open(PATH + f) as json_file:
         results = json.load(json_file)
         file_name = 'hidden_rep_cosines' + '_' +  task + '_' + version
+        print()
         print("===============================================================")
         print("======= File loaded: {} =======".format(file_name))
         print("===============================================================")
@@ -92,11 +93,11 @@ def compute_ans_similarities(a_hiddens:np.ndarray, prediction:str):
     else:
         return np.mean(a_dists), np.std(a_dists)
 
-def correct_p_values(
-                     ans_similarities:dict,
-                     alpha=.05, #.01
-                     adjustment='bonferroni',
-                     ):
+def adjust_p_values(
+                    ans_similarities:dict,
+                    alpha=.05, #.01
+                    adjustment='bonferroni',
+                    ):
     uncorrected_p_vals = np.array([vals['ttest_p_val'] for l, vals in ans_similarities.items()])
     corrected_p_vals = multipletests(pvals=uncorrected_p_vals, alpha=alpha, method=adjustment, returnsorted=False)[1]
     for l, p_val in enumerate(corrected_p_vals):
@@ -442,11 +443,11 @@ def compute_similarities_across_layers(
                 j += 1
 
     if prediction == 'learned':
-        ans_similarities = correct_p_values(ans_similarities)
+        ans_similarities = adjust_p_values(ans_similarities)
         return ans_similarities, X, y
 
     else:
-        ans_similarities = correct_p_values(ans_similarities)
+        ans_similarities = adjust_p_values(ans_similarities)
         est_preds = np.stack(est_preds, axis=1)
         #if estimations w.r.t. both layer 5 and 6 yield correct pred we assume a correct model pred else incorrect
         est_preds = np.array([1 if len(np.unique(row)) == 1 and np.unique(row)[0] == 1 else 0 for row in est_preds])
