@@ -159,7 +159,7 @@ def train(
             batch = tuple(t.to(device) for t in batch)
             X, y = batch
             logits = model(X)
-            y.type_as(logits)
+            y = y.type_as(logits)
             loss += loss_func(logits, y)
             train_f1 += f1(probas=torch.sigmoid(logits), y_true=y, task='binary')
             loss.backward()
@@ -527,8 +527,8 @@ def evaluate_estimations_and_cosines(
         model_name = 'fc_nn' + '_' + layers
 
         if version == 'train':
-            y_distrib = Counter(y)
-            y_weights = torch.tensor(y_distrib[0]/y_distrib[1], dtype=torch.float)
+            y_distribution = Counter(y)
+            y_weights = torch.tensor(y_distribution[0]/y_distribution[1], dtype=torch.float)
             model = FFNN(in_size=M)
             model.to(device)
             losses, f1_scores, model = train(model=model, train_dl=dl, n_epochs=n_epochs, batch_size=batch_size, y_weights=y_weights)
