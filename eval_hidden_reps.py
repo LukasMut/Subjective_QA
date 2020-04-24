@@ -263,7 +263,7 @@ def plot_cosine_distrib(
                         version:str,
                         layer_no:str,
 ):
-    # the higher the dpi, the better is the resolution of the plot (don't set dpi too high)
+    # the higher the dpi, the better is the resolution of the plot (be aware that this will increase MB -> don't set dpi too high)
     plt.figure(figsize=(6, 4), dpi=100)
 
     # set vars
@@ -335,14 +335,14 @@ def compute_similarities_across_layers(
         est_layers = [4, 5, 6] if source.lower() == 'subjqa' else [5, 6] 
         est_preds = []
 
-    # initialise PCA (we need to apply PCA to remove noise from the feature representations)
+    #initialise PCA (we need to apply PCA to remove noise from the feature representations)
     pca = PCA(n_components=p_components, svd_solver='auto', random_state=rnd_state)
     
     for l, hiddens_all_sents in feat_reps.items():
         correct_preds_dists, incorrect_preds_dists = [], []
         layer_no = int(l.lstrip('Layer' + '_'))
         k = 0
-        
+
         if prediction == 'hand_engineered':
             if layer_no in est_layers:
                est_preds_current = np.zeros(N)
@@ -410,7 +410,7 @@ def compute_similarities_across_layers(
             ans_similarities[l]['incorrect_preds']['std_cos_ha'] = np.std(a_incorrect_cosines_mean)
 
             # the following step is necessary since number of incorrect model predicitions is significantly higher than the number of correct model predictions
-            # draw different random samples without replacement 
+            # draw different random samples from the set of cos(h_a) w.r.t. incorrect answer predictions without replacement 
             rnd_samples_incorrect_means = [np.random.choice(a_incorrect_cosines_mean, size=len(a_correct_cosines_mean), replace=False) for _ in range(5)]
 
             #TODO: figure out whether equal_var should be set to False for independent t-test
