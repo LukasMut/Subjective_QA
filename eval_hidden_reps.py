@@ -325,8 +325,7 @@ def compute_similarities_across_layers(
 
         L = len(est_layers) # total number of layers
         M = 4 # number of statistical features (i.e., min(cos(h_a)), max(cos(h_a)), mean(cos(h_a)), std(cos(h_a)))
-        X = np.zeros((N, M*L))
-        y = np.zeros(N, dtype=int)
+        X = np.zeros((N, M*L)) # create feature matrix w.r.t. statistical properties of cos(h_a) to train ff neural net
         j = 0 # running idx to update X_i for each l in L_est
 
     elif prediction == 'hand_engineered':
@@ -375,9 +374,7 @@ def compute_similarities_across_layers(
                     a_max_cos, a_min_cos, a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens, prediction)
                     
                     if layer_no in est_layers:
-                        # create feature matrix and labels vector w.r.t. statistical properties of cos(h_a) to train ff neural net
                         X[k, M*j:M*j+M] += np.array([a_max_cos, a_min_cos, a_mean_cos, a_std_cos])
-                        y[k] += true_preds[pred_indices == i]
 
                 elif prediction == 'hand_engineered': 
                     # compute cosine similarities among hidden reps w.r.t. answer span
@@ -444,7 +441,7 @@ def compute_similarities_across_layers(
 
     if prediction == 'learned':
         ans_similarities = adjust_p_values(ans_similarities)
-        return ans_similarities, X, y
+        return ans_similarities, X
 
     else:
         ans_similarities = adjust_p_values(ans_similarities)
@@ -499,18 +496,19 @@ def evaluate_estimations_and_cosines(
     # compute (dis-)similarities among hidden reps in H_a for both correct and erroneous model predictions at each layer
     # AND estimate model predictions w.r.t. hidden reps in the penultimate layer
     if prediction == 'learned':
-        ans_similarities, X, y = compute_similarities_across_layers(
-                                                                    feat_reps=feat_reps,
-                                                                    true_start_pos=true_start_pos,
-                                                                    true_end_pos=true_end_pos,
-                                                                    sent_pairs=sent_pairs,
-                                                                    pred_indices=pred_indices,
-                                                                    true_preds=true_preds,
-                                                                    source=source,
-                                                                    prediction=prediction,
-                                                                    version=version,
-                                                                    layers=layers,
-                                                                    )
+        ans_similarities, X = compute_similarities_across_layers(
+                                                                feat_reps=feat_reps,
+                                                                true_start_pos=true_start_pos,
+                                                                true_end_pos=true_end_pos,
+                                                                sent_pairs=sent_pairs,
+                                                                pred_indices=pred_indices,
+                                                                true_preds=true_preds,
+                                                                source=source,
+                                                                prediction=prediction,
+                                                                version=version,
+                                                                layers=layers,
+                                                                )
+        y = true_preds
         M = X.shape[1]
         tensor_ds = create_tensor_dataset(X, y)
         dl = BatchGenerator(dataset=tensor_ds, batch_size=batch_size)
