@@ -568,14 +568,14 @@ if __name__ == "__main__":
                                                                              layers=args.layers,
                                                                              )
         hidden_reps_results['estimations'] = estimations
-        
+
     elif args.prediction == 'learned':
         assert isinstance(args.layers, str) and len(args.layers) > 0, 'Layers for which we want to store statistical characteristics w.r.t. cos(h_a) must be specified'
         assert isinstance(args.batch_size, int), 'Batch size must be defined'
         assert isinstance(args.model_dir, str), 'Directory to save and load weights of model must be defined'
         
         if args.version == 'train':
-            assert isinstance(n_epochs, int), 'Number of epochs must be defined'
+            assert isinstance(args.n_epochs, int), 'Number of epochs must be defined'
             
             if not os.path.exists(args.model_dir):
                 os.makedirs(args.model_dir)
@@ -601,7 +601,6 @@ if __name__ == "__main__":
                                                                          version=args.version,
                                                                          model_dir=args.model_dir,
                                                                          batch_size=args.batch_size,
-                                                                         n_epochs=args.n_epochs,
                                                                          layers=args.layers,
                                                                          )
             hidden_reps_results['test_f1'] = test_f1
