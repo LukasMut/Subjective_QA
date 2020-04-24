@@ -88,7 +88,7 @@ def compute_ans_similarities(a_hiddens:np.ndarray, prediction:str):
             if i != j and j > i:
                 a_dists.append(cosine_sim(u=a_i, v=a_j))
     if prediction == 'learned':
-        return np.max(a_dists), np.min(a_dists), mp.mean(a_dists), np.std(a_dists)
+        return np.max(a_dists), np.min(a_dists), np.mean(a_dists), np.std(a_dists)
     else:
         return np.mean(a_dists), np.std(a_dists)
 
