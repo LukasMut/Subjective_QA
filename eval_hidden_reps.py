@@ -377,7 +377,6 @@ def compute_similarities_across_layers(
                         # create feature matrix and labels vector w.r.t. statistical properties of cos(h_a) to train ff neural net
                         X[k, M*j:M*j+M] += np.array([a_max_cos, a_min_cos, a_mean_cos, a_std_cos])
                         y[k] += true_preds[pred_indices == i]
-                        j += 1
 
                 elif prediction == 'hand_engineered': 
                     # compute cosine similarities among hidden reps w.r.t. answer span
@@ -438,6 +437,10 @@ def compute_similarities_across_layers(
         if prediction == 'hand_engineered':
             if layer_no in est_layers:
                 est_preds.append(est_preds_current)
+        else:
+            # update running idx j for each l in L_est
+            if layer_no in est_layers:
+                j += 1
 
     if prediction == 'learned':
         ans_similarities = correct_p_values(ans_similarities)
