@@ -394,7 +394,7 @@ def compute_similarities_across_layers(
 
                 k += 1
 
-        # unpack means and stds w.r.t. cosine similarities
+        # unpack means and stds w.r.t. cos(h_a)
         a_correct_cosines_mean, a_correct_cosines_std = zip(*correct_preds_dists)
         a_incorrect_cosines_mean, a_incorrect_cosines_std = zip(*incorrect_preds_dists)
 
