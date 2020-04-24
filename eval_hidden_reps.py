@@ -331,7 +331,7 @@ def compute_similarities_across_layers(
     elif prediction == 'hand_engineered':
         # set threshold w.r.t. cos(a) above which we assume a correct answer prediction
         cos_thresh = .45 if source.lower() == 'subjqa' else .50
-        # separation of answer from context starts later in latent space for objective compared to subjective questions
+        # separation of answer from context starts later in latent space for objective compared to subjective questions (layer 5 vs. layer 4)
         est_layers = [4, 5, 6] if source.lower() == 'subjqa' else [5, 6] 
         est_preds = []
 
@@ -356,7 +356,7 @@ def compute_similarities_across_layers(
                 # remove hidden reps for special [CLS] and [SEP] tokens
                 #hiddens = np.vstack((hiddens[1:sep_idx, :], hiddens[sep_idx+1:-1, :])) 
                 
-                # transform feat reps into low-dim space with PCA
+                # transform feat reps with PCA
                 hiddens = pca.fit_transform(hiddens)
 
                 if layer_no == 1 and i == pred_indices[0]:
@@ -370,11 +370,11 @@ def compute_similarities_across_layers(
                 a_hiddens = hiddens[true_start_pos[i]:true_end_pos[i]+1, :]
 
                 if prediction == 'learned':
-                    # compute cosine similarities among hidden reps w.r.t. answer span
+                    # compute cosine similarities among hidden reps w.r.t. answer span (i.e., cos(h_a))
                     a_max_cos, a_min_cos, a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens, prediction)
-
+                    
                     if layer_no in est_layers:
-                        # create feature matrix and labels vector w.r.t. statistical properties of cos(h_a) to train neural network
+                        # create feature matrix and labels vector w.r.t. statistical properties of cos(h_a) to train ff neural net
                         X[k, M*j:M*j+M] += np.array([a_max_cos, a_min_cos, a_mean_cos, a_std_cos])
                         y[k] += true_preds[pred_indices == i]
                         j += 1
@@ -390,11 +390,12 @@ def compute_similarities_across_layers(
                 if true_preds[pred_indices == i] == 1:
                     correct_preds_dists.append((a_mean_cos, a_std_cos))
                 else:
+                    #print("=== Storing mean and std w.r.t. cos(h_a) for correct model predictions ===")
                     incorrect_preds_dists.append((a_mean_cos, a_std_cos))
 
                 k += 1
 
-            # unzip means and stds w.r.t. cosine similarities
+            # unpack means and stds w.r.t. cosine similarities
             a_correct_cosines_mean, a_correct_cosines_std = zip(*correct_preds_dists)
             a_incorrect_cosines_mean, a_incorrect_cosines_std = zip(*incorrect_preds_dists)
 
@@ -509,8 +510,6 @@ def evaluate_estimations_and_cosines(
                                                                     version=version,
                                                                     layers=layers,
                                                                     )
-
-
         M = X.shape[1]
         tensor_ds = create_tensor_dataset(X, y)
         dl = BatchGenerator(dataset=tensor_ds, batch_size=batch_size)
@@ -544,7 +543,6 @@ def evaluate_estimations_and_cosines(
                                                                          prediction=prediction,
                                                                          version=version,
                                                                          )
-
         est_accs = {}
         est_accs['correct_preds'] = (true_preds[true_preds == 1] == est_preds[true_preds == 1]).mean() * 100
         est_accs['incorrect_preds'] = (true_preds[true_preds == 0] == est_preds[true_preds == 0]).mean() * 100

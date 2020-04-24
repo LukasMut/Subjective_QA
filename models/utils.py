@@ -1598,7 +1598,7 @@ def test(
                       if output_all_hiddens: # 2D matrix
                         #NOTE: for now, we just want to store correct and incorrect (answer span) predictions w.r.t answerable (!) questions
                         #if compute_exact(b_true_answers[i], b_pred_answers[i]) and b_true_answers[i].strip() != '[CLS]': # exclusively correct answers
-                        if b_true_answers[i].strip() != '[CLS]' and len(b_true_answers[i].strip().split()) > 1:
+                        if b_true_answers[i].strip() != '[CLS]' and len(b_true_answers[i].split()) > 1:
                           feat_reps['Layer' + '_' + str(l + 1)].append(hidden[:b_input_lengths[i], :].tolist()) # remove PAD token vector representations
                           if l == 0:
                             # store both true and predicted answer spans for respective word sequences only once (NOT FOR EVERY LAYER)
