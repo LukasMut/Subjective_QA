@@ -1,4 +1,11 @@
-__all__ = ['evaluate_estimations_and_cosines']
+__all__ = [
+           'get_hidden_reps',
+           'compute_ans_similarities',
+           'adjust_p_values',
+           'shuffle_arrays',
+           'compute_similarities_across_layers',
+           'evaluate_estimations_and_cosines',
+           ]
 
 import argparse
 import matplotlib
@@ -10,6 +17,7 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+import torch.nn as nn
 
 from collections import defaultdict, Counter
 from eval_squad import compute_exact
@@ -43,13 +51,13 @@ except:
 
 def get_hidden_reps(source:str='SubjQA', version:str='train'):
     
-    # set folder and subdirectories
+    #set folder and subdirectories
     folder = '/results_test/'
     subdir = '/feat_reps/'
     subsubdir = '/qa_per_token/'
     task = 'ans_pred'
 
-    # create PATH
+    #create PATH
     cwd = '.'
     PATH = cwd + folder + subdir + subsubdir
     PATH += '/bert_finetuned_subjqa/' if source == 'SubjQA' else '/bert_finetuned_squad/'
@@ -59,11 +67,11 @@ def get_hidden_reps(source:str='SubjQA', version:str='train'):
         os.makedirs(PATH)
         raise FileNotFoundError('PATH was not correctly defined. Move files to PATH before executing script again.')
 
-    # we want to exclusively capture .json files
+    #we want to exclusively capture .json files
     files = [file for file in os.listdir(PATH) if file.endswith('.json')]
     f = files.pop()
 
-    # load hidden representations into memory
+    #load hidden representations into memory
     with open(PATH + f) as json_file:
         results = json.load(json_file)
         file_name = 'hidden_rep_cosines' + '_' +  task + '_' + version
@@ -75,11 +83,11 @@ def get_hidden_reps(source:str='SubjQA', version:str='train'):
 
     return results, file_name
 
-def euclidean_dist(u:np.ndarray, v:np.ndarray): return np.linalg.norm(u-v) # default is L2 norm
+def euclidean_dist(u:np.ndarray, v:np.ndarray): return np.linalg.norm(u-v) #default is L2 norm
 
 def cosine_sim(u:np.ndarray, v:np.ndarray):
     num = u @ v
-    denom = np.linalg.norm(u) * np.linalg.norm(v) # default is Frobenius norm (i.e., L2 norm)
+    denom = np.linalg.norm(u) * np.linalg.norm(v) #default is Frobenius norm (i.e., L2 norm)
     return num / denom
 
 def compute_ans_similarities(a_hiddens:np.ndarray):
@@ -134,7 +142,7 @@ def train(
 ):
     n_steps = len(train_dl)
     n_iters = n_steps * n_epochs
-    assert isinstance(y_weights, torch.Tensor), 'Tensor of weights w.r.t. model predictions is not provided'
+    assert isinstance(y_weights, torch.Tensor), 'Tensor of weights wrt model predictions is not provided'
     loss_func = nn.BCEWithLogitsLoss(pos_weight=y_weights.to(device))
     optim = Adam(model.parameters())
     max_grad_norm = 10
@@ -192,16 +200,16 @@ def plot_cosine_boxplots(
 ):
     plt.figure(figsize=(6, 4), dpi=100)
 
-    # set fontsize var
+    #set fontsize var
     lab_fontsize = 12
 
     ax = plt.subplot(111)
 
-    # hide the right and top spines
+    #hide the right and top spines
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
 
-    # only show ticks on the left (y-axis) and bottom (x-axis) spines
+    #only show ticks on the left (y-axis) and bottom (x-axis) spines
     ax.yaxis.set_ticks_position('left')
     ax.xaxis.set_ticks_position('bottom')
 
@@ -210,7 +218,7 @@ def plot_cosine_boxplots(
         sns.boxplot(
                      data=[a_correct_cosines_mean, a_incorrect_cosines_mean],
                      color='white',
-                     meanline=False, # not necessary to show dotted mean line when showmeans = True (only set one of the two to True)
+                     meanline=False, #not necessary to show dotted mean line when showmeans = True (only set one of the two to True)
                      showmeans=True,
                      showcaps=True,
                      showfliers=True,
@@ -226,11 +234,11 @@ def plot_cosine_boxplots(
             else:
                 col = 'steelblue'
 
-            # this sets the color for the main box
+            #this sets the color for the main box
             artist.set_edgecolor(col)
             
-            # each box has 7 associated Line2D objects (to make the whiskers, median lines, means, fliers, etc.)
-            # loop over them, and use the same colour as above (display means in black to make them more salient)
+            #each box has 7 associated Line2D objects (to make the whiskers, median lines, means, fliers, etc.)
+            #loop over them, and use the same colour as above (display means in black to make them more salient)
             for j in range(i*7,i*7+7):
                 line = ax.lines[j]
                 line.set_color('black' if j == 5 + (i*7) else col)
@@ -267,20 +275,20 @@ def plot_cosine_distrib(
                         version:str,
                         layer_no:str,
 ):
-    # the higher the dpi, the better is the resolution of the plot (be aware that this will increase MB -> don't set dpi too high)
+    #the higher the dpi, the better is the resolution of the plot (be aware that this will increase MB of .png file -> don't set dpi too high)
     plt.figure(figsize=(6, 4), dpi=100)
 
-    # set vars
+    #set vars
     legend_fontsize = 8
     lab_fontsize = 10
 
     ax = plt.subplot(111)
 
-    # hide the right and top spines
+    #hide the right and top spines
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
 
-    # only show ticks on the left (y-axis) and bottom (x-axis) spines
+    #only show ticks on the left (y-axis) and bottom (x-axis) spines
     ax.yaxis.set_ticks_position('left')
     ax.xaxis.set_ticks_position('bottom')
         
@@ -312,7 +320,7 @@ def compute_similarities_across_layers(
                                        layers=None,
 ):
     retained_var = .95 #retain 90% or 95% of the hidden rep's variance (95% = top 57 principal components)
-    rnd_state = 42 # set random seed for reproducibility
+    rnd_state = 42 #set random state for reproducibility
     N = len(pred_indices)
     ans_similarities = defaultdict(dict)    
     
@@ -326,15 +334,15 @@ def compute_similarities_across_layers(
         elif layers == 'all_layers':
             est_layers = list(range(1, 7))
 
-        L = len(est_layers) # total number of layers
-        M = 4 # number of statistical features (i.e., min(cos(h_a)), max(cos(h_a)), mean(cos(h_a)), std(cos(h_a)))
-        X = np.zeros((N, M*L)) # create feature matrix w.r.t. statistical properties of cos(h_a) to train ff neural net
-        j = 0 # running idx to update X_i for each l in L_est
+        L = len(est_layers) #total number of layers
+        M = 4 #number of statistical features wrt cos(h_a) (i.e., min(cos(h_a)), max(cos(h_a)), mean(cos(h_a)), std(cos(h_a)))
+        X = np.zeros((N, M*L)) #feature matrix wrt M to train ff neural net
+        j = 0 #running idx to update X_i for each l in L_est
 
     elif prediction == 'hand_engineered':
-        # set threshold w.r.t. cos(a) above which we assume a correct answer prediction
+        #set threshold wrt cos(a) above which we assume a correct answer prediction
         cos_thresh = .45 if source.lower() == 'subjqa' else .50
-        # separation of answer from context starts later in latent space for objective compared to subjective questions (layer 5 vs. layer 4)
+        #separation of answer from context starts later in latent space for objective compared to subjective questions (layer 5 vs. layer 4)
         est_layers = [4, 5, 6] if source.lower() == 'subjqa' else [5, 6] 
         est_preds = []
 
@@ -356,10 +364,10 @@ def compute_similarities_across_layers(
                 sent = sent_pairs[i].strip().split()
                 sep_idx = sent.index('[SEP]')
 
-                # remove hidden reps for special [CLS] and [SEP] tokens
-                #hiddens = np.vstack((hiddens[1:sep_idx, :], hiddens[sep_idx+1:-1, :])) 
+                #remove hidden reps for [CLS] and [SEP] tokens
+                #hiddens = np.vstack((hiddens[1:sep_idx], hiddens[sep_idx+1:-1])) 
                 
-                # transform feat reps with PCA
+                #transform feat reps with PCA
                 hiddens = pca.fit_transform(hiddens)
 
                 if layer_no == 1 and i == pred_indices[0]:
@@ -368,21 +376,21 @@ def compute_similarities_across_layers(
                     print("==============================================================")
                     print()
 
-                # extract hidden reps for answer span
-                #a_hiddens = hiddens[true_start_pos[i]-2:true_end_pos[i]-1, :] # move ans span indices two positions to the left (accounting for [CLS] and [SEP])
-                a_hiddens = hiddens[true_start_pos[i]:true_end_pos[i]+1, :]
+                #extract hidden reps for answer span
+                #a_hiddens = hiddens[true_start_pos[i]-2:true_end_pos[i]-1] #move ans span indices two positions to the left (accounting for [CLS] and [SEP])
+                a_hiddens = hiddens[true_start_pos[i]:true_end_pos[i]+1]
 
                 if prediction == 'learned':
-                    # compute cos(h_a)
+                    #compute cos(h_a)
                     a_max_cos, a_min_cos, a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens)
                     
                     if layer_no in est_layers:
                         X[k, M*j:M*j+M] += np.array([a_max_cos, a_min_cos, a_mean_cos, a_std_cos])
 
                 elif prediction == 'hand_engineered': 
-                    # compute cos(h_a)
+                    #compute cos(h_a)
                     _, _, a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens)
-                    # estimate model predictions w.r.t. avg cosine similarities among answer hidden reps in the penultimate and last transformer layer
+                    #estimate model predictions wrt avg cosine similarities among answer hidden reps in the penultimate and last transformer layer
                     if layer_no in est_layers:
                         if a_mean_cos > cos_thresh: 
                             est_preds_current[k] += 1
@@ -394,7 +402,7 @@ def compute_similarities_across_layers(
 
                 k += 1
 
-        # unpack means and stds w.r.t. cos(h_a)
+        #unpack means and stds wrt cos(h_a)
         a_correct_cosines_mean, a_correct_cosines_std = zip(*correct_preds_dists)
         a_incorrect_cosines_mean, a_incorrect_cosines_std = zip(*incorrect_preds_dists)
 
@@ -408,16 +416,16 @@ def compute_similarities_across_layers(
         ans_similarities[l]['incorrect_preds']['std_cos_ha'] = np.std(a_incorrect_cosines_mean)
         ans_similarities[l]['incorrect_preds']['mean_std_cos_ha'] = np.mean(a_incorrect_cosines_std)
 
-        # the following step is necessary since number of incorrect model predicitions is significantly higher than the number of correct model predictions
-        # draw different random samples from the set of cos(h_a) w.r.t. incorrect answer predictions without (!) replacement 
+        #the following step is necessary since number of incorrect model predicitions is significantly higher than the number of correct model predictions
+        #draw different random samples from the set of cos(h_a) wrt incorrect answer predictions without (!) replacement 
         rnd_samples_incorrect_means = [np.random.choice(a_incorrect_cosines_mean, size=len(a_correct_cosines_mean), replace=False) for _ in range(5)]
 
-        #TODO: figure out whether equal_var should be set to False for independent t-test (do we assume equal variances w.r.t. cos(h_a) across predictions?)
+        #TODO: figure out whether equal_var should be set to False for independent t-test (do we assume equal variances wrt cos(h_a) across predictions?)
         ans_similarities[l]['ttest_p_val'] = np.mean([ttest_ind(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means])
         ans_similarities[l]['anova_p_val'] = np.mean([f_oneway(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means])
 
 
-        # plot cos(h_a) distributions for both correct and erroneous model predictions across all transformer layers
+        #plot cos(h_a) distributions for both correct and erroneous model predictions across all transformer layers
         plot_cosine_distrib(
                             a_correct_cosines_mean=np.array(a_correct_cosines_mean),
                             a_incorrect_cosines_mean=np.array(a_incorrect_cosines_mean),
@@ -449,7 +457,7 @@ def compute_similarities_across_layers(
     else:
         ans_similarities = adjust_p_values(ans_similarities)
         est_preds = np.stack(est_preds, axis=1)
-        #if estimations w.r.t. both layer 5 and 6 yield correct pred we assume a correct model pred else incorrect
+        #if estimations wrt both layer 5 and 6 yield correct pred we assume a correct model pred else incorrect
         est_preds = np.array([1 if len(np.unique(row)) == 1 and np.unique(row)[0] == 1 else 0 for row in est_preds])
         return ans_similarities, est_preds
 
@@ -478,7 +486,7 @@ def evaluate_estimations_and_cosines(
     for i, pred_ans in enumerate(pred_answers):
         pred_ans = pred_ans.strip()
         true_ans = true_answers[i].strip()
-        #NOTE: for now we exclusively want to estimate model predictions w.r.t. answer spans that contain > 1 token
+        #NOTE: for now we exclusively want to estimate model predictions wrt answer spans that contain > 1 token
         if len(true_ans.split()) > 1:
             if compute_exact(true_ans, pred_ans):
                 true_preds.append(1)
@@ -496,8 +504,8 @@ def evaluate_estimations_and_cosines(
     print(Counter(true_preds))
     print()
 
-    # compute (dis-)similarities among hidden reps in H_a for both correct and erroneous model predictions at each layer
-    # AND estimate model predictions w.r.t. hidden reps in the penultimate layer
+    #compute (dis-)similarities among hidden reps in H_a for both correct and erroneous model predictions at each layer
+    #AND estimate model predictions wrt hidden reps in the penultimate layer
     if prediction == 'learned':
         ans_similarities, X = compute_similarities_across_layers(
                                                                 feat_reps=feat_reps,
@@ -513,7 +521,7 @@ def evaluate_estimations_and_cosines(
                                                                 )
         y = true_preds
         M = X.shape[1]
-        X, y = shuffle_arrays(X, y) if version == 'train' else X, y #shuffle order of examples during training (this step is not necessary at inference time)
+        #X, y = shuffle_arrays(X, y) if version == 'train' else X, y #shuffle order of examples during training (this step is not necessary at inference time)
         tensor_ds = create_tensor_dataset(X, y)
         dl = BatchGenerator(dataset=tensor_ds, batch_size=batch_size)
         model_name = 'fc_nn' + '_' + layers
@@ -557,11 +565,11 @@ def evaluate_estimations_and_cosines(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--source', type=str, default='SubjQA',
-        help='Estimate model predictions (i.e., correct or erroneous) w.r.t. hidden reps obtained from fine-tuning (and evaluating) on *source*.')
+        help='Estimate model predictions (i.e., correct or erroneous) wrt hidden reps obtained from fine-tuning (and evaluating) on *source*.')
     parser.add_argument('--version', type=str, default='train',
         help='Must be one of {train, test}')
     parser.add_argument('--prediction', type=str, default='learned',
-        help='If "learned", compute feature matrix X and labels vector y w.r.t. cos(h_a) obtained from fine-tuning on *source* to train feed-forward neural net')
+        help='If "learned", compute feature matrix X and labels vector y wrt cos(h_a) obtained from fine-tuning on *source* to train feed-forward neural net')
     parser.add_argument('--model_dir', type=str, default='./saved_models/ans_pred',
         help='Set model save directory for ans prediction model. Only necessary if args.prediction == learned.')
     parser.add_argument('--batch_size', type=int, default=8,
@@ -576,7 +584,7 @@ if __name__ == "__main__":
     # get feat reps
     results, file_name = get_hidden_reps(source=args.source, version=args.version)
 
-    # estimate model predictions w.r.t. answer and context hidden reps in latent space (per transformer layer) AND
+    # estimate model predictions wrt answer and context hidden reps in latent space (per transformer layer) AND
     # compute (dis-)similarities among hidden representations in h_a for both correct and erroneous model predictions (at each layer)
 
     hidden_reps_results = {}
@@ -594,7 +602,7 @@ if __name__ == "__main__":
         hidden_reps_results['estimations'] = estimations
 
     elif args.prediction == 'learned':
-        assert isinstance(args.layers, str) and len(args.layers) > 0, 'Layers for which we want to store statistical characteristics w.r.t. cos(h_a) must be specified'
+        assert isinstance(args.layers, str) and len(args.layers) > 0, 'Layers for which we want to store statistical characteristics wrt cos(h_a) must be specified'
         assert isinstance(args.batch_size, int), 'Batch size must be defined'
         assert isinstance(args.model_dir, str), 'Directory to save and load weights of model must be defined'
         
