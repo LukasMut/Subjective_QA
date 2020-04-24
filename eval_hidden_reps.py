@@ -172,20 +172,21 @@ def train(
         losses.append(train_loss / train_steps)
         f1_scores.append(train_f1 / train_steps)
 
-        print("=============================")
-        print("======= Epoch: {} =========".format(epoch + 1))
+        print("============================")
+        print("======== Epoch: {} ==========".format(epoch + 1))
         print("======= Loss: {} ========".format(round(losses[-1], 3)))
         print("======= F1: {} ==========".format(round(f1_scores[-1], 3)))
         print("============================")
         print()
 
-        if early_stopping:
-            if losses[-1] >= losses[-2] or f1_scores[-1] <= f1_scores[-2]:
-                print("===========================================")
-                print("==== Early stopping after {} epochs =====".format(epoch + 1))
-                print("===========================================")
-                print()
-                break
+        if epoch > 1:
+            if early_stopping:
+                if losses[-1] >= losses[-2] or f1_scores[-1] <= f1_scores[-2]:
+                    print("===========================================")
+                    print("==== Early stopping after {} epochs =====".format(epoch + 1))
+                    print("===========================================")
+                    print()
+                    break
 
     model.eval()
     return losses, f1_scores, model
