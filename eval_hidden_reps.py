@@ -401,19 +401,19 @@ def compute_similarities_across_layers(
 
             ans_similarities[l]['correct_preds'] = {}
             ans_similarities[l]['correct_preds']['mean_cos_ha'] = np.mean(a_correct_cosines_mean)
-            #ans_similarities[l]['correct_preds']['std_cos_ha'] = np.mean(a_correct_cosines_std)
             ans_similarities[l]['correct_preds']['std_cos_ha'] = np.std(a_correct_cosines_mean)
+            ans_similarities[l]['correct_preds']['mean_std_cos_ha'] = np.mean(a_correct_cosines_std)
             
             ans_similarities[l]['incorrect_preds'] = {}
             ans_similarities[l]['incorrect_preds']['mean_cos_ha'] = np.mean(a_incorrect_cosines_mean)
-            #ans_similarities[l]['incorrect_preds']['std_cos_ha'] = np.mean(a_incorrect_cosines_std)
             ans_similarities[l]['incorrect_preds']['std_cos_ha'] = np.std(a_incorrect_cosines_mean)
+            ans_similarities[l]['incorrect_preds']['mean_std_cos_ha'] = np.mean(a_incorrect_cosines_std)
 
             # the following step is necessary since number of incorrect model predicitions is significantly higher than the number of correct model predictions
-            # draw different random samples from the set of cos(h_a) w.r.t. incorrect answer predictions without replacement 
+            # draw different random samples from the set of cos(h_a) w.r.t. incorrect answer predictions without (!) replacement 
             rnd_samples_incorrect_means = [np.random.choice(a_incorrect_cosines_mean, size=len(a_correct_cosines_mean), replace=False) for _ in range(5)]
 
-            #TODO: figure out whether equal_var should be set to False for independent t-test
+            #TODO: figure out whether equal_var should be set to False for independent t-test (do we assume equal variances w.r.t. cos(h_a) across predictions?)
             ans_similarities[l]['ttest_p_val'] = np.mean([ttest_ind(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means])
             ans_similarities[l]['anova_p_val'] = np.mean([f_oneway(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means])
 
