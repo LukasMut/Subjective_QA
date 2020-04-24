@@ -184,11 +184,11 @@ def train(
         print("============================")
         print()
 
-        if epoch > 1:
-            if early_stopping:
+        if early_stopping:
+            if epoch > 1:
                 if losses[-1] > losses[-2]:
                     print("===========================================")
-                    print("==== Early stopping after {} epochs =====".format(epoch + 1))
+                    print("==== Early stopping after {} epochs ======".format(epoch + 1))
                     print("===========================================")
                     print()
                     break
@@ -424,11 +424,11 @@ def compute_similarities_across_layers(
 
         #the following step is necessary since number of incorrect model predicitions is significantly higher than the number of correct model predictions
         #draw different random samples from the set of cos(h_a) wrt incorrect answer predictions without (!) replacement 
-        rnd_samples_incorrect_means = [np.random.choice(a_incorrect_cosines_mean, size=len(a_correct_cosines_mean), replace=False) for _ in range(5)]
+        #rnd_samples_incorrect_means = [np.random.choice(a_incorrect_cosines_mean, size=len(a_correct_cosines_mean), replace=False) for _ in range(5)]
 
         #TODO: figure out whether equal_var should be set to False for independent t-test (do we assume equal variances wrt cos(h_a) across predictions?)
-        ans_similarities[l]['ttest_p_val'] = np.mean([ttest_ind(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means])
-        ans_similarities[l]['anova_p_val'] = np.mean([f_oneway(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means])
+        ans_similarities[l]['ttest_p_val'] = ttest_ind(a_correct_cosines_mean, a_incorrect_cosines_mean)[1] #np.mean([ttest_ind(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means])
+        ans_similarities[l]['anova_p_val'] = f_oneway(a_correct_cosines_mean, a_incorrect_cosines_mean)[1] #np.mean([f_oneway(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means])
 
 
         #plot cos(h_a) distributions for both correct and erroneous model predictions across all transformer layers
@@ -457,11 +457,11 @@ def compute_similarities_across_layers(
                 j += 1
 
     if prediction == 'learned':
-        ans_similarities = adjust_p_values(ans_similarities)
+        #ans_similarities = adjust_p_values(ans_similarities)
         return ans_similarities, X
 
     else:
-        ans_similarities = adjust_p_values(ans_similarities)
+        #ans_similarities = adjust_p_values(ans_similarities)
         est_preds = np.stack(est_preds, axis=1)
         #if estimations wrt both layer 5 and 6 yield correct pred we assume a correct model pred else incorrect
         est_preds = np.array([1 if len(np.unique(row)) == 1 and np.unique(row)[0] == 1 else 0 for row in est_preds])
@@ -580,7 +580,7 @@ if __name__ == "__main__":
         help='Set model save directory for ans prediction model. Only necessary if args.prediction == learned.')
     parser.add_argument('--batch_size', type=int, default=8,
         help='Specify mini-batch size. Only necessary if args.prediction == learned.')
-    parser.add_argument('--n_epochs', type=int, default=10,
+    parser.add_argument('--n_epochs', type=int, default=5,
         help='Set number of epochs model should be trained for. Only necessary if args.prediction == learned.')
     parser.add_argument('--layers', type=str, default='',
         help='Must be one of {all_layers, bottom_three_layers, top_three_layers}. Only necessary if args.prediction == learned.')
@@ -647,7 +647,7 @@ if __name__ == "__main__":
     
     hidden_reps_results['cos_similarities'] = ans_similarities
 
-    PATH = './results_hidden_reps/' + '/' + source.lower() + '/' + args.prediction + '/'
+    PATH = './results_hidden_reps/' + '/' + args.source.lower() + '/' + args.prediction + '/'
     
     if not os.path.exists(PATH):
         os.makedirs(PATH)

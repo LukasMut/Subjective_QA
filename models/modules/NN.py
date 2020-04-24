@@ -8,20 +8,16 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class FFNN(nn.Module):
 
-	def __init__(self, in_size:int, dropout:float=0.25):
+	def __init__(self, in_size:int):
 		super(FFNN, self).__init__()
 		self.in_size = in_size
-		self.dropout = dropout
-
 		self.fc_1 = nn.Linear(self.in_size, self.in_size)
 		self.fc_2 = nn.Linear(self.in_size, 1)
 		nn.init.xavier_uniform_(self.fc_1.weight)
 		nn.init.xavier_uniform_(self.fc_2.weight)
 
-		self.dropout = nn.Dropout(p=self.dropout)
-
 	def forward(self, X):
-		out = self.dropout(self.fc_1(X))
-		logits = self.fc_2(out)
+		#out = self.fc_1(X)
+		logits = self.fc_2(X)
 		logits = logits.squeeze(-1)
 		return logits
