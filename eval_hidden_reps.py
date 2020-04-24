@@ -82,17 +82,14 @@ def cosine_sim(u:np.ndarray, v:np.ndarray):
     denom = np.linalg.norm(u) * np.linalg.norm(v) # default is Frobenius norm (i.e., L2 norm)
     return num / denom
 
-def compute_ans_similarities(a_hiddens:np.ndarray, prediction:str):
+def compute_ans_similarities(a_hiddens:np.ndarray):
     a_dists = []
     for i, a_i in enumerate(a_hiddens):
         for j, a_j in enumerate(a_hiddens):
             #NOTE: we don't want to compute cosine sim of a vector with itself (i.e., cos_sim(u, u) = 1)
             if i != j and j > i:
                 a_dists.append(cosine_sim(u=a_i, v=a_j))
-    if prediction == 'learned':
-        return np.max(a_dists), np.min(a_dists), np.mean(a_dists), np.std(a_dists)
-    else:
-        return np.mean(a_dists), np.std(a_dists)
+    return np.max(a_dists), np.min(a_dists), np.mean(a_dists), np.std(a_dists)
 
 def adjust_p_values(
                     ans_similarities:dict,
@@ -377,14 +374,14 @@ def compute_similarities_across_layers(
 
                 if prediction == 'learned':
                     # compute cos(h_a)
-                    a_max_cos, a_min_cos, a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens, prediction)
+                    a_max_cos, a_min_cos, a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens)
                     
                     if layer_no in est_layers:
                         X[k, M*j:M*j+M] += np.array([a_max_cos, a_min_cos, a_mean_cos, a_std_cos])
 
                 elif prediction == 'hand_engineered': 
                     # compute cos(h_a)
-                    a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens, prediction)
+                    _, _, a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens)
                     # estimate model predictions w.r.t. avg cosine similarities among answer hidden reps in the penultimate and last transformer layer
                     if layer_no in est_layers:
                         if a_mean_cos > cos_thresh: 
