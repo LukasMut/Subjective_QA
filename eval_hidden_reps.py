@@ -96,14 +96,19 @@ def compute_ans_similarities(a_hiddens:np.ndarray, prediction:str):
 
 def adjust_p_values(
                     ans_similarities:dict,
-                    alpha=.05, #.01
-                    adjustment='bonferroni',
+                    alpha:float=.05,
+                    adjustment:str='bonferroni',
                     ):
     uncorrected_p_vals = np.array([vals['ttest_p_val'] for l, vals in ans_similarities.items()])
     corrected_p_vals = multipletests(pvals=uncorrected_p_vals, alpha=alpha, method=adjustment, returnsorted=False)[1]
     for l, p_val in enumerate(corrected_p_vals):
         ans_similarities['Layer'+'_'+str(l+1)]['ttest_p_val'] = p_val
     return ans_similarities
+
+def shuffle_arrays(X:np.ndarray, y:np.ndarray):
+    assert X.shape[0] == y.shape[0]
+    perm = np.random.permutation(X.shape[0])
+    return X[perm], y[perm]
 
 def create_tensor_dataset(X:np.ndarray, y:np.ndarray): return TensorDataset(torch.tensor(X), torch.tensor(y, dtype=torch.long))
 
@@ -511,7 +516,7 @@ def evaluate_estimations_and_cosines(
                                                                 )
         y = true_preds
         M = X.shape[1]
-        X, y = shuffle(X, y, random_state=42) if version == 'train' else X, y #shuffle order of examples during training (not necessary at inference time)
+        X, y = shuffle_arrays(X, y) if version == 'train' else X, y #shuffle order of examples during training (this step is not necessary at inference time)
         tensor_ds = create_tensor_dataset(X, y)
         dl = BatchGenerator(dataset=tensor_ds, batch_size=batch_size)
         model_name = 'fc_nn' + '_' + layers
@@ -522,12 +527,12 @@ def evaluate_estimations_and_cosines(
             model = FFNN(in_size=M)
             model.to(device)
             losses, f1_scores, model = train(model=model, train_dl=dl, n_epochs=n_epochs, batch_size=batch_size, y_weights=y_weights)
-            torch.save(model.state_dict(), model_dir + '/%s' % (model_name)) # save model's weights
+            torch.save(model.state_dict(), model_dir + '/%s' % (model_name)) #save model's weights
             return ans_similarities, losses, f1_scores
 
         else:
             model = FFNN(in_size=M)
-            model.load_state_dict(torch.load(model_dir + '/%s' % (model_name))) # load model's weights
+            model.load_state_dict(torch.load(model_dir + '/%s' % (model_name))) #load model's weights
             model.to(device)
             test_f1 = test(model=model, test_dl=dl)
             return ans_similarities, test_f1
