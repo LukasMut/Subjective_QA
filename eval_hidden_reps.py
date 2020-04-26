@@ -22,13 +22,13 @@ import torch.nn as nn
 from collections import defaultdict, Counter
 from eval_squad import compute_exact
 from statsmodels.stats.multitest import multipletests
-from scipy.stats import f_oneway, mode, ttest_ind
+from scipy.stats import entropy, f_oneway, ttest_ind
 from sklearn.decomposition import PCA
 from sklearn.metrics import f1_score
 from sklearn.utils import shuffle
 from tqdm import trange, tqdm
 from torch.utils.data import DataLoader, TensorDataset
-from torch.optim import Adam 
+from torch.optim import Adam, SGD
 from utils import BatchGenerator
 
 try:
@@ -83,9 +83,16 @@ def get_hidden_reps(source:str='SubjQA', version:str='train'):
 
     return results, file_name
 
-def euclidean_dist(u:np.ndarray, v:np.ndarray): return np.linalg.norm(u-v) #default is L2 norm
+def euclidean_dist(u, v): return np.linalg.norm(u-v) #default is L2 norm
 
-def cosine_sim(u:np.ndarray, v:np.ndarray):
+def kl_div(p, q):
+    #NOTE: probability distributions p and q must sum to 1 (normalization factor required)
+    p /= np.sum(p, keepdims=True)
+    q /= np.sum(q, keepdims=True)
+    rel_entr = p * np.log(p/q)
+    return np.sum(rel_entr)
+
+def cosine_sim(u, v):
     num = u @ v
     denom = np.linalg.norm(u) * np.linalg.norm(v) #default is Frobenius norm (i.e., L2 norm)
     return num / denom
@@ -94,7 +101,7 @@ def compute_ans_similarities(a_hiddens:np.ndarray):
     a_dists = []
     for i, a_i in enumerate(a_hiddens):
         for j, a_j in enumerate(a_hiddens):
-            #NOTE: we don't want to compute cosine sim of a vector with itself (i.e., cos_sim(u, u) = 1)
+            #NOTE: cos sim is a symmetric dist metric plus we don't want to compute cos sim of a vector with itself (i.e., cos_sim(u, u) = 1)
             if i != j and j > i:
                 a_dists.append(cosine_sim(u=a_i, v=a_j))
     return np.max(a_dists), np.min(a_dists), np.mean(a_dists), np.std(a_dists)
@@ -143,34 +150,33 @@ def train(
           n_epochs:int,
           batch_size:int,
           y_weights:torch.Tensor,
-          early_stopping:bool=True,
 ):
     n_steps = len(train_dl)
     n_iters = n_steps * n_epochs
+    min_n_epochs = 10
     assert isinstance(y_weights, torch.Tensor), 'Tensor of weights wrt model predictions is not provided'
     loss_func = nn.BCEWithLogitsLoss(pos_weight=y_weights.to(device))
-    optim = Adam(model.parameters())
+    optimizer = Adam(model.parameters(), lr=1e-2, weight_decay=0.005) #L2 Norm (i.e., weight decay)
     max_grad_norm = 10
     losses = []
     f1_scores = []
 
-    for epoch in trange(n_epochs,  desc="Epoch"):
+    for epoch in range(n_epochs):
         model.train()
         train_f1 = 0
         train_steps = 0
         train_loss = 0
         for step, batch in enumerate(train_dl):
-            loss = 0
             batch = tuple(t.to(device) for t in batch)
             X, y = batch
+            optimizer.zero_grad()
             logits = model(X)
             y = y.type_as(logits)
-            loss += loss_func(logits, y)
+            loss = loss_func(logits, y)
             train_f1 += f1(probas=torch.sigmoid(logits), y_true=y, task='binary')
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
-            optim.step()
-            optim.zero_grad()
+            optimizer.step()
             train_steps += 1
             train_loss += loss.item()
 
@@ -184,14 +190,9 @@ def train(
         print("============================")
         print()
 
-        if early_stopping:
-            if epoch > 1:
-                if losses[-1] > losses[-2]:
-                    print("===========================================")
-                    print("==== Early stopping after {} epochs ======".format(epoch + 1))
-                    print("===========================================")
-                    print()
-                    break
+        if epoch >= min_n_epochs:
+            if losses[-1] >= losses[-2]:
+                break
 
     model.eval()
     return losses, f1_scores, model
@@ -313,6 +314,22 @@ def plot_cosine_distrib(
     plt.savefig(PATH + 'layer' + '_' + layer_no + '.png')
     plt.close()
 
+def concat_per_layer_mean_cos(
+                              X:np.ndarray,
+                              y:np.ndarray,
+                              ans_sims:dict,
+                              layers:str,
+                              correct:str='correct_preds',
+                              incorrect:str='incorrect_preds',
+):
+    assert X.shape[0] == y.shape[0]
+    est_layers = list(range(1, 7)) if layers == 'all_layers' else list(range(4, 7))
+    L = len(est_layers)
+    C = np.zeros((X.shape[0], 2*L))
+    C[y[y == 1],:] += np.array([(vals[correct]['mean_cos_ha'], vals[correct]['std_cos_ha'])  for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]).flatten()
+    C[y[y == 0],:] += np.array([(vals[incorrect]['mean_cos_ha'], vals[incorrect]['std_cos_ha']) for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]).flatten()
+    return np.concatenate((X, C), axis=1)
+
 def compute_similarities_across_layers(
                                        feat_reps:dict,
                                        true_start_pos:list,
@@ -331,15 +348,7 @@ def compute_similarities_across_layers(
     ans_similarities = defaultdict(dict)    
     
     if prediction == 'learned':
-        if layers == 'bottom_three_layers':
-            est_layers = list(range(1, 4))
-
-        elif layers == 'top_three_layers':
-            est_layers = list(range(4, 7))
-
-        elif layers == 'all_layers':
-            est_layers = list(range(1, 7))
-
+        est_layers = list(range(1, 7)) if layers == 'all_layers' else list(range(4, 7))
         L = len(est_layers) #total number of layers
         M = 4 #number of statistical features wrt cos(h_a) (i.e., min(cos(h_a)), max(cos(h_a)), mean(cos(h_a)), std(cos(h_a)))
         X = np.zeros((N, M*L)) #feature matrix wrt M to train ff neural net
@@ -389,7 +398,7 @@ def compute_similarities_across_layers(
                 if prediction == 'learned':
                     #compute cos(h_a)
                     a_max_cos, a_min_cos, a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens)
-                    
+
                     if layer_no in est_layers:
                         X[k, M*j:M*j+M] += np.array([a_max_cos, a_min_cos, a_mean_cos, a_std_cos])
 
@@ -451,6 +460,7 @@ def compute_similarities_across_layers(
                                  layer_no=str(layer_no),
                                  boxplot_version=boxplot_version,
                                 )
+
         if prediction == 'hand_engineered':
             if layer_no in est_layers:
                 est_preds.append(est_preds_current)
@@ -528,7 +538,8 @@ def evaluate_estimations_and_cosines(
                                                                 layers=layers,
                                                                 )
         y = true_preds
-        M = X.shape[1]
+        X = concat_per_layer_mean_cos(X, y, ans_similarities, layers) #concatenate X[N, L*M] with C[N, 2*L] => X = X $\in$ R^{N x M*L} concat C $\in$ R^{N x 2*L}
+        M = X.shape[1] #M = number of input features (i.e., x $\in$ R^M)
         #X, y = shuffle_arrays(X, y) if version == 'train' else X, y #shuffle order of examples during training (this step is not necessary at inference time)
         tensor_ds = create_tensor_dataset(X, y)
         dl = BatchGenerator(dataset=tensor_ds, batch_size=batch_size)
@@ -582,10 +593,10 @@ if __name__ == "__main__":
         help='Set model save directory for ans prediction model. Only necessary if args.prediction == learned.')
     parser.add_argument('--batch_size', type=int, default=8,
         help='Specify mini-batch size. Only necessary if args.prediction == learned.')
-    parser.add_argument('--n_epochs', type=int, default=10,
+    parser.add_argument('--n_epochs', type=int, default=25,
         help='Set number of epochs model should be trained for. Only necessary if args.prediction == learned.')
     parser.add_argument('--layers', type=str, default='',
-        help='Must be one of {all_layers, bottom_three_layers, top_three_layers}. Only necessary if args.prediction == learned.')
+        help='Must be one of {all_layers, top_three_layers}. Only necessary if args.prediction == learned.')
 
     args = parser.parse_args()
     assert isinstance(args.version, str), 'Version must be one of {train, test}'
