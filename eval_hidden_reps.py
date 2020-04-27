@@ -530,6 +530,7 @@ def evaluate_estimations_and_cosines(
     #compute (dis-)similarities among hidden reps in H_a for both correct and erroneous model predictions at each layer
     #AND estimate model predictions wrt hidden reps in the penultimate layer
     if prediction == 'learned':
+        y = true_preds
         ans_similarities, X = compute_similarities_across_layers(
                                                                 feat_reps=feat_reps,
                                                                 true_start_pos=true_start_pos,
@@ -542,14 +543,17 @@ def evaluate_estimations_and_cosines(
                                                                 version=version,
                                                                 layers=layers,
                                                                 )
-        y = true_preds
         if concat_per_layer_stats:
-            X = concat_per_layer_mean_cos(X, y, ans_similarities, layers) #concatenate X[N, L*M] with C[N, 2*L] => X = X $\in$ R^{N x M*L} concat C $\in$ R^{N x 2*L}
+            #concatenate X[N, L*M] with C[N, 2*L] => X = X $\in$ R^{N x M*L} concat C $\in$ R^{N x 2*L}
+            X = concat_per_layer_mean_cos(X, y, ans_similarities, layers) 
+            model_name = 'fc_nn' + '_' + layers + 'concat_per_layer_stats'
+        else:
+            model_name = 'fc_nn' + '_' + layers
+
         M = X.shape[1] #M = number of input features (i.e., x $\in$ R^M)
         #X, y = shuffle_arrays(X, y) if version == 'train' else X, y #shuffle order of examples during training (this step is not necessary at inference time)
         tensor_ds = create_tensor_dataset(X, y)
         dl = BatchGenerator(dataset=tensor_ds, batch_size=batch_size)
-        model_name = 'fc_nn' + '_' + layers
 
         if version == 'train':
             y_distribution = Counter(y)
@@ -671,11 +675,11 @@ if __name__ == "__main__":
     hidden_reps_results['cos_similarities'] = ans_similarities
 
     PATH = './results_hidden_reps/' + '/' + args.source.lower() + '/' + args.prediction + '/'
-    
     if not os.path.exists(PATH):
         os.makedirs(PATH)
 
+    concat_per_layer_stats = 'concat_per_layer_stats' if args.concat_per_layer_stats else ''
     # save results
-    with open(PATH + file_name + '_' + args.layers + '.json', 'w') as json_file:
+    with open(PATH + file_name + '_' + args.layers + '_' + concat_per_layer_stats + '.json', 'w') as json_file:
         json.dump(hidden_reps_results, json_file)
 
