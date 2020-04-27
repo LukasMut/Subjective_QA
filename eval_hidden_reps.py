@@ -326,8 +326,12 @@ def concat_per_layer_mean_cos(
     est_layers = list(range(1, 7)) if layers == 'all_layers' else list(range(4, 7))
     L = len(est_layers)
     C = np.zeros((X.shape[0], 2*L))
-    C[y[y == 1],:] += np.array([(vals[correct]['mean_cos_ha'], vals[correct]['std_cos_ha'])  for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]).flatten()
-    C[y[y == 0],:] += np.array([(vals[incorrect]['mean_cos_ha'], vals[incorrect]['std_cos_ha']) for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]).flatten()
+    #Alternative 1: np.hstack([mu_l for l in range(L)], [sigma_l for l in range(L)]) for x_i in X
+    #C[y[y == 1]] += np.hstack(zip(*[(vals[correct]['mean_cos_ha'],vals[correct]['std_cos_ha']) for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]))
+    #C[y[y == 0]] += np.hstack(zip(*[(vals[incorrect]['mean_cos_ha'],vals[incorrect]['std_cos_ha']) for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]))
+    #Alternative 2: np.array([(mu_l, sigma_l) for l in range(L)]).flatten() for x_i in X
+    C[y[y == 1]] += np.array([(vals[correct]['mean_cos_ha'], vals[correct]['std_cos_ha']) for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]).flatten()
+    C[y[y == 0]] += np.array([(vals[incorrect]['mean_cos_ha'], vals[incorrect]['std_cos_ha']) for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]).flatten()
     return np.concatenate((X, C), axis=1)
 
 def compute_similarities_across_layers(
@@ -488,6 +492,7 @@ def evaluate_estimations_and_cosines(
                                      n_epochs=None,
                                      batch_size=None,
                                      layers=None,
+                                     concat_per_layer_stats:bool:False,
 ):
     pred_answers = test_results['predicted_answers']
     true_answers = test_results['true_answers']
@@ -538,7 +543,8 @@ def evaluate_estimations_and_cosines(
                                                                 layers=layers,
                                                                 )
         y = true_preds
-        X = concat_per_layer_mean_cos(X, y, ans_similarities, layers) #concatenate X[N, L*M] with C[N, 2*L] => X = X $\in$ R^{N x M*L} concat C $\in$ R^{N x 2*L}
+        if concat_per_layer_stats:
+            X = concat_per_layer_mean_cos(X, y, ans_similarities, layers) #concatenate X[N, L*M] with C[N, 2*L] => X = X $\in$ R^{N x M*L} concat C $\in$ R^{N x 2*L}
         M = X.shape[1] #M = number of input features (i.e., x $\in$ R^M)
         #X, y = shuffle_arrays(X, y) if version == 'train' else X, y #shuffle order of examples during training (this step is not necessary at inference time)
         tensor_ds = create_tensor_dataset(X, y)
@@ -597,6 +603,8 @@ if __name__ == "__main__":
         help='Set number of epochs model should be trained for. Only necessary if args.prediction == learned.')
     parser.add_argument('--layers', type=str, default='',
         help='Must be one of {all_layers, top_three_layers}. Only necessary if args.prediction == learned.')
+    parser.add_argument('--concat_per_layer_stats', action='store_true',
+        help='If provided, concatenate per layer mean and std w.r.t. to cos(h_a) with each vector x_i for correct and erroneous model predictions respectively')
 
     args = parser.parse_args()
     assert isinstance(args.version, str), 'Version must be one of {train, test}'
@@ -623,7 +631,7 @@ if __name__ == "__main__":
     elif args.prediction == 'learned':
         assert isinstance(args.layers, str) and len(args.layers) > 0, 'Layers for which we want to store statistical characteristics wrt cos(h_a) must be specified'
         assert isinstance(args.batch_size, int), 'Batch size must be defined'
-        assert isinstance(args.model_dir, str), 'Directory to save and load weights of model must be defined'
+        assert isinstance(args.model_dir, str), 'Directory to save and load model weights must be defined'
         
         if args.version == 'train':
             assert isinstance(args.n_epochs, int), 'Number of epochs must be defined'
@@ -640,6 +648,7 @@ if __name__ == "__main__":
                                                                                     batch_size=args.batch_size,
                                                                                     n_epochs=args.n_epochs,
                                                                                     layers=args.layers,
+                                                                                    concat_per_layer_stats=args.concat_per_layer_stats,
                                                                                     )
             hidden_reps_results['train_losses'] = losses
             hidden_reps_results['train_f1s'] = f1_scores
@@ -653,6 +662,7 @@ if __name__ == "__main__":
                                                                          model_dir=args.model_dir,
                                                                          batch_size=args.batch_size,
                                                                          layers=args.layers,
+                                                                         concat_per_layer_stats=args.concat_per_layer_stats,
                                                                          )
             hidden_reps_results['test_f1'] = test_f1
     else:
