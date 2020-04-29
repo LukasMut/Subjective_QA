@@ -73,6 +73,22 @@ def compute_acc(results:dict): return {k: 100 * (v['correct'] / v['freq']) for k
 
 def sort_dict(results:dict): return dict(sorted(results.items(), key=lambda kv:kv[1], reverse=True))
 
+def compute_batch_score_sbj(
+                            results_sbj:dict,
+                            b_true_answers:list,
+                            b_pred_answers:list,
+                            b_sbj:torch.Tensor,
+                            ):
+    b_sbj = to_cpu(b_sbj)
+    for i, (y_true, y_hat) in enumerate(zip(b_true_answers, b_pred_answers)):
+      try:
+        results_sbj['sbj' if b_sbj[i] == 1 else 'obj']['freq'] += 1
+      except KeyError:
+        results_sbj['sbj' if b_sbj[i] == 1 else 'obj']['freq'] = 0
+        results_sbj['sbj' if b_sbj[i] == 1 else 'obj']['correct'] = 0
+      results_sbj['sbj' if b_sbj[i] == 1 else 'obj']['correct'] += compute_exact(y_true, y_hat)
+    return results_sbj
+
 def compute_batch_score_per_q_type(
                                    results_per_q_type:dict,
                                    b_true_answers:list,
@@ -88,7 +104,7 @@ def compute_batch_score_per_q_type(
       key = q_types[1]
     try:
       results_per_q_type[key]['freq'] += 1
-    except:
+    except KeyError:
       results_per_q_type[key]['freq'] = 1
       results_per_q_type[key]['correct'] = 0
     results_per_q_type[key]['correct'] += compute_exact(y_true, y_hat)
@@ -1293,6 +1309,7 @@ def test(
         sequential_transfer:bool=False,
         inference_strategy:str=None,
         detailed_analysis_sbj_class:bool=False,
+        detailed_results_sbj:bool=False,
         detailed_results_q_words:bool=False,
         detailed_results_domains:bool=False,
         detailed_results_q_type:bool=False,
@@ -1354,6 +1371,10 @@ def test(
         q_word_labels = []
         feat_reps = defaultdict(list)
 
+    elif detailed_results_sbj:
+        assert task == 'QA', 'Model must perform QA, if we want to compute exact-match per question type'
+        results_sbj = defaultdict(dict)
+
     elif detailed_results_q_words:
         assert task == 'QA', 'Model must perform QA, if we want to compute exact-match scores per top k interrogative word'
         q_words = ['how', 'what', 'is', 'where', 'does', 'do']
@@ -1366,7 +1387,7 @@ def test(
         results_per_domain = defaultdict(dict)
 
     elif detailed_results_q_type:
-        assert task == 'QA', 'Model must perform QA, if we want to compute exact-match scores per review domain'
+        assert task == 'QA', 'Model must perform QA, if we want to compute exact-match for unanswerable and answerable questions respectively'
         q_types = ['answerable_single', 'answerable_multi', 'unanswerable']
         results_per_q_type = defaultdict(dict)
 
@@ -1685,6 +1706,14 @@ def test(
                                                                     b_pred_answers,
                                                                     q_words,
                                                                     )
+              if detailed_results_sbj:
+                results_sbj = compute_batch_score_sbj(
+                                                      results_sbj,
+                                                      b_true_answers,
+                                                      b_pred_answers,
+                                                      b_sbj,
+                                                      )
+
               if detailed_results_q_type:
                 results_per_q_type = compute_batch_score_per_q_type(
                                                                     results_per_q_type,
@@ -1951,6 +1980,10 @@ def test(
       erroneous_preds_distribution = {pred: (freq / len(erroneous_predictions)) * 100 for pred, freq in Counter(erroneous_predictions).items()}
       erroneous_preds_distribution = sort_dict(erroneous_preds_distribution)
       return test_loss, test_acc, test_f1, erroneous_preds_distribution
+
+    elif task == 'QA' and detailed_results_sbj:
+      results_sbj = sort_dict(compute_acc(results_sbj))
+      return test_loss, test_acc, test_f1, results_sbj
 
     elif task == 'QA' and detailed_results_q_type:
       results_per_q_type = sort_dict(compute_acc(results_per_q_type))
