@@ -492,7 +492,7 @@ def evaluate_estimations_and_cosines(
                                      n_epochs=None,
                                      batch_size=None,
                                      layers=None,
-                                     concat_per_layer_stats:bool:False,
+                                     concat_per_layer_stats:bool=False,
 ):
     pred_answers = test_results['predicted_answers']
     true_answers = test_results['true_answers']
