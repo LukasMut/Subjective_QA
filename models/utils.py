@@ -66,16 +66,33 @@ def f1(probas:torch.Tensor, y_true:torch.Tensor, task:str, avg:str='macro'):
     y_pred = soft_to_hard(probas) if task == 'binary' else torch.argmax(to_cpu(probas, detach=True, to_numpy=False), dim=1)
     return f1_score(to_cpu(y_true), y_pred.numpy(), average=avg)
 
-def compute_acc_per_ds(results_per_ds:dict):
-  return {ds: {q_type: 100 * (score['correct'] / score['freq']) for q_type, score in q_types.items()} for ds, q_types in results_per_ds.items()}
+def compute_acc_nested(results_per_ds:dict):
+    return {ds: {q_type: 100 * (score['correct'] / score['freq']) for q_type, score in q_types.items()} for ds, q_types in results_per_ds.items()}
 
-def compute_acc_per_q_word(results_per_q_word:dict):
-  return {q_word: 100 * (val['correct'] / val['freq']) for q_word, val in results_per_q_word.items()}
-
-def compute_acc_per_domain(results_per_domain:dict):
-  return {domain: 100 * (val['correct'] / val['freq']) for domain, val in results_per_domain.items()}
+def compute_acc(results:dict): return {k: 100 * (v['correct'] / v['freq']) for k, v in results.items()}
 
 def sort_dict(results:dict): return dict(sorted(results.items(), key=lambda kv:kv[1], reverse=True))
+
+def compute_batch_score_per_q_type(
+                                   results_per_q_type:dict,
+                                   b_true_answers:list,
+                                   b_pred_answers:list,
+                                   q_types:list,
+                                   ):
+  for y_true, y_hat in zip(b_true_answers, b_pred_answers):
+    if y_true.strip() == '[CLS]':
+      key = q_types[2]
+    elif len(y_true.split()) == 1:
+      key = q_types[0]
+    else:
+      key = q_types[1]
+    try:
+      results_per_q_type[key]['freq'] += 1
+    except:
+      results_per_q_type[key]['freq'] = 1
+      results_per_q_type[key]['correct'] = 0
+    results_per_q_type[key]['correct'] += compute_exact(y_true, y_hat)
+  return results_per_q_type
 
 def compute_batch_score_per_domain(
                                    results_per_domain:dict,
@@ -1278,6 +1295,7 @@ def test(
         detailed_analysis_sbj_class:bool=False,
         detailed_results_q_words:bool=False,
         detailed_results_domains:bool=False,
+        detailed_results_q_type:bool=False,
         multi_qa_type_class:bool=False,
         output_last_hiddens_cls:bool=False,
         output_all_hiddens_cls:bool=False,
@@ -1346,6 +1364,11 @@ def test(
         domains = ['books', 'tripadvisor', 'grocery', 'electronics', 'movies', 'restaurants']
         idx_to_domain = dict(enumerate(domains))
         results_per_domain = defaultdict(dict)
+
+    elif detailed_results_q_type:
+        assert task == 'QA', 'Model must perform QA, if we want to compute exact-match scores per review domain'
+        q_types = ['answerable_single', 'answerable_multi', 'unanswerable']
+        results_per_q_type = defaultdict(dict)
 
     elif get_erroneous_predictions:
         assert task == 'QA', 'Model must perform QA, if we want to store erroneous answer span predictions'
@@ -1662,6 +1685,13 @@ def test(
                                                                     b_pred_answers,
                                                                     q_words,
                                                                     )
+              if detailed_results_q_type:
+                results_per_q_type = compute_batch_score_per_q_type(
+                                                                    results_per_q_type,
+                                                                    b_true_answers,
+                                                                    b_pred_answers,
+                                                                    q_types,
+                                                                    )
 
               if detailed_results_domains:
                 results_per_domain = compute_batch_score_per_domain(
@@ -1914,7 +1944,7 @@ def test(
     print()
 
     if detailed_analysis_sbj_class:
-      results_per_ds = compute_acc_per_ds(results_per_ds)
+      results_per_ds = compute_acc_nested(results_per_ds)
       return test_loss, test_acc, test_f1, results_per_ds
 
     elif task == 'QA' and get_erroneous_predictions:
@@ -1922,12 +1952,16 @@ def test(
       erroneous_preds_distribution = sort_dict(erroneous_preds_distribution)
       return test_loss, test_acc, test_f1, erroneous_preds_distribution
 
+    elif task == 'QA' and detailed_results_q_type:
+      results_per_q_type = sort_dict(compute_acc(results_per_q_type))
+      return test_loss, test_acc, test_f1, results_per_q_type
+
     elif task == 'QA' and detailed_results_domains:
-      results_per_domain = sort_dict(compute_acc_per_domain(results_per_domain))
+      results_per_domain = sort_dict(compute_acc(results_per_domain))
       return test_loss, test_acc, test_f1, results_per_domain
 
     elif task == 'QA' and detailed_results_q_words:
-      results_per_q_word = sort_dict(compute_acc_per_q_word(results_per_q_word))
+      results_per_q_word = sort_dict(compute_acc(results_per_q_word))
       return test_loss, test_acc, test_f1, results_per_q_word
 
     elif task == 'QA' and estimate_preds_wrt_hiddens:
