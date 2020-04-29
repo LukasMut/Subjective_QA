@@ -82,11 +82,11 @@ def compute_batch_score_sbj(
     b_sbj = to_cpu(b_sbj)
     for i, (y_true, y_hat) in enumerate(zip(b_true_answers, b_pred_answers)):
       try:
-        results_sbj['sbj' if b_sbj[i] == 1 else 'obj']['freq'] += 1
+        results_sbj['sbj' if b_sbj[i, 1] == 1 else 'obj']['freq'] += 1
       except KeyError:
-        results_sbj['sbj' if b_sbj[i] == 1 else 'obj']['freq'] = 0
-        results_sbj['sbj' if b_sbj[i] == 1 else 'obj']['correct'] = 0
-      results_sbj['sbj' if b_sbj[i] == 1 else 'obj']['correct'] += compute_exact(y_true, y_hat)
+        results_sbj['sbj' if b_sbj[i, 1] == 1 else 'obj']['freq'] = 0
+        results_sbj['sbj' if b_sbj[i, 1] == 1 else 'obj']['correct'] = 0
+      results_sbj['sbj' if b_sbj[i, 1] == 1 else 'obj']['correct'] += compute_exact(y_true, y_hat)
     return results_sbj
 
 def compute_batch_score_per_q_type(
