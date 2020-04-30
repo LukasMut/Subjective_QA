@@ -1362,7 +1362,7 @@ def test(
 
     elif output_all_hiddens:
         assert task == 'QA', 'Model must perform QA, if we want to store hidden representations for every token in a word sequence at each layer'
-        predicted_answers, true_answers, true_start_pos, true_end_pos, sent_pairs = [], [], [], [], []
+        predicted_answers, true_answers, true_start_pos, true_end_pos, start_log_probs, end_log_probs, sent_pairs = [], [], [], [], [], [], []
         feat_reps = defaultdict(list)
 
     elif output_all_hiddens_cls_q_words:
@@ -1636,12 +1636,11 @@ def test(
                     for i, hidden in enumerate(hiddens):
 
                       ######################################################################################
-                      #### STORE HIDDEN REPRESENTATIONS OF EVERY NON-[PAD] TOKEN FOR EACH WORD SEQUENCE ####
+                      #### STORE HIDDEN REPRESENTATIONS OF EVERY NON-[PAD] TOKEN FOR EACH INPUT SEQUENCE ####
                       ######################################################################################
                       
                       if output_all_hiddens: # 2D matrix
                         #NOTE: for now, we just want to store correct and incorrect (answer span) predictions w.r.t answerable (!) questions
-                        #if compute_exact(b_true_answers[i], b_pred_answers[i]) and b_true_answers[i].strip() != '[CLS]': # exclusively correct answers
                         if b_true_answers[i].strip() != '[CLS]' and len(b_true_answers[i].split()) > 1:
                           feat_reps['Layer' + '_' + str(l + 1)].append(hidden[:b_input_lengths[i], :].tolist()) # remove PAD token vector representations
                           if l == 0:
@@ -1650,7 +1649,8 @@ def test(
                             true_answers.append(b_true_answers[i])
                             true_start_pos.append(to_cpu(b_start_pos[i], to_numpy=True).tolist())
                             true_end_pos.append(to_cpu(b_end_pos[i], to_numpy=True).tolist())
-
+                            start_log_probs.append(start_log_probs_test[i].numpy().tolist())
+                            end_log_probs.append(end_log_probs_test[i].numpy().tolist())
                             b_sent_pairs = get_answers(
                                                       tokenizer=tokenizer,
                                                       b_input_ids=b_input_ids,
@@ -2022,7 +2022,7 @@ def test(
       #sent_pairs = [sent_pair for b_sent_pairs in sent_pairs for sent_pair in b_sent_pairs]
       true_start_pos = np.array(true_start_pos).flatten().tolist()
       true_end_pos = np.array(true_end_pos).flatten().tolist()
-      return test_loss, test_acc, test_f1, predicted_answers, true_answers, true_start_pos, true_end_pos, sent_pairs, feat_reps
+      return test_loss, test_acc, test_f1, predicted_answers, true_answers, true_start_pos, true_end_pos, start_log_probs, end_log_probs, sent_pairs, feat_reps
 
     elif task == 'QA' and output_all_hiddens_cls_q_words:
       return test_loss, test_acc, test_f1, q_word_labels, feat_reps

@@ -498,6 +498,8 @@ def evaluate_estimations_and_cosines(
     true_answers = test_results['true_answers']
     true_start_pos = test_results['true_start_pos']
     true_end_pos = test_results['true_end_pos']
+    start_log_probs = test_results['start_log_probs']
+    end_log_probs = test_results['end_log_probs']
     sent_pairs = test_results['sent_pairs']
     feat_reps = test_results['feat_reps']
     true_preds, pred_indices = [], []
