@@ -318,15 +318,11 @@ def compute_rel_freq(cos_sim_preds:dict):
     return {layer: {pred: {'min_std_cos':vals['min_std_cos']/vals['freq'], 'max_mean_cos':vals['max_mean_cos']/vals['freq']} for pred, vals in preds.items()} for layer, preds in cos_sim_preds.items()}
 
 def remove_single_token_preds(
-                              start_log_probs_sorted:np.ndarray,
-                              end_log_probs_sorted:np.ndarray,
+                              s_log_probs_sorted:np.ndarray,
+                              e_log_probs_sorted:np.ndarray,
                               ):
-    start_log_probs, end_log_probs = [], []
-    for i, start_log_prob in enumerate(start_log_probs_sorted)
-        if start_log_prob != end_log_probs_sorted[i]:
-            start_log_probs.append(start_log_prob)
-            end_log_probs.append(end_log_probs_sorted[i])
-    return start_log_probs, end_log_probs
+    s_log_probs, e_log_probs = zip(*[(s_log_prob, e_log_prob) for s_log_prob, e_log_prob in zip(s_log_probs_sorted, e_log_probs_sorted) if s_log_prob != e_log_prob])
+    return s_log_probs, e_log_probs
 
 def compute_cos_sim_across_logits(
                                   hiddens:np.ndarray,
@@ -343,7 +339,7 @@ def compute_cos_sim_across_logits(
     start_log_probs_sorted, end_log_probs_sorted = remove_single_token_preds(start_log_probs_sorted, end_log_probs_sorted)
     top_k_start_log_probs = start_log_probs_sorted[:top_k]
     tok_k_end_log_probs = end_log_probs_sorted[:top_k]
-    
+
     _, _, mean_cosines, std_cosines = zip(*[compute_ans_similarities(hiddens[top_k_start_log_probs[i]:top_k_end_log_probs[i]+1,:]) for i in range(top_k)])
 
     cos_similarities_preds[layer]['correct' if true_pred else 'erroneous'] = {}
