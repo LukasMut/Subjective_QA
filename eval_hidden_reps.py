@@ -321,7 +321,7 @@ def remove_single_token_preds(
                               s_log_probs_sorted:np.ndarray,
                               e_log_probs_sorted:np.ndarray,
                               ):
-    s_log_probs, e_log_probs = zip(*[(s_log_prob, e_log_prob) for s_log_prob, e_log_prob in zip(s_log_probs_sorted, e_log_probs_sorted) if s_log_prob != e_log_prob])
+    s_log_probs, e_log_probs = zip(*[(s_log_prob, e_log_prob) for s_log_prob, e_log_prob in zip(s_log_probs_sorted, e_log_probs_sorted) if s_log_prob != e_log_prob and s_log_prob < e_log_prob])
     return s_log_probs, e_log_probs
 
 def compute_cos_sim_across_logits(
@@ -340,7 +340,7 @@ def compute_cos_sim_across_logits(
     top_k_s_log_probs = s_log_probs_sorted[:top_k]
     top_k_e_log_probs = e_log_probs_sorted[:top_k]
 
-    _, _, mean_cosines, std_cosines = zip(*[compute_ans_similarities(hiddens[top_k_s_log_probs[i]:top_k_e_log_probs[i]+1,:]) for i in range(top_k)])
+    _, _, mean_cosines, std_cosines = zip(*[compute_ans_similarities(hiddens[top_k_s_log_probs[i]:top_k_e_log_probs[i]+1]) for i in range(top_k)])
 
     cos_similarities_preds[layer]['correct' if true_pred else 'erroneous'] = {}
     
@@ -438,20 +438,22 @@ def compute_similarities_across_layers(
                 #transform feat reps with PCA
                 hiddens = pca.fit_transform(hiddens)
 
-                cos_similarities_preds = compute_cos_sim_across_logits(
-                                                                       hiddens=hiddens,
-                                                                       s_log_probs=s_log_probs[i],
-                                                                       e_log_probs=e_log_probs[i],
-                                                                       cos_similarities_preds=cos_similarities_preds,
-                                                                       true_pred=bool(true_preds[pred_indices == i]),
-                                                                       layer=l,
-                                                                       top_k=top_k,
-                                                                       )
                 if layer_no == 1 and i == pred_indices[0]:
                     print("==============================================================")
                     print("=== Number of components in transformed hidden reps: {} ===".format(hiddens.shape[1]))
                     print("==============================================================")
                     print()
+
+                elif layer_no > 3:
+                    cos_similarities_preds = compute_cos_sim_across_logits(
+                                                                           hiddens=hiddens,
+                                                                           s_log_probs=s_log_probs[i],
+                                                                           e_log_probs=e_log_probs[i],
+                                                                           cos_similarities_preds=cos_similarities_preds,
+                                                                           true_pred=bool(true_preds[pred_indices == i]),
+                                                                           layer=l,
+                                                                           top_k=top_k,
+                                                                           )
 
                 #extract hidden reps for answer span
                 #a_hiddens = hiddens[true_start_pos[i]-2:true_end_pos[i]-1] #move ans span indices two positions to the left (accounting for [CLS] and [SEP])
