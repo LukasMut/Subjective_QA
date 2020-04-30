@@ -465,7 +465,7 @@ def compute_similarities_across_layers(
                     #a_max_cos, a_min_cos, a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens)
 
                     if layer_no in est_layers:
-                        X[k, M*j:M*j+M] += np.array([a_max_cos, a_min_cos, a_mean_cos, a_std_cos])
+                        X[k, M*j:M*j+M] += np.array([a_mean_cos, a_std_cos]) #np.array([a_max_cos, a_min_cos, a_mean_cos, a_std_cos]) #uncomment, if M = 4
 
                 elif prediction == 'hand_engineered': 
                     #compute cos(h_a)
