@@ -338,7 +338,7 @@ def compute_cos_sim_across_logits(
     e_log_probs_sorted = np.argsort(e_log_probs)[::-1]
     s_log_probs_sorted, e_log_probs_sorted = remove_single_token_preds(s_log_probs_sorted, e_log_probs_sorted)
     top_k_s_log_probs = s_log_probs_sorted[:top_k]
-    tok_k_e_log_probs = e_log_probs_sorted[:top_k]
+    top_k_e_log_probs = e_log_probs_sorted[:top_k]
 
     _, _, mean_cosines, std_cosines = zip(*[compute_ans_similarities(hiddens[top_k_s_log_probs[i]:top_k_e_log_probs[i]+1,:]) for i in range(top_k)])
 
