@@ -314,6 +314,39 @@ def plot_cosine_distrib(
     plt.savefig(PATH + 'layer' + '_' + layer_no + '.png')
     plt.close()
 
+def compute_rel_freq(cos_sim_preds:dict):
+    return {layer: {pred: {'min_std_cos':vals['min_std_cos']/vals['freq'], 'max_mean_cos':vals['max_mean_cos']/vals['freq']} for pred, vals in preds.items()} for layer, preds in cos_sim_preds.items()}
+
+def compute_cos_sim_across_logits(
+                                  hiddens:np.ndarray,
+                                  start_log_probs:np.ndarray,
+                                  end_log_probs:np.ndarray,
+                                  cos_similarities_preds:dict,
+                                  true_pred:bool,
+                                  layer:str,
+                                  top_k:int,
+                                  ):
+    top_k_start_log_probs = np.argsort(start_log_probs)[::-1][:top_k]
+    top_k_end_log_probs = np.argsort(end_log_probs)[::-1][:top_k]
+    _, _, mean_cosines, std_cosines = zip(*[compute_ans_similarities(hiddens[top_k_start_log_probs[i]:top_k_end_log_probs[i]+1,:]) for i in range(top_k)])
+
+    cos_similarities_preds[layer]['correct' if true_pred else 'erroneous'] = {}
+    
+    try:
+        cos_similarities_preds[layer]['correct' if true_pred else 'erroneous']['freq'] += 1
+    except KeyError:
+        cos_similarities_preds[layer]['correct' if true_pred else 'erroneous']['freq'] = 1
+        cos_similarities_preds[layer]['correct' if true_pred else 'erroneous']['max_mean_cos'] = 0
+        cos_similarities_preds[layer]['correct' if true_pred else 'erroneous']['min_std_cos'] = 0
+
+    if np.argmax(np.array(mean_cosines)) == 0:
+        cos_similarities_preds[layer]['correct' if true_pred else 'erroneous']['max_mean_cos'] += 1
+
+    if np.argmin(np.array(std_cosines)) == 0:
+        cos_similarities_preds[layer]['correct' if true_pred else 'erroneous']['min_std_cos'] += 1
+
+    return cos_similarities_preds
+
 def concat_per_layer_mean_cos(
                               X:np.ndarray,
                               y:np.ndarray,
@@ -341,15 +374,19 @@ def compute_similarities_across_layers(
                                        sent_pairs:list,
                                        pred_indices:list,
                                        true_preds:np.ndarray,
+                                       start_log_probs:np.ndarray,
+                                       end_log_probs:np.ndarray,
                                        source:str,
                                        prediction:str,
                                        version:str,
+                                       top_k:int=10,
                                        layers=None,
 ):
     retained_var = .95 #retain 90% or 95% of the hidden rep's variance (95% = top 57 principal components)
     rnd_state = 42 #set random state for reproducibility
     N = len(pred_indices)
-    ans_similarities = defaultdict(dict)    
+    ans_similarities = defaultdict(dict)
+    cos_similarities_preds = defaultdict(dict)    
     
     if prediction == 'learned':
         est_layers = list(range(1, 7)) if layers == 'all_layers' else list(range(4, 7))
@@ -389,6 +426,15 @@ def compute_similarities_across_layers(
                 #transform feat reps with PCA
                 hiddens = pca.fit_transform(hiddens)
 
+                cos_similarities_preds = compute_cos_sim_across_logits(
+                                                                       hiddens=hiddens,
+                                                                       start_log_probs=start_log_probs[i],
+                                                                       end_log_probs=end_log_probs[i],
+                                                                       cos_similarities_preds=cos_similarities_preds,
+                                                                       true_pred=bool(true_preds[pred_indices == i]),
+                                                                       layer=l,
+                                                                       top_k=top_k,
+                                                                       )
                 if layer_no == 1 and i == pred_indices[0]:
                     print("==============================================================")
                     print("=== Number of components in transformed hidden reps: {} ===".format(hiddens.shape[1]))
@@ -472,16 +518,17 @@ def compute_similarities_across_layers(
             if layer_no in est_layers:
                 j += 1
 
+    cos_similarities_preds = compute_rel_freq(cos_similarities_preds)
+    ans_similarities = adjust_p_values(ans_similarities)
+
     if prediction == 'learned':
-        ans_similarities = adjust_p_values(ans_similarities)
-        return ans_similarities, X
+        return ans_similarities, cos_similarities_preds, X
 
     else:
-        ans_similarities = adjust_p_values(ans_similarities)
         est_preds = np.stack(est_preds, axis=1)
         #if estimations wrt both layer 5 and 6 yield correct pred we assume a correct model pred else incorrect
         est_preds = np.array([1 if len(np.unique(row)) == 1 and np.unique(row)[0] == 1 else 0 for row in est_preds])
-        return ans_similarities, est_preds
+        return ans_similarities, cos_similarities_preds, est_preds
 
 def evaluate_estimations_and_cosines(
                                      test_results:dict,
@@ -498,8 +545,8 @@ def evaluate_estimations_and_cosines(
     true_answers = test_results['true_answers']
     true_start_pos = test_results['true_start_pos']
     true_end_pos = test_results['true_end_pos']
-    start_log_probs = test_results['start_log_probs']
-    end_log_probs = test_results['end_log_probs']
+    start_log_probs = np.array(test_results['start_log_probs'])
+    end_log_probs = np.array(test_results['end_log_probs'])
     sent_pairs = test_results['sent_pairs']
     feat_reps = test_results['feat_reps']
     true_preds, pred_indices = [], []
@@ -533,18 +580,20 @@ def evaluate_estimations_and_cosines(
     #AND estimate model predictions wrt hidden reps in the penultimate layer
     if prediction == 'learned':
         y = true_preds
-        ans_similarities, X = compute_similarities_across_layers(
-                                                                feat_reps=feat_reps,
-                                                                true_start_pos=true_start_pos,
-                                                                true_end_pos=true_end_pos,
-                                                                sent_pairs=sent_pairs,
-                                                                pred_indices=pred_indices,
-                                                                true_preds=true_preds,
-                                                                source=source,
-                                                                prediction=prediction,
-                                                                version=version,
-                                                                layers=layers,
-                                                                )
+        ans_similarities, cos_similarities_preds, X = compute_similarities_across_layers(
+                                                                                        feat_reps=feat_reps,
+                                                                                        true_start_pos=true_start_pos,
+                                                                                        true_end_pos=true_end_pos,
+                                                                                        sent_pairs=sent_pairs,
+                                                                                        pred_indices=pred_indices,
+                                                                                        true_preds=true_preds,
+                                                                                        start_log_probs=start_log_probs,
+                                                                                        end_log_probs=end_log_probs,
+                                                                                        source=source,
+                                                                                        prediction=prediction,
+                                                                                        version=version,
+                                                                                        layers=layers,
+                                                                                        )
         if concat_per_layer_stats:
             #concatenate X[N, L*M] with C[N, 2*L] => X = X $\in$ R^{N x M*L} concat C $\in$ R^{N x 2*L}
             X = concat_per_layer_mean_cos(X, y, ans_similarities, layers) 
@@ -564,34 +613,36 @@ def evaluate_estimations_and_cosines(
             model.to(device)
             losses, f1_scores, model = train(model=model, train_dl=dl, n_epochs=n_epochs, batch_size=batch_size, y_weights=y_weights)
             torch.save(model.state_dict(), model_dir + '/%s' % (model_name)) #save model's weights
-            return ans_similarities, losses, f1_scores
+            return ans_similarities, cos_similarities_preds, losses, f1_scores
 
         else:
             model = FFNN(in_size=M)
             model.load_state_dict(torch.load(model_dir + '/%s' % (model_name))) #load model's weights
             model.to(device)
             test_f1 = test(model=model, test_dl=dl)
-            return ans_similarities, test_f1
+            return ans_similarities, cos_similarities_preds, test_f1
     
     elif prediction == 'hand_engineered':
-        ans_similarities, est_preds = compute_similarities_across_layers(
-                                                                         feat_reps=feat_reps,
-                                                                         true_start_pos=true_start_pos,
-                                                                         true_end_pos=true_end_pos,
-                                                                         sent_pairs=sent_pairs,
-                                                                         pred_indices=pred_indices,
-                                                                         true_preds=true_preds,
-                                                                         source=source,
-                                                                         prediction=prediction,
-                                                                         version=version,
-                                                                         )
+        ans_similarities, cos_similarities_preds, est_preds = compute_similarities_across_layers(
+                                                                                                 feat_reps=feat_reps,
+                                                                                                 true_start_pos=true_start_pos,
+                                                                                                 true_end_pos=true_end_pos,
+                                                                                                 sent_pairs=sent_pairs,
+                                                                                                 pred_indices=pred_indices,
+                                                                                                 true_preds=true_preds,
+                                                                                                 start_log_probs=start_log_probs,
+                                                                                                 end_log_probs=end_log_probs,
+                                                                                                 source=source,
+                                                                                                 prediction=prediction,
+                                                                                                 version=version,
+                                                                                                 )
         est_accs = {}
         est_accs['correct_preds'] = (true_preds[true_preds == 1] == est_preds[true_preds == 1]).mean() * 100
         est_accs['incorrect_preds'] = (true_preds[true_preds == 0] == est_preds[true_preds == 0]).mean() * 100
         est_accs['total_preds'] = {} 
         est_accs['total_preds']['acc'] = (true_preds == est_preds).mean() * 100
         est_accs['total_preds']['f1_macro'] = f1_score(true_preds, est_preds, average='macro') * 100
-        return est_accs, ans_similarities
+        return est_accs, ans_similarities, cos_similarities_preds
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -622,16 +673,16 @@ if __name__ == "__main__":
 
     hidden_reps_results = {}
     if args.prediction == 'hand_engineered':
-        estimations, ans_similarities  = evaluate_estimations_and_cosines(
-                                                                         test_results=results,
-                                                                         source=args.source, 
-                                                                         prediction=args.prediction,
-                                                                         version=args.version,
-                                                                         model_dir=args.model_dir,
-                                                                         batch_size=args.batch_size,
-                                                                         n_epochs=args.n_epochs,
-                                                                         layers=args.layers,
-                                                                         )
+        estimations, ans_similarities, cos_similarities_preds = evaluate_estimations_and_cosines(
+                                                                                                 test_results=results,
+                                                                                                 source=args.source, 
+                                                                                                 prediction=args.prediction,
+                                                                                                 version=args.version,
+                                                                                                 model_dir=args.model_dir,
+                                                                                                 batch_size=args.batch_size,
+                                                                                                 n_epochs=args.n_epochs,
+                                                                                                 layers=args.layers,
+                                                                                                 )
         hidden_reps_results['estimations'] = estimations
 
     elif args.prediction == 'learned':
@@ -645,36 +696,37 @@ if __name__ == "__main__":
             if not os.path.exists(args.model_dir):
                 os.makedirs(args.model_dir)
             
-            ans_similarities, losses, f1_scores  = evaluate_estimations_and_cosines(
-                                                                                    test_results=results,
-                                                                                    source=args.source, 
-                                                                                    prediction=args.prediction,
-                                                                                    version=args.version,
-                                                                                    model_dir=args.model_dir,
-                                                                                    batch_size=args.batch_size,
-                                                                                    n_epochs=args.n_epochs,
-                                                                                    layers=args.layers,
-                                                                                    concat_per_layer_stats=args.concat_per_layer_stats,
-                                                                                    )
+            ans_similarities, cos_similarities_preds, losses, f1_scores  = evaluate_estimations_and_cosines(
+                                                                                                            test_results=results,
+                                                                                                            source=args.source, 
+                                                                                                            prediction=args.prediction,
+                                                                                                            version=args.version,
+                                                                                                            model_dir=args.model_dir,
+                                                                                                            batch_size=args.batch_size,
+                                                                                                            n_epochs=args.n_epochs,
+                                                                                                            layers=args.layers,
+                                                                                                            concat_per_layer_stats=args.concat_per_layer_stats,
+                                                                                                            )
             hidden_reps_results['train_losses'] = losses
             hidden_reps_results['train_f1s'] = f1_scores
 
         else:
-            ans_similarities, test_f1 = evaluate_estimations_and_cosines(
-                                                                         test_results=results,
-                                                                         source=args.source, 
-                                                                         prediction=args.prediction,
-                                                                         version=args.version,
-                                                                         model_dir=args.model_dir,
-                                                                         batch_size=args.batch_size,
-                                                                         layers=args.layers,
-                                                                         concat_per_layer_stats=args.concat_per_layer_stats,
-                                                                         )
+            ans_similarities, cos_similarities_preds, test_f1 = evaluate_estimations_and_cosines(
+                                                                                                 test_results=results,
+                                                                                                 source=args.source, 
+                                                                                                 prediction=args.prediction,
+                                                                                                 version=args.version,
+                                                                                                 model_dir=args.model_dir,
+                                                                                                 batch_size=args.batch_size,
+                                                                                                 layers=args.layers,
+                                                                                                 concat_per_layer_stats=args.concat_per_layer_stats,
+                                                                                                 )
             hidden_reps_results['test_f1'] = test_f1
     else:
         raise ValueError('Prediction must be one of {hand_engineered, learned}')
     
-    hidden_reps_results['cos_similarities'] = ans_similarities
+    hidden_reps_results['cos_similarities_true'] = ans_similarities
+    hidden_reps_results['cos_similarities_preds'] = cos_similarities_preds
 
     PATH = './results_hidden_reps/' + '/' + args.source.lower() + '/' + args.prediction + '/'
     if not os.path.exists(PATH):
