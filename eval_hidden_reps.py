@@ -317,6 +317,17 @@ def plot_cosine_distrib(
 def compute_rel_freq(cos_sim_preds:dict):
     return {layer: {pred: {'min_std_cos':vals['min_std_cos']/vals['freq'], 'max_mean_cos':vals['max_mean_cos']/vals['freq']} for pred, vals in preds.items()} for layer, preds in cos_sim_preds.items()}
 
+def remove_single_token_preds(
+                              start_log_probs_sorted:np.ndarray,
+                              end_log_probs_sorted:np.ndarray,
+                              ):
+    start_log_probs, end_log_probs = [], []
+    for i, start_log_prob in enumerate(start_log_probs_sorted)
+        if start_log_prob != end_log_probs_sorted[i]:
+            start_log_probs.append(start_log_prob)
+            end_log_probs.append(end_log_probs_sorted[i])
+    return start_log_probs, end_log_probs
+
 def compute_cos_sim_across_logits(
                                   hiddens:np.ndarray,
                                   start_log_probs:np.ndarray,
@@ -326,8 +337,13 @@ def compute_cos_sim_across_logits(
                                   layer:str,
                                   top_k:int,
                                   ):
-    top_k_start_log_probs = np.argsort(start_log_probs)[::-1][:top_k]
-    top_k_end_log_probs = np.argsort(end_log_probs)[::-1][:top_k]
+    assert len(start_log_probs) == len(end_log_probs)
+    start_log_probs_sorted = np.argsort(start_log_probs)[::-1]
+    end_log_probs_sorted = np.argsort(end_log_probs)[::-1]
+    start_log_probs_sorted, end_log_probs_sorted = remove_single_token_preds(start_log_probs_sorted, end_log_probs_sorted)
+    top_k_start_log_probs = start_log_probs_sorted[:top_k]
+    tok_k_end_log_probs = end_log_probs_sorted[:top_k]
+    
     _, _, mean_cosines, std_cosines = zip(*[compute_ans_similarities(hiddens[top_k_start_log_probs[i]:top_k_end_log_probs[i]+1,:]) for i in range(top_k)])
 
     cos_similarities_preds[layer]['correct' if true_pred else 'erroneous'] = {}
@@ -391,7 +407,7 @@ def compute_similarities_across_layers(
     if prediction == 'learned':
         est_layers = list(range(1, 7)) if layers == 'all_layers' else list(range(4, 7))
         L = len(est_layers) #total number of layers
-        M = 4 #number of statistical features wrt cos(h_a) (i.e., min(cos(h_a)), max(cos(h_a)), mean(cos(h_a)), std(cos(h_a)))
+        M = 2 #number of statistical features wrt cos(h_a) (i.e., min(cos(h_a)), max(cos(h_a)), mean(cos(h_a)), std(cos(h_a)))
         X = np.zeros((N, M*L)) #feature matrix wrt M to train ff neural net
         j = 0 #running idx to update X_i for each l in L_est
 
@@ -447,7 +463,8 @@ def compute_similarities_across_layers(
 
                 if prediction == 'learned':
                     #compute cos(h_a)
-                    a_max_cos, a_min_cos, a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens)
+                    _, _, a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens)
+                    #a_max_cos, a_min_cos, a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens)
 
                     if layer_no in est_layers:
                         X[k, M*j:M*j+M] += np.array([a_max_cos, a_min_cos, a_mean_cos, a_std_cos])
