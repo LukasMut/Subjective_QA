@@ -326,21 +326,21 @@ def remove_single_token_preds(
 
 def compute_cos_sim_across_logits(
                                   hiddens:np.ndarray,
-                                  start_log_probs:np.ndarray,
-                                  end_log_probs:np.ndarray,
+                                  s_log_probs:np.ndarray,
+                                  e_log_probs:np.ndarray,
                                   cos_similarities_preds:dict,
                                   true_pred:bool,
                                   layer:str,
                                   top_k:int,
                                   ):
-    assert len(start_log_probs) == len(end_log_probs)
-    start_log_probs_sorted = np.argsort(start_log_probs)[::-1]
-    end_log_probs_sorted = np.argsort(end_log_probs)[::-1]
-    start_log_probs_sorted, end_log_probs_sorted = remove_single_token_preds(start_log_probs_sorted, end_log_probs_sorted)
-    top_k_start_log_probs = start_log_probs_sorted[:top_k]
-    tok_k_end_log_probs = end_log_probs_sorted[:top_k]
+    assert len(s_log_probs) == len(e_log_probs)
+    s_log_probs_sorted = np.argsort(s_log_probs)[::-1]
+    e_log_probs_sorted = np.argsort(e_log_probs)[::-1]
+    s_log_probs_sorted, e_log_probs_sorted = remove_single_token_preds(s_log_probs_sorted, e_log_probs_sorted)
+    top_k_s_log_probs = s_log_probs_sorted[:top_k]
+    tok_k_e_log_probs = e_log_probs_sorted[:top_k]
 
-    _, _, mean_cosines, std_cosines = zip(*[compute_ans_similarities(hiddens[top_k_start_log_probs[i]:top_k_end_log_probs[i]+1,:]) for i in range(top_k)])
+    _, _, mean_cosines, std_cosines = zip(*[compute_ans_similarities(hiddens[top_k_s_log_probs[i]:top_k_e_log_probs[i]+1,:]) for i in range(top_k)])
 
     cos_similarities_preds[layer]['correct' if true_pred else 'erroneous'] = {}
     
@@ -386,8 +386,8 @@ def compute_similarities_across_layers(
                                        sent_pairs:list,
                                        pred_indices:list,
                                        true_preds:np.ndarray,
-                                       start_log_probs:np.ndarray,
-                                       end_log_probs:np.ndarray,
+                                       s_log_probs:np.ndarray,
+                                       e_log_probs:np.ndarray,
                                        source:str,
                                        prediction:str,
                                        version:str,
@@ -440,8 +440,8 @@ def compute_similarities_across_layers(
 
                 cos_similarities_preds = compute_cos_sim_across_logits(
                                                                        hiddens=hiddens,
-                                                                       start_log_probs=start_log_probs[i],
-                                                                       end_log_probs=end_log_probs[i],
+                                                                       s_log_probs=s_log_probs[i],
+                                                                       e_log_probs=e_log_probs[i],
                                                                        cos_similarities_preds=cos_similarities_preds,
                                                                        true_pred=bool(true_preds[pred_indices == i]),
                                                                        layer=l,
@@ -558,8 +558,8 @@ def evaluate_estimations_and_cosines(
     true_answers = test_results['true_answers']
     true_start_pos = test_results['true_start_pos']
     true_end_pos = test_results['true_end_pos']
-    start_log_probs = np.array(test_results['start_log_probs'])
-    end_log_probs = np.array(test_results['end_log_probs'])
+    s_log_probs = np.array(test_results['start_log_probs'])
+    e_log_probs = np.array(test_results['end_log_probs'])
     sent_pairs = test_results['sent_pairs']
     feat_reps = test_results['feat_reps']
     true_preds, pred_indices = [], []
@@ -600,8 +600,8 @@ def evaluate_estimations_and_cosines(
                                                                                         sent_pairs=sent_pairs,
                                                                                         pred_indices=pred_indices,
                                                                                         true_preds=true_preds,
-                                                                                        start_log_probs=start_log_probs,
-                                                                                        end_log_probs=end_log_probs,
+                                                                                        s_log_probs=s_log_probs,
+                                                                                        e_log_probs=e_log_probs,
                                                                                         source=source,
                                                                                         prediction=prediction,
                                                                                         version=version,
@@ -643,8 +643,8 @@ def evaluate_estimations_and_cosines(
                                                                                                  sent_pairs=sent_pairs,
                                                                                                  pred_indices=pred_indices,
                                                                                                  true_preds=true_preds,
-                                                                                                 start_log_probs=start_log_probs,
-                                                                                                 end_log_probs=end_log_probs,
+                                                                                                 s_log_probs=s_log_probs,
+                                                                                                 e_log_probs=e_log_probs,
                                                                                                  source=source,
                                                                                                  prediction=prediction,
                                                                                                  version=version,
