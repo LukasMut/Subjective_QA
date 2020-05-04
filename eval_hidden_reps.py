@@ -360,12 +360,12 @@ def compute_cos_sim_across_logits(
     return cos_similarities_preds
 
 def interp_cos_per_layer(
-                          X:np.ndarray,
-                          y:np.ndarray,
-                          source:str,
-                          ):
+                         X:np.ndarray,
+                         y:np.ndarray,
+                         source:str,
+                         ):
     """
-    per layer interpolate cos(h_a) according to CDF (Cumulative Distribution Function) wrt cos(h_a) distribution in *train* 
+    interpolate cos(h_a) per layer according to CDF (Cumulative Distribution Function) wrt cos(h_a) distribution in *train* 
     corresponding to incorrect or erroneous predictions respectively
     replace both mean(cos(h_a)) and std(cos(h_a)) with interpolated values (i.e., probability values NOT cosine similarities)
     """
@@ -378,8 +378,8 @@ def interp_cos_per_layer(
                    delta:float=.1,
                    ):
         """
-        compute P(x_i - delta < x_i < x_i + delta) (is equal to P(x_i - delta <= x_i <= x_i + delta)) => p that observed mean(cos(h_a)) lies within pre-defined interval
-        set endpoint flag to False to yield an unbiased estimator of the CDF (same as np.arange(1, len(cos)+1) / len(cos))
+        compute P(x_i - delta < x_i < x_i + delta) (is equal to P(x_i - delta <= x_i <= x_i + delta)) => p that observed cos(h_a) lies within pre-defined interval
+        set endpoint flag in np.linspace() to False to yield an unbiased estimator of the CDF (same as np.arange(1, len(cos)+1) / len(cos))
         """
         p = np.arange(1, len(cos)+1) / len(cos) #np.linspace(0, 1, len(cos), endpoint=False)
         cos_sorted = np.sort(cos) # sort values in ascending order
@@ -665,7 +665,7 @@ def evaluate_estimations_and_cosines(
                                                                                         version=version,
                                                                                         layers=layers,
                                                                                         )
-        #interpolate values wrt to *train* CDFs
+        #interpolate values wrt to *train* CDFs (replace raw cos similarities with probability values according to cos(h_a) CDFs)
         X = interp_cos_per_layer(X, y, source)
         model_name = 'fc_nn' + '_' + layers
         M = X.shape[1] #M = number of input features (i.e., x $\in$ R^M)
