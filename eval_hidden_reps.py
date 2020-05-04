@@ -340,7 +340,7 @@ def compute_cos_sim_across_logits(
     top_k_s_log_probs = s_log_probs_sorted[:top_k]
     top_k_e_log_probs = e_log_probs_sorted[:top_k]
 
-    _, _, mean_cosines, std_cosines = zip(*[compute_ans_similarities(hiddens[top_k_s_log_probs[i]:top_k_e_log_probs[i]+1]) for i in range(top_k)])
+    _, _, mean_cosines, std_cosines = zip(*[compute_ans_similarities(hiddens[top_k_s_log_probs[i]:top_k_e_log_probs[i]+1, :]) for i in range(top_k)])
 
     cos_similarities_preds[layer]['correct' if true_pred else 'erroneous'] = {}
     
@@ -351,13 +351,54 @@ def compute_cos_sim_across_logits(
         cos_similarities_preds[layer]['correct' if true_pred else 'erroneous']['max_mean_cos'] = 0
         cos_similarities_preds[layer]['correct' if true_pred else 'erroneous']['min_std_cos'] = 0
 
-    if np.argmax(np.array(mean_cosines)) == 0:
+    if np.argmax(np.asarray(mean_cosines)) == 0:
         cos_similarities_preds[layer]['correct' if true_pred else 'erroneous']['max_mean_cos'] += 1
 
-    if np.argmin(np.array(std_cosines)) == 0:
+    if np.argmin(np.asarray(std_cosines)) == 0:
         cos_similarities_preds[layer]['correct' if true_pred else 'erroneous']['min_std_cos'] += 1
 
     return cos_similarities_preds
+
+def interp_cos_per_layer(
+                          X:np.ndarray,
+                          y:np.ndarray,
+                          source:str,
+                          ):
+    """
+    per layer interpolate cos(h_a) according to CDF (Cumulative Distribution Function) wrt cos(h_a) distribution in *train* 
+    corresponding to incorrect or erroneous predictions respectively
+    replace both mean(cos(h_a)) and std(cos(h_a)) with interpolated values (i.e., probability values NOT cosine similarities)
+    """
+    cos_distrib_correct_preds = np.loadtxt('./results_hidden_reps/' + source.lower() + '/cosines/' + 'correct/' + 'cosine_distrib_per_layer.txt')
+    cos_distrib_incorrect_preds = np.loadtxt('./results_hidden_reps/' + source.lower() + '/cosines/' + 'incorrect/' + 'cosine_distrib_per_layer.txt')
+    
+    def interp_cos(
+                   x:float,
+                   cos:np.ndarray,
+                   delta:float=.1,
+                   ):
+        """
+        compute P(x_i - delta < x_i < x_i + delta) (is equal to P(x_i - delta <= x_i <= x_i + delta)) => p that observed mean(cos(h_a)) lies within pre-defined interval
+        set endpoint flag to False to yield an unbiased estimator of the CDF (same as np.arange(1, len(cos)+1) / len(cos))
+        """
+        p = np.arange(1, len(cos)+1) / len(cos) #np.linspace(0, 1, len(cos), endpoint=False)
+        cos_sorted = np.sort(cos) # sort values in ascending order
+        assert np.all(np.diff(cos_sorted) > 0), 'x-coordinate sequence xp is required to be passed in increasing order'
+        p_interval = np.interp(x+delta, cos_sorted, p) - np.interp(x-delta, cos_sorted, p) #P(cos(h_a) < x_i+delta) - P(cos(h_a) < x_i-delta) 
+        return p_interval
+    
+    for l, (cos_correct, cos_incorrect) in enumerate(zip(cos_distrib_correct_preds, cos_distrib_incorrect_preds)):
+        #unpack *train* distributions
+        cos_correct_means, cos_correct_stds = zip(*cos_correct)
+        cos_incorrect_means, cos_incorrect_stds = zip(*cos_incorrect)
+        for i in range(X.shape[0]):
+            cos_mean = X[i, 2*l]
+            cos_std = X[i, 2*l+1]
+            p_cos_mean = interp_cos(cos_mean, cos_correct_means if y[i] == 1 else cos_incorrect_means)
+            p_cos_std = interp_cos(cos_std, cos_correct_stds if y[i] == 1 else cos_incorrect_std)
+            X[i, 2*l] = p_cos_mean
+            X[i, 2*l+1] = p_cos_std
+    return X
 
 def concat_per_layer_mean_cos(
                               X:np.ndarray,
@@ -367,16 +408,14 @@ def concat_per_layer_mean_cos(
                               correct:str='correct_preds',
                               incorrect:str='incorrect_preds',
 ):
+    #concatenate X[N, L*M] with C[N, 2*L] => X = X $\in$ R^{N x M*L} concat C $\in$ R^{N x 2*L}
     assert X.shape[0] == y.shape[0]
     est_layers = list(range(1, 7)) if layers == 'all_layers' else list(range(4, 7))
     L = len(est_layers)
     C = np.zeros((X.shape[0], 2*L))
-    #Alternative 1: np.hstack([mu_l for l in range(L)], [sigma_l for l in range(L)]) for x_i in X
-    #C[y[y == 1],:] += np.hstack(zip(*[(vals[correct]['mean_cos_ha'],vals[correct]['std_cos_ha']) for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]))
-    #C[y[y == 0],:] += np.hstack(zip(*[(vals[incorrect]['mean_cos_ha'],vals[incorrect]['std_cos_ha']) for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]))
-    #Alternative 2: np.array([(mu_l, sigma_l) for l in range(L)]).flatten() for x_i in X
-    C[y[y == 1],:] += np.array([(vals[correct]['mean_cos_ha'], vals[correct]['std_cos_ha']) for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]).flatten()
-    C[y[y == 0],:] += np.array([(vals[incorrect]['mean_cos_ha'], vals[incorrect]['std_cos_ha']) for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]).flatten()
+    #np.array([(mu_l, sigma_l) for l in range(L)]).flatten() for x_i in X
+    C[y[y == 1]] += np.asarray([(vals[correct]['mean_cos_ha'], vals[correct]['std_cos_ha']) for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]).flatten()
+    C[y[y == 0]] += np.asarray([(vals[incorrect]['mean_cos_ha'], vals[incorrect]['std_cos_ha']) for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]).flatten()
     return np.concatenate((X, C), axis=1)
 
 def compute_similarities_across_layers(
@@ -394,7 +433,7 @@ def compute_similarities_across_layers(
                                        top_k:int=10,
                                        layers=None,
 ):
-    retained_var = .95 #retain 90% or 95% of the hidden rep's variance (95% = top 57 principal components)
+    retained_var = .95 #retain 90% or 95% of the hidden rep's variance
     rnd_state = 42 #set random state for reproducibility
     N = len(pred_indices)
     ans_similarities = defaultdict(dict)
@@ -403,7 +442,7 @@ def compute_similarities_across_layers(
     if prediction == 'learned':
         est_layers = list(range(1, 7)) if layers == 'all_layers' else list(range(4, 7))
         L = len(est_layers) #total number of layers
-        M = 2 #number of statistical features wrt cos(h_a) (i.e., min(cos(h_a)), max(cos(h_a)), mean(cos(h_a)), std(cos(h_a)))
+        M = 2 #number of statistical features wrt cos(h_a) (i.e., mean(cos(h_a)), std(cos(h_a)))
         X = np.zeros((N, M*L)) #feature matrix wrt M to train ff neural net
         j = 0 #running idx to update X_i for each l in L_est
 
@@ -416,9 +455,14 @@ def compute_similarities_across_layers(
 
     #initialise PCA (we need to apply PCA to remove noise from the feature representations)
     pca = PCA(n_components=retained_var, svd_solver='auto', random_state=rnd_state)
+
+    if version == 'train':
+        correct_preds_cosines_per_layer = []
+        incorrect_preds_cosines_per_layer = []
     
     for l, hiddens_all_sents in feat_reps.items():
-        correct_preds_dists, incorrect_preds_dists = [], []
+        correct_preds_cosines = []
+        incorrect_preds_cosines = []
         layer_no = int(l.lstrip('Layer' + '_'))
         k = 0
 
@@ -428,14 +472,14 @@ def compute_similarities_across_layers(
 
         for i, hiddens in enumerate(hiddens_all_sents):
             if i in pred_indices:
-                hiddens = np.array(hiddens)
+                hiddens = np.asarray(hiddens)
                 sent = sent_pairs[i].strip().split()
                 sep_idx = sent.index('[SEP]')
 
-                #remove hidden reps for [CLS] and [SEP] tokens
-                #hiddens = np.vstack((hiddens[1:sep_idx], hiddens[sep_idx+1:-1])) 
+                #remove hidden reps corresponding to special [CLS] and [SEP] tokens
+                hiddens = np.vstack((hiddens[1:sep_idx], hiddens[sep_idx+1:-1])) 
                 
-                #transform feat reps with PCA
+                #transform hidden reps with PCA
                 hiddens = pca.fit_transform(hiddens)
 
                 if layer_no == 1 and i == pred_indices[0]:
@@ -456,35 +500,36 @@ def compute_similarities_across_layers(
                                                                            )
 
                 #extract hidden reps for answer span
-                #a_hiddens = hiddens[true_start_pos[i]-2:true_end_pos[i]-1] #move ans span indices two positions to the left (accounting for [CLS] and [SEP])
-                a_hiddens = hiddens[true_start_pos[i]:true_end_pos[i]+1]
+                a_hiddens = hiddens[true_start_pos[i]-2:true_end_pos[i]-1] #move ans span indices two positions to the left (accounting for the removal of [CLS] and [SEP])
+                #a_hiddens = hiddens[true_start_pos[i]:true_end_pos[i]+1]
+
+                #compute cos(h_a)
+                 _, _, a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens)
 
                 if prediction == 'learned':
-                    #compute cos(h_a)
-                    _, _, a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens)
-                    #a_max_cos, a_min_cos, a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens)
-
                     if layer_no in est_layers:
-                        X[k, M*j:M*j+M] += np.array([a_mean_cos, a_std_cos]) #np.array([a_max_cos, a_min_cos, a_mean_cos, a_std_cos]) #uncomment, if M = 4
-
-                elif prediction == 'hand_engineered': 
-                    #compute cos(h_a)
-                    _, _, a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens)
-                    #estimate model predictions wrt avg cosine similarities among answer hidden reps in the penultimate and last transformer layer
+                        X[k, M*j:M*j+M] += np.array([a_mean_cos, a_std_cos])
+                else: 
                     if layer_no in est_layers:
                         if a_mean_cos > cos_thresh: 
                             est_preds_current[k] += 1
                 
                 if true_preds[pred_indices == i] == 1:
-                    correct_preds_dists.append((a_mean_cos, a_std_cos))
+                    correct_preds_cosines.append((a_mean_cos, a_std_cos))
                 else:
-                    incorrect_preds_dists.append((a_mean_cos, a_std_cos))
+                    incorrect_preds_cosines.append((a_mean_cos, a_std_cos))
 
                 k += 1
 
+        if version == 'train':
+            # store mean cos(h_a) and std cos(h_a) distributions for every transformer layer
+            if layer_no in est_layers:
+                correct_preds_cosines_per_layer.append(correct_preds_cosines)
+                incorrect_preds_cosines_per_layer.append(incorrect_preds_cosines)
+
         #unpack means and stds wrt cos(h_a)
-        a_correct_cosines_mean, a_correct_cosines_std = zip(*correct_preds_dists)
-        a_incorrect_cosines_mean, a_incorrect_cosines_std = zip(*incorrect_preds_dists)
+        a_correct_cosines_mean, a_correct_cosines_std = zip(*correct_preds_cosines)
+        a_incorrect_cosines_mean, a_incorrect_cosines_std = zip(*incorrect_preds_cosines)
 
         ans_similarities[l]['correct_preds'] = {}
         ans_similarities[l]['correct_preds']['mean_cos_ha'] = np.mean(a_correct_cosines_mean)
@@ -509,8 +554,8 @@ def compute_similarities_across_layers(
 
         #plot cos(h_a) distributions for both correct and erroneous model predictions across all transformer layers
         plot_cosine_distrib(
-                            a_correct_cosines_mean=np.array(a_correct_cosines_mean),
-                            a_incorrect_cosines_mean=np.array(a_incorrect_cosines_mean),
+                            a_correct_cosines_mean=np.asarray(a_correct_cosines_mean),
+                            a_incorrect_cosines_mean=np.asarray(a_incorrect_cosines_mean),
                             source=source,
                             version=version,
                             layer_no=str(layer_no),
@@ -518,8 +563,8 @@ def compute_similarities_across_layers(
 
         for boxplot_version in ['seaborn', 'matplotlib']:
             plot_cosine_boxplots(
-                                 a_correct_cosines_mean=np.array(a_correct_cosines_mean),
-                                 a_incorrect_cosines_mean=np.array(a_incorrect_cosines_mean),
+                                 a_correct_cosines_mean=np.asarray(a_correct_cosines_mean),
+                                 a_incorrect_cosines_mean=np.asarray(a_incorrect_cosines_mean),
                                  source=source,
                                  version=version,
                                  layer_no=str(layer_no),
@@ -536,12 +581,23 @@ def compute_similarities_across_layers(
     cos_similarities_preds = compute_rel_freq(cos_similarities_preds)
     ans_similarities = adjust_p_values(ans_similarities)
 
+    if version == 'train':
+        correct_preds_cosines_per_layer = np.asarray(correct_preds_cosines_per_layer)
+        incorrect_preds_cosines_per_layer = np.asarray(incorrect_preds_cosines_per_layer)
+        
+        PATH = './results_hidden_reps/' + source.lower() + '/cosines/'
+        if not os.path.exists(PATH):
+            os.makedirs(PATH)
+
+        np.savetxt(PATH + 'correct' + '/' + 'cosine_distrib_per_layer.txt', correct_preds_cosines_per_layer)
+        np.savetxt(PATH + 'incorrect' + '/' + 'cosine_distrib_per_layer.txt', incorrect_preds_cosines_per_layer)
+
     if prediction == 'learned':
         return ans_similarities, cos_similarities_preds, X
 
     else:
         est_preds = np.stack(est_preds, axis=1)
-        #if estimations wrt both layer 5 and 6 yield correct pred we assume a correct model pred else incorrect
+        #if estimations wrt both layer 5 (penultimate) and 6 (last) yield correct pred we assume a correct model pred else incorrect
         est_preds = np.array([1 if len(np.unique(row)) == 1 and np.unique(row)[0] == 1 else 0 for row in est_preds])
         return ans_similarities, cos_similarities_preds, est_preds
 
@@ -560,8 +616,8 @@ def evaluate_estimations_and_cosines(
     true_answers = test_results['true_answers']
     true_start_pos = test_results['true_start_pos']
     true_end_pos = test_results['true_end_pos']
-    s_log_probs = np.array(test_results['start_log_probs'])
-    e_log_probs = np.array(test_results['end_log_probs'])
+    s_log_probs = np.asarray(test_results['start_log_probs'])
+    e_log_probs = np.asarray(test_results['end_log_probs'])
     sent_pairs = test_results['sent_pairs']
     feat_reps = test_results['feat_reps']
     true_preds, pred_indices = [], []
@@ -584,8 +640,8 @@ def evaluate_estimations_and_cosines(
             pred_indices.append(i)
     
     assert len(true_preds) == len(pred_indices)
-    pred_indices = np.array(pred_indices)
-    true_preds = np.array(true_preds)
+    pred_indices = np.asarray(pred_indices)
+    true_preds = np.asarray(true_preds)
 
     print()
     print(Counter(true_preds))
@@ -609,13 +665,9 @@ def evaluate_estimations_and_cosines(
                                                                                         version=version,
                                                                                         layers=layers,
                                                                                         )
-        if concat_per_layer_stats:
-            #concatenate X[N, L*M] with C[N, 2*L] => X = X $\in$ R^{N x M*L} concat C $\in$ R^{N x 2*L}
-            X = concat_per_layer_mean_cos(X, y, ans_similarities, layers) 
-            model_name = 'fc_nn' + '_' + layers + 'concat_per_layer_stats'
-        else:
-            model_name = 'fc_nn' + '_' + layers
-
+        #interpolate values wrt to *train* CDFs
+        X = interp_cos_per_layer(X, y, source)
+        model_name = 'fc_nn' + '_' + layers
         M = X.shape[1] #M = number of input features (i.e., x $\in$ R^M)
         #X, y = shuffle_arrays(X, y) if version == 'train' else X, y #shuffle order of examples during training (this step is not necessary at inference time)
         tensor_ds = create_tensor_dataset(X, y)
