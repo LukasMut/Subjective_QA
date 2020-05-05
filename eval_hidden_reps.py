@@ -589,24 +589,24 @@ def compute_similarities_across_layers(
     cos_similarities_preds = compute_rel_freq(cos_similarities_preds)
     ans_similarities = adjust_p_values(ans_similarities)
 
-    if version == 'train':
-        correct_preds_cosines_per_layer = np.asarray(correct_preds_cosines_per_layer)
-        incorrect_preds_cosines_per_layer = np.asarray(incorrect_preds_cosines_per_layer)
-        
-        PATH = './results_hidden_reps/' + source.lower() + '/cosines/'
-        subdir_correct = 'correct/'
-        subdir_incorrect = 'incorrect/'
-        
-        if not os.path.exists(PATH + subdir_correct):
-            os.makedirs(PATH + subdir_correct)
-
-        if not os.path.exists(PATH + subdir_incorrect):
-            os.makedirs(PATH + subdir_incorrect)
-
-        np.savetxt(PATH + subdir_correct + 'cosine_distrib_per_layer.txt', correct_preds_cosines_per_layer)
-        np.savetxt(PATH + subdir_incorrect + 'cosine_distrib_per_layer.txt', incorrect_preds_cosines_per_layer)
-
     if prediction == 'learned':
+        if version == 'train':
+            correct_preds_cosines_per_layer = np.asarray(correct_preds_cosines_per_layer)
+            incorrect_preds_cosines_per_layer = np.asarray(incorrect_preds_cosines_per_layer)
+            
+            PATH = './results_hidden_reps/' + source.lower() + '/cosines/'
+            subdir_correct = 'correct/'
+            subdir_incorrect = 'incorrect/'
+            
+            if not os.path.exists(PATH + subdir_correct):
+                os.makedirs(PATH + subdir_correct)
+
+            if not os.path.exists(PATH + subdir_incorrect):
+                os.makedirs(PATH + subdir_incorrect)
+
+            np.savetxt(PATH + subdir_correct + 'cosine_distrib_per_layer.txt', correct_preds_cosines_per_layer)
+            np.savetxt(PATH + subdir_incorrect + 'cosine_distrib_per_layer.txt', incorrect_preds_cosines_per_layer)
+            
         return ans_similarities, cos_similarities_preds, X
 
     else:
