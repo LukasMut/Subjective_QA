@@ -138,7 +138,7 @@ def test(model, test_dl):
             test_steps += 1
         test_f1 /= test_steps
     print("===================")
-    print("==== Inference ====".format(epoch + 1))
+    print("==== Inference ====")
     print("==== F1: {} ====".format(round(test_f1, 3)))
     print("===================")
     print()
