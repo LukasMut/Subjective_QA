@@ -317,7 +317,7 @@ def plot_cosine_distrib(
 def compute_rel_freq(cos_sim_preds:dict):
     return {layer: {pred: {'min_std_cos':vals['min_std_cos']/vals['freq'], 'max_mean_cos':vals['max_mean_cos']/vals['freq'], 'spearman_r':np.mean(vals['spearman_r'])} for pred, vals in preds.items()} for layer, preds in cos_sim_preds.items()}
 
-def remove_single_and_impossible_token_preds(s_positions:np.ndarray, e_positions:np.ndarray):
+def remove_single_and_impossible_candidates(s_positions:np.ndarray, e_positions:np.ndarray):
     s_candidates, e_candidates = zip(*[(s_pos, e_pos) for s_pos, e_pos in zip(s_positions, e_positions) if s_pos < e_pos])
     return s_candidates, e_candidates
 
@@ -335,7 +335,7 @@ def compute_cos_sim_across_logits(
     s_positions = np.argsort(s_log_probs)[::-1]
     e_positions = np.argsort(e_log_probs)[::-1]
     #remove answer span predictions that are not possible (i.e., remove answer spans where s_pos >= e_pos) to yield an array of candidate answers
-    s_candidates, e_candidates = remove_single_and_impossible_token_preds(s_positions, e_positions)
+    s_candidates, e_candidates = remove_single_and_impossible_candidates(s_positions, e_positions)
     top_k_s_candidates = s_candidates[:top_k]
     top_k_e_candidates = e_candidates[:top_k]
 
