@@ -22,7 +22,7 @@ import torch.nn as nn
 from collections import defaultdict, Counter
 from eval_squad import compute_exact
 from statsmodels.stats.multitest import multipletests
-from scipy.stats import entropy, f_oneway, ttest_ind
+from scipy.stats import entropy, f_oneway, spearmanr, ttest_ind
 from sklearn.decomposition import PCA
 from sklearn.metrics import f1_score
 from sklearn.utils import shuffle
@@ -315,7 +315,7 @@ def plot_cosine_distrib(
     plt.close()
 
 def compute_rel_freq(cos_sim_preds:dict):
-    return {layer: {pred: {'min_std_cos':vals['min_std_cos']/vals['freq'], 'max_mean_cos':vals['max_mean_cos']/vals['freq']} for pred, vals in preds.items()} for layer, preds in cos_sim_preds.items()}
+    return {layer: {pred: {'min_std_cos':vals['min_std_cos']/vals['freq'], 'max_mean_cos':vals['max_mean_cos']/vals['freq'], 'spearman_r':np.mean(vals['spearman_r'])} for pred, vals in preds.items()} for layer, preds in cos_sim_preds.items()}
 
 def remove_single_and_impossible_token_preds(s_positions:np.ndarray, e_positions:np.ndarray):
     s_candidates, e_candidates = zip(*[(s_pos, e_pos) for s_pos, e_pos in zip(s_positions, e_positions) if s_pos < e_pos])
@@ -349,12 +349,15 @@ def compute_cos_sim_across_logits(
         cos_similarities_preds[layer]['correct' if true_pred else 'erroneous']['freq'] = 1
         cos_similarities_preds[layer]['correct' if true_pred else 'erroneous']['max_mean_cos'] = 0
         cos_similarities_preds[layer]['correct' if true_pred else 'erroneous']['min_std_cos'] = 0
+        cos_similarities_preds[layer]['correct' if true_pred else 'erroneous']['spearman_r'] = []
 
     if np.argmax(np.asarray(mean_cosines)) == 0:
         cos_similarities_preds[layer]['correct' if true_pred else 'erroneous']['max_mean_cos'] += 1
 
     if np.argmin(np.asarray(std_cosines)) == 0:
         cos_similarities_preds[layer]['correct' if true_pred else 'erroneous']['min_std_cos'] += 1
+
+    cos_similarities_preds[layer]['correct' if true_pred else 'erroneous']['spearman_r'].append(spearmanr(mean_cosines, std_cosines)[0])
 
     return cos_similarities_preds
 
@@ -534,11 +537,13 @@ def compute_similarities_across_layers(
         ans_similarities[l]['correct_preds']['mean_cos_ha'] = np.mean(a_correct_cosines_mean)
         ans_similarities[l]['correct_preds']['std_cos_ha'] = np.std(a_correct_cosines_mean)
         ans_similarities[l]['correct_preds']['mean_std_cos_ha'] = np.mean(a_correct_cosines_std)
-        
+        ans_similarities[l]['correct_preds']['spearman_r'] = spearmanr(a_correct_cosines_mean, a_correct_cosines_std)
+         
         ans_similarities[l]['incorrect_preds'] = {}
         ans_similarities[l]['incorrect_preds']['mean_cos_ha'] = np.mean(a_incorrect_cosines_mean)
         ans_similarities[l]['incorrect_preds']['std_cos_ha'] = np.std(a_incorrect_cosines_mean)
         ans_similarities[l]['incorrect_preds']['mean_std_cos_ha'] = np.mean(a_incorrect_cosines_std)
+        ans_similarities[l]['incorrect_preds']['spearman_r'] = spearmanr(a_incorrect_cosines_mean, a_incorrect_cosines_std)
 
         #the following step might be necessary since number of incorrect model predicitions is significantly higher than the number of correct model predictions
         #draw different random samples from the set of cos(h_a) wrt incorrect answer predictions without (!) replacement 
