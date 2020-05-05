@@ -524,7 +524,7 @@ def compute_similarities_across_layers(
                 k += 1
 
         if version == 'train':
-            # store mean cos(h_a) and std cos(h_a) distributions for every transformer layer to compute CDFs
+            #store mean cos(h_a) and std cos(h_a) distributions for every transformer layer to compute *train* CDFs
             if layer_no in est_layers:
                 correct_preds_cosines_per_layer.append(correct_preds_cosines)
                 incorrect_preds_cosines_per_layer.append(incorrect_preds_cosines)
