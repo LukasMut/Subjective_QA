@@ -540,15 +540,13 @@ def compute_similarities_across_layers(
         ans_similarities[l]['incorrect_preds']['std_cos_ha'] = np.std(a_incorrect_cosines_mean)
         ans_similarities[l]['incorrect_preds']['mean_std_cos_ha'] = np.mean(a_incorrect_cosines_std)
 
-        """
         #the following step might be necessary since number of incorrect model predicitions is significantly higher than the number of correct model predictions
         #draw different random samples from the set of cos(h_a) wrt incorrect answer predictions without (!) replacement 
-        #rnd_samples_incorrect_means = [np.random.choice(a_incorrect_cosines_mean, size=len(a_correct_cosines_mean), replace=False) for _ in range(5)]
-        """
+        rnd_samples_incorrect_means = [np.random.choice(a_incorrect_cosines_mean, size=len(a_correct_cosines_mean), replace=False) for _ in range(5)]
 
         #TODO: figure out whether equal_var should be set to False for independent t-test (do we assume equal sigma^2 wrt cos(h_a) across predictions?)
-        ans_similarities[l]['ttest_p_val'] = ttest_ind(a_correct_cosines_mean, a_incorrect_cosines_mean)[1] #np.mean([ttest_ind(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means])
-        ans_similarities[l]['anova_p_val'] = f_oneway(a_correct_cosines_mean, a_incorrect_cosines_mean)[1] #np.mean([f_oneway(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means])
+        ans_similarities[l]['ttest_p_val'] = np.mean([ttest_ind(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means]) #ttest_ind(a_correct_cosines_mean, a_incorrect_cosines_mean)[1]
+        ans_similarities[l]['anova_p_val'] = np.mean([f_oneway(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means]) #f_oneway(a_correct_cosines_mean, a_incorrect_cosines_mean)[1]
 
 
         #plot cos(h_a) distributions for both correct and erroneous model predictions across all transformer layers
