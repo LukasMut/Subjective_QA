@@ -392,7 +392,7 @@ def interp_cos_per_layer(
         p_interval = np.interp(x+delta, cos_sorted, p) - np.interp(x-delta, cos_sorted, p) #P(cos(h_a) < x_i+delta) - P(cos(h_a) < x_i-delta) 
         return p_interval
     
-    for l, cos_correct, cos_incorrect in enumerate(zip(cos_distrib_correct_preds, cos_distrib_incorrect_preds)):
+    for l, (cos_correct, cos_incorrect) in enumerate(zip(cos_distrib_correct_preds, cos_distrib_incorrect_preds)):
         #unpack *train* cosine distributions
         cos_correct_means, cos_correct_stds = zip(*cos_correct)
         cos_incorrect_means, cos_incorrect_stds = zip(*cos_incorrect)
