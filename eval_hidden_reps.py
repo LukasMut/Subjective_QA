@@ -331,10 +331,10 @@ def compute_cos_sim_across_logits(
                                   top_k:int,
                                   ):
     assert len(s_log_probs) == len(e_log_probs)
-    #sort log-probabilities in decreasing order (0 to -inf) (use exp trick to counteract potential numeric problems due to -inf)
+    #sort log-probabilities in decreasing order (0 to -inf) (leverage exp trick to counteract potential numeric problems with log(0))
     s_positions = np.argsort(np.exp(s_log_probs))[::-1]
     e_positions = np.argsort(np.exp(e_log_probs))[::-1]
-    #remove answer span predictions that are not possible (i.e., remove answer spans where s_pos >= e_pos) to yield an array of candidate answers
+    #remove answer span predictions that are not possible (i.e., remove answer spans where s_pos >= e_pos) to yield an array of possible candidate answers
     s_candidates, e_candidates = remove_single_and_impossible_candidates(s_positions, e_positions)
     top_k_s_candidates = s_candidates[:top_k]
     top_k_e_candidates = e_candidates[:top_k]
@@ -733,7 +733,7 @@ if __name__ == "__main__":
         help='Set model save directory for ans prediction model. Only necessary if args.prediction == learned.')
     parser.add_argument('--batch_size', type=int, default=8,
         help='Specify mini-batch size. Only necessary if args.prediction == learned.')
-    parser.add_argument('--n_epochs', type=int, default=25,
+    parser.add_argument('--n_epochs', type=int, default=20,
         help='Set number of epochs model should be trained for. Only necessary if args.prediction == learned.')
     parser.add_argument('--layers', type=str, default='',
         help='Must be one of {all_layers, top_three_layers}. Only necessary if args.prediction == learned.')
