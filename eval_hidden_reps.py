@@ -405,7 +405,7 @@ def interp_cos_per_layer(
                 X[i, 2*l] = p_cos_mean
                 X[i, 2*l+1] = p_cos_std
             else:
-                #instead of replacing raw values with p, use p as a weighting factor for cos(h_a)
+                #instead of replacing raw mean and std wrt cos(h_a) with p, use p as a weighting factor for mean and std wrt cos(h_a)
                 X[i, 2*l] *= p_cos_mean
                 X[i, 2*l+1] *= p_cos_std
     return X
@@ -462,7 +462,7 @@ def compute_similarities_across_layers(
         est_layers = [4, 5, 6] if source.lower() == 'subjqa' else [5, 6] 
         est_preds = []
 
-    #initialise PCA (we need to apply PCA to remove noise from the feature representations)
+    #initialise PCA (we need to apply PCA to remove noise from the high-dimensional feature representations)
     pca = PCA(n_components=retained_var, svd_solver='auto', random_state=rnd_state)
 
     if version == 'train':
