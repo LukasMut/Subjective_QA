@@ -506,7 +506,7 @@ def compute_similarities_across_layers(
                 #a_hiddens = hiddens[true_start_pos[i]:true_end_pos[i]+1]
 
                 #compute cos(h_a)
-                 _, _, a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens)
+                _, _, a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens)
 
                 if prediction == 'learned':
                     if layer_no in est_layers:
