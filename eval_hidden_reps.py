@@ -331,7 +331,7 @@ def compute_cos_sim_across_logits(
                                   top_k:int,
                                   ):
     assert len(s_log_probs) == len(e_log_probs)
-    #sort log-probabilities in descending order (0 to -inf) (use exp trick to counteract potential numeric problems due to -inf)
+    #sort log-probabilities in decreasing order (0 to -inf) (use exp trick to counteract potential numeric problems due to -inf)
     s_positions = np.argsort(np.exp(s_log_probs))[::-1]
     e_positions = np.argsort(np.exp(e_log_probs))[::-1]
     #remove answer span predictions that are not possible (i.e., remove answer spans where s_pos >= e_pos) to yield an array of candidate answers
