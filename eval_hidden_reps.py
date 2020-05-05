@@ -404,7 +404,7 @@ def interp_cos_per_layer(
                 X[i, 2*l] = p_cos_mean
                 X[i, 2*l+1] = p_cos_std
             else:
-                #instead of replacing raw values with p, use p as weighting factor
+                #instead of replacing raw values with p, use p as weighting factor for cos(h_a)
                 X[i, 2*l] *= p_cos_mean
                 X[i, 2*l+1] *= p_cos_std
     return X
@@ -606,7 +606,7 @@ def compute_similarities_across_layers(
 
             np.savetxt(PATH + subdir_correct + 'cosine_distrib_per_layer.txt', correct_preds_cosines_per_layer)
             np.savetxt(PATH + subdir_incorrect + 'cosine_distrib_per_layer.txt', incorrect_preds_cosines_per_layer)
-            
+
         return ans_similarities, cos_similarities_preds, X
 
     else:
@@ -822,6 +822,7 @@ if __name__ == "__main__":
         os.makedirs(PATH)
 
     concat_per_layer_stats = 'concat_per_layer_stats' if args.concat_per_layer_stats else ''
+    
     # save results
     with open(PATH + file_name + '_' + args.layers + '_' + 'interpolation' + '_' + concat_per_layer_stats + '.json', 'w') as json_file:
         json.dump(hidden_reps_results, json_file)
