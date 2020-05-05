@@ -365,6 +365,7 @@ def interp_cos_per_layer(
                          X:np.ndarray,
                          y:np.ndarray,
                          source:str,
+                         computation:str='replace',
 ):
     """
         - interpolate cos(h_a) per layer according to CDFs (Cumulative Distribution Functions) wrt cos(h_a) *train* distribution 
@@ -399,8 +400,13 @@ def interp_cos_per_layer(
             cos_std = X[i, 2*l+1]
             p_cos_mean = interp_cos(cos_mean, cos_correct_means if y[i] == 1 else cos_incorrect_means)
             p_cos_std = interp_cos(cos_std, cos_correct_stds if y[i] == 1 else cos_incorrect_std)
-            X[i, 2*l] = p_cos_mean
-            X[i, 2*l+1] = p_cos_std
+            if computation == 'replace':
+                X[i, 2*l] = p_cos_mean
+                X[i, 2*l+1] = p_cos_std
+            else:
+                #instead of replacing raw values with p, use p as weighting factor
+                X[i, 2*l] *= p_cos_mean
+                X[i, 2*l+1] *= p_cos_std
     return X
 
 def concat_per_layer_cos_stats(
