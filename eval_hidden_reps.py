@@ -373,8 +373,8 @@ def interp_cos_per_layer(
         - replace both mean(cos(h_a)) and std(cos(h_a)) with interpolated probability values
         - (i.e., probability values that denote how likely observed *test* cos(h_a) lies within pre-defined interval given *train* cos(h_a) CDF)
     """
-    cos_distrib_correct_preds = np.loadtxt('./results_hidden_reps/' + source.lower() + '/cosines/' + 'correct/' + 'cosine_distrib_per_layer.txt')
-    cos_distrib_incorrect_preds = np.loadtxt('./results_hidden_reps/' + source.lower() + '/cosines/' + 'incorrect/' + 'cosine_distrib_per_layer.txt')
+    cos_distrib_correct_preds = np.loadtxt('./results_hidden_reps/' + source.lower() + '/cosines' + '/correct' + '/cosine_distrib_per_layer.txt')
+    cos_distrib_incorrect_preds = np.loadtxt('./results_hidden_reps/' + source.lower() + '/cosines' + '/incorrect' + '/cosine_distrib_per_layer.txt')
     
     def interp_cos(
                    x:float,
@@ -594,11 +594,17 @@ def compute_similarities_across_layers(
         incorrect_preds_cosines_per_layer = np.asarray(incorrect_preds_cosines_per_layer)
         
         PATH = './results_hidden_reps/' + source.lower() + '/cosines/'
-        if not os.path.exists(PATH):
-            os.makedirs(PATH)
+        subdir_correct = 'correct/'
+        subdir_incorrect = 'incorrect/'
+        
+        if not os.path.exists(PATH + subdir_correct):
+            os.makedirs(PATH + subdir_correct)
 
-        np.savetxt(PATH + 'correct' + '/' + 'cosine_distrib_per_layer.txt', correct_preds_cosines_per_layer)
-        np.savetxt(PATH + 'incorrect' + '/' + 'cosine_distrib_per_layer.txt', incorrect_preds_cosines_per_layer)
+        if not os.path.exists(PATH + subdir_incorrect):
+            os.makedirs(PATH + subdir_incorrect)
+
+        np.savetxt(PATH + subdir_correct + 'cosine_distrib_per_layer.txt', correct_preds_cosines_per_layer)
+        np.savetxt(PATH + subdir_incorrect + 'cosine_distrib_per_layer.txt', incorrect_preds_cosines_per_layer)
 
     if prediction == 'learned':
         return ans_similarities, cos_similarities_preds, X
