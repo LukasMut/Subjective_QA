@@ -317,7 +317,7 @@ def plot_cosine_distrib(
 def compute_rel_freq(cos_sim_preds:dict):
     return {layer: {pred: {'min_std_cos':vals['min_std_cos']/vals['freq'], 'max_mean_cos':vals['max_mean_cos']/vals['freq'], 'spearman_r':np.mean(vals['spearman_r'])} for pred, vals in preds.items()} for layer, preds in cos_sim_preds.items()}
 
-def remove_single_and_impossible_candidates(s_positions:np.ndarray, e_positions:np.ndarray):
+def remove_impossible_candidates(s_positions:np.ndarray, e_positions:np.ndarray):
     s_candidates, e_candidates = zip(*[(s_pos, e_pos) for s_pos, e_pos in zip(s_positions, e_positions) if s_pos < e_pos])
     return s_candidates, e_candidates
 
@@ -331,15 +331,15 @@ def compute_cos_sim_across_logits(
                                   top_k:int,
                                   ):
     assert len(s_log_probs) == len(e_log_probs)
-    #sort log-probabilities in decreasing order (0 to -inf) (leverage exp trick to counteract potential numeric problems with log(0))
-    s_positions = np.argsort(np.exp(s_log_probs))[::-1]
-    e_positions = np.argsort(np.exp(e_log_probs))[::-1]
+    #sort log-probabilities in decreasing order (0 to -inf)
+    s_positions = np.argsort(s_log_probs)[::-1]
+    e_positions = np.argsort(e_log_probs)[::-1]
     #remove answer span predictions that are not possible (i.e., remove answer spans where s_pos >= e_pos) to yield an array of possible candidate answers
-    s_candidates, e_candidates = remove_single_and_impossible_candidates(s_positions, e_positions)
+    s_candidates, e_candidates = remove_impossible_candidates(s_positions, e_positions)
     top_k_s_candidates = s_candidates[:top_k]
     top_k_e_candidates = e_candidates[:top_k]
 
-    _, _, mean_cosines, std_cosines = zip(*[compute_ans_similarities(hiddens[top_k_s_candidates[i]:top_k_e_candidates[i]+1, :]) for i in range(top_k)])
+    _, _, mean_cosines, std_cosines = zip(*[compute_ans_similarities(hiddens[top_k_s_candidates[i]:top_k_e_candidates[i]+1,:]) for i in range(top_k)])
 
     cos_similarities_preds[layer]['correct' if true_pred else 'erroneous'] = {}
     
@@ -479,7 +479,7 @@ def compute_similarities_across_layers(
                 sep_idx = sent.index('[SEP]')
 
                 #remove hidden reps corresponding to special [CLS] and [SEP] tokens
-                hiddens = np.vstack((hiddens[1:sep_idx], hiddens[sep_idx+1:-1])) 
+                #hiddens = np.vstack((hiddens[1:sep_idx], hiddens[sep_idx+1:-1])) 
                 
                 #transform hidden reps with PCA
                 hiddens = pca.fit_transform(hiddens)
@@ -502,8 +502,8 @@ def compute_similarities_across_layers(
                                                                            )
 
                 #extract hidden reps for answer span
-                a_hiddens = hiddens[true_start_pos[i]-2:true_end_pos[i]-1] #move ans span indices two positions to the left (accounting for the removal of [CLS] and [SEP])
-                #a_hiddens = hiddens[true_start_pos[i]:true_end_pos[i]+1]
+                #a_hiddens = hiddens[true_start_pos[i]-2:true_end_pos[i]-1] #move ans span indices two positions to the left (accounting for the removal of [CLS] and [SEP])
+                a_hiddens = hiddens[true_start_pos[i]:true_end_pos[i]+1]
 
                 #compute cos(h_a)
                 _, _, a_mean_cos, a_std_cos = compute_ans_similarities(a_hiddens)
