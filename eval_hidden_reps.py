@@ -22,6 +22,7 @@ import torch.nn as nn
 from collections import defaultdict, Counter
 from eval_squad import compute_exact
 from statsmodels.stats.multitest import multipletests
+from scipy import io
 from scipy.stats import entropy, f_oneway, spearmanr, ttest_ind
 from sklearn.decomposition import PCA
 from sklearn.metrics import f1_score
@@ -373,8 +374,8 @@ def interp_cos_per_layer(
         - replace both mean(cos(h_a)) and std(cos(h_a)) with interpolated probability values
         - (i.e., probability values that denote how likely observed *test* cos(h_a) lies within pre-defined interval given *train* cos(h_a) CDF)
     """
-    cos_distrib_correct_preds = np.loadtxt('./results_hidden_reps/' + source.lower() + '/cosines' + '/correct' + '/cosine_distrib_per_layer.txt')
-    cos_distrib_incorrect_preds = np.loadtxt('./results_hidden_reps/' + source.lower() + '/cosines' + '/incorrect' + '/cosine_distrib_per_layer.txt')
+    cos_distrib_correct_preds = io.loadmat('./results_hidden_reps/' + source.lower() + '/cosines' + '/correct' + '/cosine_distrib_per_layer.mat')['out']
+    cos_distrib_incorrect_preds = io.loadmat('./results_hidden_reps/' + source.lower() + '/cosines' + '/incorrect' + '/cosine_distrib_per_layer.mat')['out']
     
     def interp_cos(
                    x:float,
@@ -604,8 +605,8 @@ def compute_similarities_across_layers(
             if not os.path.exists(PATH + subdir_incorrect):
                 os.makedirs(PATH + subdir_incorrect)
 
-            np.savetxt(PATH + subdir_correct + 'cosine_distrib_per_layer.txt', correct_preds_cosines_per_layer)
-            np.savetxt(PATH + subdir_incorrect + 'cosine_distrib_per_layer.txt', incorrect_preds_cosines_per_layer)
+            io.savemat(PATH + subdir_correct + 'cosine_distrib_per_layer.mat', mdict={'out': correct_preds_cosines_per_layer}, oned_as='row')
+            io.savemat(PATH + subdir_incorrect + 'cosine_distrib_per_layer.mat', mdict={'out': incorrect_preds_cosines_per_layer}, oned_as='row')
 
         return ans_similarities, cos_similarities_preds, X
 
@@ -822,7 +823,7 @@ if __name__ == "__main__":
         os.makedirs(PATH)
 
     concat_per_layer_stats = 'concat_per_layer_stats' if args.concat_per_layer_stats else ''
-    
+
     # save results
     with open(PATH + file_name + '_' + args.layers + '_' + 'interpolation' + '_' + concat_per_layer_stats + '.json', 'w') as json_file:
         json.dump(hidden_reps_results, json_file)
