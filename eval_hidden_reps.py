@@ -413,7 +413,6 @@ def concat_per_layer_cos_stats(
     est_layers = list(range(1, 7)) if layers == 'all_layers' else list(range(4, 7))
     L = len(est_layers)
     C = np.zeros((X.shape[0], 2*L))
-    #np.array([(mu_l, sigma_l) for l in range(L)]).flatten()
     C[y[y == 1]] += np.asarray([(vals[correct]['mean_cos_ha'], vals[correct]['std_cos_ha']) for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]).flatten()
     C[y[y == 0]] += np.asarray([(vals[incorrect]['mean_cos_ha'], vals[incorrect]['std_cos_ha']) for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]).flatten()
     return np.concatenate((X, C), axis=1)
@@ -667,6 +666,14 @@ def evaluate_estimations_and_cosines(
                                                                                         )
         #interpolate values wrt to *train* CDFs (i.e., replace raw cos similarities with probability values according to *train* CDFs wrt cos(h_a))
         X = interp_cos_per_layer(X, y, source)
+
+        if concat_per_layer_stats:
+            #concatenate X[N, L*M] with C[N, 2*L] => X = X $\in$ R^{N x M*L} concat C $\in$ R^{N x 2*L}
+            X = concat_per_layer_cos_stats(X, y, ans_similarities, layers) 
+            model_name = 'fc_nn' + '_' + layers + 'concat_per_layer_stats'
+        else:
+            model_name = 'fc_nn' + '_' + layers
+
         model_name = 'fc_nn' + '_' + layers
         M = X.shape[1] #M = number of input features (i.e., x $\in$ R^M)
         #X, y = shuffle_arrays(X, y) if version == 'train' else X, y #shuffle order of examples during training (this step is not necessary at inference time)
@@ -801,6 +808,6 @@ if __name__ == "__main__":
 
     concat_per_layer_stats = 'concat_per_layer_stats' if args.concat_per_layer_stats else ''
     # save results
-    with open(PATH + file_name + '_' + args.layers + '_' + concat_per_layer_stats + '.json', 'w') as json_file:
+    with open(PATH + file_name + '_' + args.layers + '_' + 'interpolation' + '_' + concat_per_layer_stats + '.json', 'w') as json_file:
         json.dump(hidden_reps_results, json_file)
 
