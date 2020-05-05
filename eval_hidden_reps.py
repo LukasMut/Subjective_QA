@@ -317,12 +317,9 @@ def plot_cosine_distrib(
 def compute_rel_freq(cos_sim_preds:dict):
     return {layer: {pred: {'min_std_cos':vals['min_std_cos']/vals['freq'], 'max_mean_cos':vals['max_mean_cos']/vals['freq']} for pred, vals in preds.items()} for layer, preds in cos_sim_preds.items()}
 
-def remove_single_token_preds(
-                              s_log_probs_sorted:np.ndarray,
-                              e_log_probs_sorted:np.ndarray,
-                              ):
-    s_log_probs, e_log_probs = zip(*[(s_log_prob, e_log_prob) for s_log_prob, e_log_prob in zip(s_log_probs_sorted, e_log_probs_sorted) if s_log_prob != e_log_prob and s_log_prob < e_log_prob])
-    return s_log_probs, e_log_probs
+def remove_single_and_impossible_token_preds(s_positions:np.ndarray, e_positions:np.ndarray):
+    s_candidates, e_candidates = zip(*[(s_pos, e_pos) for s_pos, e_pos in zip(s_positions, e_positions) if s_pos < e_pos])
+    return s_candidates, e_candidates
 
 def compute_cos_sim_across_logits(
                                   hiddens:np.ndarray,
@@ -334,13 +331,14 @@ def compute_cos_sim_across_logits(
                                   top_k:int,
                                   ):
     assert len(s_log_probs) == len(e_log_probs)
-    s_log_probs_sorted = np.argsort(s_log_probs)[::-1]
-    e_log_probs_sorted = np.argsort(e_log_probs)[::-1]
-    s_log_probs_sorted, e_log_probs_sorted = remove_single_token_preds(s_log_probs_sorted, e_log_probs_sorted)
-    top_k_s_log_probs = s_log_probs_sorted[:top_k]
-    top_k_e_log_probs = e_log_probs_sorted[:top_k]
+    s_positions = np.argsort(s_log_probs)[::-1]
+    e_positions = np.argsort(e_log_probs)[::-1]
+    #remove answer span predictions that are not possible (i.e., remove answer spans where s_pos >= e_pos) to yield an array of candidate answers
+    s_candidates, e_candidates = remove_single_and_impossible_token_preds(s_positions, e_positions)
+    top_k_s_candidates = s_candidates[:top_k]
+    top_k_e_candidates = e_candidates[:top_k]
 
-    _, _, mean_cosines, std_cosines = zip(*[compute_ans_similarities(hiddens[top_k_s_log_probs[i]:top_k_e_log_probs[i]+1, :]) for i in range(top_k)])
+    _, _, mean_cosines, std_cosines = zip(*[compute_ans_similarities(hiddens[top_k_s_candidates[i]:top_k_e_candidates[i]+1, :]) for i in range(top_k)])
 
     cos_similarities_preds[layer]['correct' if true_pred else 'erroneous'] = {}
     
