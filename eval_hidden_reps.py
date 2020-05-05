@@ -363,11 +363,12 @@ def interp_cos_per_layer(
                          X:np.ndarray,
                          y:np.ndarray,
                          source:str,
-                         ):
+):
     """
-    interpolate cos(h_a) per layer according to CDF (Cumulative Distribution Function) wrt cos(h_a) distribution in *train* 
-    corresponding to incorrect or erroneous predictions respectively
-    replace both mean(cos(h_a)) and std(cos(h_a)) with interpolated values (i.e., probability values NOT cosine similarities)
+        - interpolate cos(h_a) per layer according to CDFs (Cumulative Distribution Functions) wrt cos(h_a) *train* distribution 
+        - corresponding to incorrect or erroneous predictions respectively
+        - replace both mean(cos(h_a)) and std(cos(h_a)) with interpolated probability values
+        - (i.e., probability values that denote how likely observed *test* cos(h_a) lies within pre-defined interval given *train* cos(h_a) CDF)
     """
     cos_distrib_correct_preds = np.loadtxt('./results_hidden_reps/' + source.lower() + '/cosines/' + 'correct/' + 'cosine_distrib_per_layer.txt')
     cos_distrib_incorrect_preds = np.loadtxt('./results_hidden_reps/' + source.lower() + '/cosines/' + 'incorrect/' + 'cosine_distrib_per_layer.txt')
@@ -376,19 +377,19 @@ def interp_cos_per_layer(
                    x:float,
                    cos:np.ndarray,
                    delta:float=.1,
-                   ):
+    ):
         """
-        compute P(x_i - delta < x_i < x_i + delta) (is equal to P(x_i - delta <= x_i <= x_i + delta)) => p that observed cos(h_a) lies within pre-defined interval
-        set endpoint flag in np.linspace() to False to yield an unbiased estimator of the CDF (same as np.arange(1, len(cos)+1) / len(cos))
+            - compute P(x_i - delta < x_i < x_i + delta) (is equal to P(x_i - delta <= x_i <= x_i + delta)) => p that observed cos(h_a) lies within pre-defined interval according to CDFs
+            - set endpoint flag in np.linspace() to False to yield an unbiased estimator of the CDF (equivalent to np.arange(1, len(cos)+1)/len(cos))
         """
         p = np.arange(1, len(cos)+1) / len(cos) #np.linspace(0, 1, len(cos), endpoint=False)
-        cos_sorted = np.sort(cos) # sort values in ascending order
-        assert np.all(np.diff(cos_sorted) > 0), 'x-coordinate sequence xp is required to be passed in increasing order'
+        cos_sorted = np.sort(cos) #sort values in ascending order
+        assert np.all(np.diff(cos_sorted) > 0), 'x-coordinate sequence xp must be passed in increasing order'
         p_interval = np.interp(x+delta, cos_sorted, p) - np.interp(x-delta, cos_sorted, p) #P(cos(h_a) < x_i+delta) - P(cos(h_a) < x_i-delta) 
         return p_interval
     
-    for l, (cos_correct, cos_incorrect) in enumerate(zip(cos_distrib_correct_preds, cos_distrib_incorrect_preds)):
-        #unpack *train* distributions
+    for l, cos_correct, cos_incorrect in enumerate(zip(cos_distrib_correct_preds, cos_distrib_incorrect_preds)):
+        #unpack *train* cosine distributions
         cos_correct_means, cos_correct_stds = zip(*cos_correct)
         cos_incorrect_means, cos_incorrect_stds = zip(*cos_incorrect)
         for i in range(X.shape[0]):
@@ -400,20 +401,20 @@ def interp_cos_per_layer(
             X[i, 2*l+1] = p_cos_std
     return X
 
-def concat_per_layer_mean_cos(
-                              X:np.ndarray,
-                              y:np.ndarray,
-                              ans_sims:dict,
-                              layers:str,
-                              correct:str='correct_preds',
-                              incorrect:str='incorrect_preds',
+def concat_per_layer_cos_stats(
+                               X:np.ndarray,
+                               y:np.ndarray,
+                               ans_sims:dict,
+                               layers:str,
+                               correct:str='correct_preds',
+                               incorrect:str='incorrect_preds',
 ):
     #concatenate X[N, L*M] with C[N, 2*L] => X = X $\in$ R^{N x M*L} concat C $\in$ R^{N x 2*L}
     assert X.shape[0] == y.shape[0]
     est_layers = list(range(1, 7)) if layers == 'all_layers' else list(range(4, 7))
     L = len(est_layers)
     C = np.zeros((X.shape[0], 2*L))
-    #np.array([(mu_l, sigma_l) for l in range(L)]).flatten() for x_i in X
+    #np.array([(mu_l, sigma_l) for l in range(L)]).flatten()
     C[y[y == 1]] += np.asarray([(vals[correct]['mean_cos_ha'], vals[correct]['std_cos_ha']) for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]).flatten()
     C[y[y == 0]] += np.asarray([(vals[incorrect]['mean_cos_ha'], vals[incorrect]['std_cos_ha']) for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]).flatten()
     return np.concatenate((X, C), axis=1)
@@ -522,7 +523,7 @@ def compute_similarities_across_layers(
                 k += 1
 
         if version == 'train':
-            # store mean cos(h_a) and std cos(h_a) distributions for every transformer layer
+            # store mean cos(h_a) and std cos(h_a) distributions for every transformer layer to compute CDFs
             if layer_no in est_layers:
                 correct_preds_cosines_per_layer.append(correct_preds_cosines)
                 incorrect_preds_cosines_per_layer.append(incorrect_preds_cosines)
@@ -665,7 +666,7 @@ def evaluate_estimations_and_cosines(
                                                                                         version=version,
                                                                                         layers=layers,
                                                                                         )
-        #interpolate values wrt to *train* CDFs (replace raw cos similarities with probability values according to cos(h_a) CDFs)
+        #interpolate values wrt to *train* CDFs (i.e., replace raw cos similarities with probability values according to *train* CDFs wrt cos(h_a))
         X = interp_cos_per_layer(X, y, source)
         model_name = 'fc_nn' + '_' + layers
         M = X.shape[1] #M = number of input features (i.e., x $\in$ R^M)
