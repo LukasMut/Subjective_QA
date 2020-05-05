@@ -423,8 +423,10 @@ def concat_per_layer_cos_stats(
     est_layers = list(range(1, 7)) if layers == 'all_layers' else list(range(4, 7))
     L = len(est_layers)
     C = np.zeros((X.shape[0], 2*L))
-    C[y[y == 1]] += np.asarray([(vals[correct]['mean_cos_ha'], vals[correct]['std_cos_ha']) for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]).flatten()
-    C[y[y == 0]] += np.asarray([(vals[incorrect]['mean_cos_ha'], vals[incorrect]['std_cos_ha']) for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]).flatten()
+    C[y[y == 1]] += np.hstack(zip(*[(vals[correct]['mean_cos_ha'],vals[correct]['std_cos_ha']) for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]))
+    C[y[y == 0]] += np.hstack(zip(*[(vals[incorrect]['mean_cos_ha'],vals[incorrect]['std_cos_ha']) for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]))
+    #C[y[y == 1]] += np.asarray([(vals[correct]['mean_cos_ha'], vals[correct]['std_cos_ha']) for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]).flatten()
+    #C[y[y == 0]] += np.asarray([(vals[incorrect]['mean_cos_ha'], vals[incorrect]['std_cos_ha']) for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]).flatten()
     return np.concatenate((X, C), axis=1)
 
 def compute_similarities_across_layers(
