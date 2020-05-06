@@ -383,9 +383,9 @@ def interp_cos_per_layer(
     file_name = '/cosine_distrib_per_layer.txt'
 
     with open(PATH + subdir_correct + file_name, 'rb') as f:
-        cos_distrib_correct_preds = np.load(f, allow_pickle=True)
+        cos_distrib_correct_preds = np.load(f)
     with open(PATH + subdir_incorrect + file_name, 'rb') as f:
-        cos_distrib_incorrect_preds = np.load(f, allow_pickle=True)        
+        cos_distrib_incorrect_preds = np.load(f)        
     
     def interp_cos(
                    x:float,
