@@ -611,7 +611,7 @@ def compute_similarities_across_layers(
         #draw different random samples from the set of cos(h_a) wrt incorrect answer predictions without (!) replacement 
         rnd_samples_incorrect_means = [np.random.choice(a_incorrect_cosines_mean, size=len(a_correct_cosines_mean), replace=False) for _ in range(5)]
 
-        #TODO: figure out whether equal_var should be set to False for independent t-test (do we assume equal sigma^2 wrt cos(h_a) across predictions?)
+        #compute independent t-tests and one-way ANOVAs
         ans_similarities[l]['ttest_p_val'] = np.mean([ttest_ind(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means])
         ans_similarities[l]['anova_p_val'] = np.mean([f_oneway(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means])
 
