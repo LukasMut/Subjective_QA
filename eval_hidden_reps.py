@@ -367,9 +367,11 @@ def compute_cos_sim_across_logits(
 
 def interp_cos_per_layer(
                          X:np.ndarray,
-                         y:np.ndarray,
                          source:str,
+                         version:str,
+                         w_strategy:str='cdf',
                          computation:str='replace',
+                         y=None,
 ):
     """
         - interpolate cos(h_a) per layer according to CDFs (Cumulative Distribution Functions) wrt cos(h_a) *train* distribution 
@@ -380,17 +382,28 @@ def interp_cos_per_layer(
     PATH = './results_hidden_reps/' + source.lower() + '/cosines'
     subdir_correct = '/correct'
     subdir_incorrect = '/incorrect'
-    file_name = '/cosine_distrib_per_layer.txt'
+    file_name = '/cosine_distrib_per_layer.mat'
 
+    """
     with open(PATH + subdir_correct + file_name, 'rb') as f:
         cos_distrib_correct_preds = np.load(f)
     with open(PATH + subdir_incorrect + file_name, 'rb') as f:
-        cos_distrib_incorrect_preds = np.load(f)        
+        cos_distrib_incorrect_preds = np.load(f)
+    """
+
+    io.loadmat(PATH + subdir_correct + file_name)['out']
+    io.loadmat(PATH + subdir_incorrect + file_name)['out']
+
+    if computation == 'concat':
+        assert len(cos_distrib_correct_preds) == len(cos_distrib_incorrect_preds)
+        L = len(cos_distrib_correct_preds)
+        cdfs = np.zeros((X.shape[0], L))      
     
     def interp_cos(
                    x:float,
                    cos:np.ndarray,
                    delta:float=.1,
+                   weighting:bool=False,
     ):
         """
             - compute P(x_i - delta < x_i < x_i + delta) (is equal to P(x_i - delta <= x_i <= x_i + delta)) => p that observed cos(h_a) lies within pre-defined interval according to CDFs
@@ -399,47 +412,73 @@ def interp_cos_per_layer(
         p = np.arange(1, len(cos)+1) / len(cos) #np.linspace(0, 1, len(cos), endpoint=False)
         cos_sorted = np.sort(cos) #sort values in ascending order
         assert np.all(np.diff(cos_sorted) >= 0), 'x-coordinate sequence xp must be passed in increasing order' #use >= 0 since some values might be equivalent (hence, > 0 will yield False)
-        p_interval = np.interp(x+delta, cos_sorted, p) - np.interp(x-delta, cos_sorted, p) #P(cos(h_a) < x_i+delta) - P(cos(h_a) < x_i-delta) 
-        return p_interval
+        
+        if weighting:
+            p_cdf = np.interp(x, cos_sorted, p) #P(cos(h_a) < x)
+            return p_cdf
+        else:
+            p_interval = np.interp(x+delta, cos_sorted, p) - np.interp(x-delta, cos_sorted, p) #P(cos(h_a) < x + delta) - P(cos(h_a) < x - delta) 
+            return p_interval
     
     for l, (cos_correct, cos_incorrect) in enumerate(zip(cos_distrib_correct_preds, cos_distrib_incorrect_preds)):
         #unpack *train* cos(h_a) distributions
         cos_correct_means, cos_correct_stds = zip(*cos_correct)
         cos_incorrect_means, cos_incorrect_stds = zip(*cos_incorrect)
+        
+        if computation == 'concat':
+            cdfs_per_layer = []
+
         for i in range(X.shape[0]):
             cos_mean = X[i, 2*l]
             cos_std = X[i, 2*l+1]
-            p_cos_mean = interp_cos(x=cos_mean, cos=cos_correct_means if y[i] == 1 else cos_incorrect_means)
-            p_cos_std = interp_cos(x=cos_std, cos=cos_correct_stds if y[i] == 1 else cos_incorrect_stds)
+            
+            if version == 'train':
+                assert isinstance(y, np.ndarray), 'y must be provided at train time'
+                p_cos_mean = interp_cos(x=cos_mean, cos=cos_correct_means if y[i] == 1 else cos_incorrect_means)
+                p_cos_std = interp_cos(x=cos_std, cos=cos_correct_stds if y[i] == 1 else cos_incorrect_stds)
+
+            else:
+                #NOTE: we shall not exploit gold labels (i.e., QA model answer span predictions) at test time
+                if w_strategy == 'distance':
+                    cos_mean_w_correct = 1 - abs(np.mean(cos_correct_means) - cos_mean)
+                    cos_mean_w_incorrect = 1 - abs(np.mean(cos_incorrect_means) - cos_mean)
+                    cos_std_w_correct = 1 - abs(np.mean(cos_correct_stds) - cos_std)
+                    cos_std_w_incorrect = 1 - abs(np.mean(cos_incorrect_stds) - cos_std)
+
+                elif w_strategy == 'cdf':
+                    #compute Q-function (i.e., 1 - probability values obtained from CDFs)
+                    cos_mean_w_correct = 1 - interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
+                    cos_mean_w_incorrect = 1 - interp_cos(x=cos_mean, cos=cos_incorrect_means, weighting=True)
+                    cos_std_w_correct = 1 - interp_cos(x=cos_std, cos=cos_correct_stds, weighting=True)
+                    cos_std_w_incorrect = 1 - interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
+
+                p_cos_mean_correct = interp_cos(x=cos_mean, cos=cos_correct_means)
+                p_cos_mean_incorrect = interp_cos(x=cos_mean, cos=cos_incorrect_means)
+                p_cos_std_correct = interp_cos(x=cos_std, cos=cos_correct_stds)
+                p_cos_std_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds)
+
+                p_cos_mean = ((p_cos_mean_correct * cos_mean_w_correct) + (p_cos_mean_incorrect * cos_mean_w_incorrect)) / 2
+                p_cos_std = ((p_cos_std_correct * cos_std_w_correct) + (p_cos_std_incorrect * cos_std_w_incorrect)) / 2
+
             if computation == 'replace':
                 X[i, 2*l] = p_cos_mean
                 X[i, 2*l+1] = p_cos_std
+            
             elif computation == 'weighting':
                 #instead of replacing raw mean and std wrt cos(h_a) with p, use p as a weighting factor for mean and std wrt cos(h_a)
                 X[i, 2*l] *= p_cos_mean
                 X[i, 2*l+1] *= p_cos_std
-            else:
-                raise ValueError('Computation strategy for interpolation must be one of {}'.format(set(['replace', 'weighting'])))
-    return X
+            
+            elif computation == 'concat':
+                cdfs_per_layer.append((p_cos_mean, p_cos_std))
 
-def concat_per_layer_cos_stats(
-                               X:np.ndarray,
-                               y:np.ndarray,
-                               ans_sims:dict,
-                               layers:str,
-                               correct:str='correct_preds',
-                               incorrect:str='incorrect_preds',
-):
-    #concatenate X[N, L*M] with C[N, 2*L] => X = X $\in$ R^{N x M*L} concat C $\in$ R^{N x 2*L}
-    assert X.shape[0] == y.shape[0]
-    est_layers = list(range(1, 7)) if layers == 'all_layers' else list(range(4, 7))
-    L = len(est_layers)
-    C = np.zeros((X.shape[0], 2*L))
-    C[y[y == 1]] += np.hstack(zip(*[(vals[correct]['mean_cos_ha'],vals[correct]['std_cos_ha']) for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]))
-    C[y[y == 0]] += np.hstack(zip(*[(vals[incorrect]['mean_cos_ha'],vals[incorrect]['std_cos_ha']) for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]))
-    #C[y[y == 1]] += np.asarray([(vals[correct]['mean_cos_ha'], vals[correct]['std_cos_ha']) for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]).flatten()
-    #C[y[y == 0]] += np.asarray([(vals[incorrect]['mean_cos_ha'], vals[incorrect]['std_cos_ha']) for l, vals in ans_sims.items() if int(l.lstrip('Layer'+'_')) in est_layers]).flatten()
-    return np.concatenate((X, C), axis=1)
+        if computation == 'concat':
+            cdfs[:, 2*l:2*l+2] += np.stack(zip(*cdfs_per_layer), axis=1)
+
+    if computation == 'concat':
+        X = np.hstack(X, cdfs)
+
+    return X
 
 def compute_similarities_across_layers(
                                        feat_reps:dict,
@@ -573,8 +612,8 @@ def compute_similarities_across_layers(
         rnd_samples_incorrect_means = [np.random.choice(a_incorrect_cosines_mean, size=len(a_correct_cosines_mean), replace=False) for _ in range(5)]
 
         #TODO: figure out whether equal_var should be set to False for independent t-test (do we assume equal sigma^2 wrt cos(h_a) across predictions?)
-        ans_similarities[l]['ttest_p_val'] = np.mean([ttest_ind(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means]) #ttest_ind(a_correct_cosines_mean, a_incorrect_cosines_mean)[1]
-        ans_similarities[l]['anova_p_val'] = np.mean([f_oneway(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means]) #f_oneway(a_correct_cosines_mean, a_incorrect_cosines_mean)[1]
+        ans_similarities[l]['ttest_p_val'] = np.mean([ttest_ind(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means])
+        ans_similarities[l]['anova_p_val'] = np.mean([f_oneway(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means])
 
 
         #plot cos(h_a) distributions for both correct and erroneous model predictions across all transformer layers
@@ -616,17 +655,21 @@ def compute_similarities_across_layers(
             PATH = './results_hidden_reps/' + source.lower() + '/cosines/'
             subdir_correct = 'correct/'
             subdir_incorrect = 'incorrect/'
-            file_name = 'cosine_distrib_per_layer.txt'
+            file_name = 'cosine_distrib_per_layer.mat'
             
             if not os.path.exists(PATH + subdir_correct):
                 os.makedirs(PATH + subdir_correct)
             if not os.path.exists(PATH + subdir_incorrect):
                 os.makedirs(PATH + subdir_incorrect)
 
+            """
             with open(PATH + subdir_correct + file_name, 'wb') as f:
                 np.save(f, correct_preds_cosines_per_layer)
             with open(PATH + subdir_incorrect + file_name, 'wb') as f:
                 np.save(f, incorrect_preds_cosines_per_layer)
+            """
+            io.savemat(PATH + subdir_correct + file_name,  mdict={'out': correct_preds_cosines_per_layer}, oned_as='row')
+            io.savemat(PATH + subdir_incorrect + file_name,  mdict={'out': incorrect_preds_cosines_per_layer}, oned_as='row')
 
         return ans_similarities, cos_similarities_preds, X
 
@@ -645,7 +688,8 @@ def evaluate_estimations_and_cosines(
                                      n_epochs=None,
                                      batch_size=None,
                                      layers=None,
-                                     concat_per_layer_stats:bool=False,
+                                     w_strategy=None,
+                                     interp_computation=None,
 ):
     pred_answers = test_results['predicted_answers']
     true_answers = test_results['true_answers']
@@ -678,10 +722,6 @@ def evaluate_estimations_and_cosines(
     pred_indices = np.asarray(pred_indices)
     true_preds = np.asarray(true_preds)
 
-    print()
-    print(Counter(true_preds))
-    print()
-
     #compute (dis-)similarities among hidden reps in H_a for both correct and erroneous model predictions at each layer
     #AND estimate model predictions wrt hidden reps in the penultimate layer
     if prediction == 'learned':
@@ -701,16 +741,16 @@ def evaluate_estimations_and_cosines(
                                                                                         layers=layers,
                                                                                         )
         #interpolate values wrt to *train* CDFs (i.e., replace raw cos similarities with probability values according to *train* CDFs wrt cos(h_a))
-        X = interp_cos_per_layer(X, y, source)
+        X = interp_cos_per_layer(
+                                 X=X,
+                                 source=source,
+                                 version=version,
+                                 w_strategy=w_strategy,
+                                 computation=interp_computation,
+                                 y=y if version == 'train' else None,
+                                 )
 
-        if concat_per_layer_stats:
-            #concatenate X[N, L*M] with C[N, 2*L] => X = X $\in$ R^{N x M*L} concat C $\in$ R^{N x 2*L}
-            X = concat_per_layer_cos_stats(X, y, ans_similarities, layers) 
-            model_name = 'fc_nn' + '_' + layers + 'concat_per_layer_stats'
-        else:
-            model_name = 'fc_nn' + '_' + layers
-
-        model_name = 'fc_nn' + '_' + layers
+        model_name = 'fc_nn' + '_' + layers + '_' w_strategy + '_' + interp_computation
         M = X.shape[1] #M = number of input features (i.e., x $\in$ R^M)
         #X, y = shuffle_arrays(X, y) if version == 'train' else X, y #shuffle order of examples during training (this step is not necessary at inference time)
         tensor_ds = create_tensor_dataset(X, y)
@@ -766,12 +806,15 @@ if __name__ == "__main__":
         help='Set model save directory for ans prediction model. Only necessary if args.prediction == learned.')
     parser.add_argument('--batch_size', type=int, default=8,
         help='Specify mini-batch size. Only necessary if args.prediction == learned.')
-    parser.add_argument('--n_epochs', type=int, default=25,
+    parser.add_argument('--n_epochs', type=int, default=20,
         help='Set number of epochs model should be trained for. Only necessary if args.prediction == learned.')
     parser.add_argument('--layers', type=str, default='',
         help='Must be one of {all_layers, top_three_layers}. Only necessary if args.prediction == learned.')
-    parser.add_argument('--concat_per_layer_stats', action='store_true',
-        help='If provided, concatenate per layer mean and std w.r.t. to cos(h_a) with each vector x_i for correct and erroneous model predictions respectively')
+    parser.add_argument('--w_strategy', type=str, default='',
+        help='Must be one of {distance, cdf}. Only necessary if args.prediction == learned.')
+    parser.add_argument('--interp_computation', type=str, default='',
+        help='Must be one of {replace, weighting, concat}. Only necessary if args.prediction == learned.')
+
 
     args = parser.parse_args()
     assert isinstance(args.version, str), 'Version must be one of {train, test}'
@@ -799,6 +842,8 @@ if __name__ == "__main__":
         assert isinstance(args.layers, str) and len(args.layers) > 0, 'Layers for which we want to store statistical characteristics wrt cos(h_a) must be specified'
         assert isinstance(args.batch_size, int), 'Batch size must be defined'
         assert isinstance(args.model_dir, str), 'Directory to save and load model weights must be defined'
+        assert isinstance(args.w_strategy, str), 'Weighting strategy must be defined'
+        assert isinstance(args.interp_computation, str), 'How to leverage probabilities obtained from CDFs must be defined'
         
         if args.version == 'train':
             assert isinstance(args.n_epochs, int), 'Number of epochs must be defined'
@@ -815,7 +860,8 @@ if __name__ == "__main__":
                                                                                                             batch_size=args.batch_size,
                                                                                                             n_epochs=args.n_epochs,
                                                                                                             layers=args.layers,
-                                                                                                            concat_per_layer_stats=args.concat_per_layer_stats,
+                                                                                                            w_strategy=args.w_strategy,
+                                                                                                            interp_computation=args.interp_computation,
                                                                                                             )
             hidden_reps_results['train_losses'] = losses
             hidden_reps_results['train_f1s'] = f1_scores
@@ -828,8 +874,8 @@ if __name__ == "__main__":
                                                                                                  version=args.version,
                                                                                                  model_dir=args.model_dir,
                                                                                                  batch_size=args.batch_size,
-                                                                                                 layers=args.layers,
-                                                                                                 concat_per_layer_stats=args.concat_per_layer_stats,
+                                                                                                 w_strategy=args.w_strategy,
+                                                                                                 interp_computation=args.interp_computation,
                                                                                                  )
             hidden_reps_results['test_f1'] = test_f1
     else:
@@ -842,9 +888,7 @@ if __name__ == "__main__":
     if not os.path.exists(PATH):
         os.makedirs(PATH)
 
-    concat_per_layer_stats = 'concat_per_layer_stats' if args.concat_per_layer_stats else ''
-
     # save results
-    with open(PATH + file_name + '_' + args.layers + '_' + 'interpolation' + '_' + concat_per_layer_stats + '.json', 'w') as json_file:
+    with open(PATH + file_name + '_' + args.layers + '_' + 'interpolation' + '_' + args.w_strategy + '_' + interp_computation + '.json', 'w') as json_file:
         json.dump(hidden_reps_results, json_file)
 
