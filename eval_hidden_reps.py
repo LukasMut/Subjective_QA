@@ -383,9 +383,9 @@ def interp_cos_per_layer(
     file_name = '/cosine_distrib_per_layer.txt'
 
     with open(PATH + subdir_correct + file_name, 'rb') as f:
-        cos_distrib_correct_preds = np.load(f)
+        cos_distrib_correct_preds = np.load(f, allow_pickle=True)
     with open(PATH + subdir_incorrect + file_name, 'rb') as f:
-        cos_distrib_incorrect_preds = np.load(f)        
+        cos_distrib_incorrect_preds = np.load(f, allow_pickle=True)        
     
     def interp_cos(
                    x:float,
@@ -511,16 +511,18 @@ def compute_similarities_across_layers(
                     print("==============================================================")
                     print()
 
-                elif layer_no > 3:
-                    cos_similarities_preds = compute_cos_sim_across_logits(
-                                                                           hiddens=hiddens,
-                                                                           s_log_probs=s_log_probs[i],
-                                                                           e_log_probs=e_log_probs[i],
-                                                                           cos_similarities_preds=cos_similarities_preds,
-                                                                           true_pred=bool(true_preds[pred_indices == i]),
-                                                                           layer=l,
-                                                                           top_k=top_k,
-                                                                           )
+                #TODO: the if statement below is just a work-around for now (must be fixed later)
+                if not (version == 'test' and source.lower() == 'subjqa'):
+                    elif layer_no > 3:
+                        cos_similarities_preds = compute_cos_sim_across_logits(
+                                                                               hiddens=hiddens,
+                                                                               s_log_probs=s_log_probs[i],
+                                                                               e_log_probs=e_log_probs[i],
+                                                                               cos_similarities_preds=cos_similarities_preds,
+                                                                               true_pred=bool(true_preds[pred_indices == i]),
+                                                                               layer=l,
+                                                                               top_k=top_k,
+                                                                               )
 
                 #extract hidden reps for answer span
                 #a_hiddens = hiddens[true_start_pos[i]-2:true_end_pos[i]-1] #move ans span indices two positions to the left (accounting for the removal of [CLS] and [SEP])
@@ -601,7 +603,9 @@ def compute_similarities_across_layers(
             if layer_no in est_layers:
                 j += 1
 
-    cos_similarities_preds = compute_rel_freq(cos_similarities_preds)
+    #TODO: the if statement below is just a work-around for now (must be fixed later)
+    if not (version == 'test' and source.lower() == 'subjqa'):
+        cos_similarities_preds = compute_rel_freq(cos_similarities_preds)
     ans_similarities = adjust_p_values(ans_similarities)
 
     if prediction == 'learned':
