@@ -391,8 +391,8 @@ def interp_cos_per_layer(
         cos_distrib_incorrect_preds = np.load(f)
     """
 
-    io.loadmat(PATH + subdir_correct + file_name)['out']
-    io.loadmat(PATH + subdir_incorrect + file_name)['out']
+    cos_distrib_correct_preds = io.loadmat(PATH + subdir_correct + file_name)['out']
+    cos_distrib_incorrect_preds = io.loadmat(PATH + subdir_incorrect + file_name)['out']
 
     if computation == 'concat':
         assert len(cos_distrib_correct_preds) == len(cos_distrib_incorrect_preds)
@@ -465,7 +465,7 @@ def interp_cos_per_layer(
                 X[i, 2*l+1] = p_cos_std
             
             elif computation == 'weighting':
-                #instead of replacing raw mean and std wrt cos(h_a) with p, use p as a weighting factor for mean and std wrt cos(h_a)
+                #instead of replacing "raw" mean and std wrt cos(h_a) with p, use p as a weighting factor for mean and std wrt cos(h_a)
                 X[i, 2*l] *= p_cos_mean
                 X[i, 2*l+1] *= p_cos_std
             
@@ -672,7 +672,6 @@ def compute_similarities_across_layers(
             io.savemat(PATH + subdir_incorrect + file_name,  mdict={'out': incorrect_preds_cosines_per_layer}, oned_as='row')
 
         return ans_similarities, cos_similarities_preds, X
-
     else:
         est_preds = np.stack(est_preds, axis=1)
         #if estimations wrt both layer 5 (penultimate) and 6 (last) yield correct pred we assume a correct model pred else incorrect
