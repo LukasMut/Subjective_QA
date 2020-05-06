@@ -374,8 +374,15 @@ def interp_cos_per_layer(
         - replace both mean(cos(h_a)) and std(cos(h_a)) with interpolated probability values
         - (i.e., probability values that denote how likely observed *test* cos(h_a) lies within pre-defined interval given *train* cos(h_a) CDF)
     """
-    cos_distrib_correct_preds = io.loadmat('./results_hidden_reps/' + source.lower() + '/cosines' + '/correct' + '/cosine_distrib_per_layer.mat')['out']
-    cos_distrib_incorrect_preds = io.loadmat('./results_hidden_reps/' + source.lower() + '/cosines' + '/incorrect' + '/cosine_distrib_per_layer.mat')['out']
+    PATH = './results_hidden_reps/' + source.lower() + '/cosines'
+    subdir_correct = '/correct'
+    subdir_incorrect = '/incorrect'
+    file_name = '/cosine_distrib_per_layer.txt'
+
+    with open(PATH + subdir_correct + file_name, 'rb') as f:
+        cos_distrib_correct_preds = np.load(f)
+    with open(PATH + subdir_incorrect + file_name, 'rb') as f:
+        cos_distrib_incorrect_preds = np.load(f)        
     
     def interp_cos(
                    x:float,
@@ -602,15 +609,17 @@ def compute_similarities_across_layers(
             PATH = './results_hidden_reps/' + source.lower() + '/cosines/'
             subdir_correct = 'correct/'
             subdir_incorrect = 'incorrect/'
+            file_name = 'cosine_distrib_per_layer.txt'
             
             if not os.path.exists(PATH + subdir_correct):
                 os.makedirs(PATH + subdir_correct)
-
             if not os.path.exists(PATH + subdir_incorrect):
                 os.makedirs(PATH + subdir_incorrect)
 
-            io.savemat(PATH + subdir_correct + 'cosine_distrib_per_layer.mat', mdict={'out': correct_preds_cosines_per_layer}, oned_as='row')
-            io.savemat(PATH + subdir_incorrect + 'cosine_distrib_per_layer.mat', mdict={'out': incorrect_preds_cosines_per_layer}, oned_as='row')
+            with open(PATH + subdir_correct + file_name, 'wb') as f:
+                np.save(f, correct_preds_cosines_per_layer)
+            with open(PATH + subdir_incorrect + file_name, 'wb') as f:
+                np.save(f, incorrect_preds_cosines_per_layer)
 
         return ans_similarities, cos_similarities_preds, X
 
