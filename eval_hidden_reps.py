@@ -511,9 +511,9 @@ def compute_similarities_across_layers(
                     print("==============================================================")
                     print()
 
-                #TODO: the if statement below is just a work-around for now (must be fixed later)
-                if not (version == 'test' and source.lower() == 'subjqa'):
-                    elif layer_no > 3:
+                elif layer_no > 3:
+                    #TODO: the if statement below is just a work-around for now (must be fixed later)
+                    if not (version == 'test' and source.lower() == 'subjqa'):
                         cos_similarities_preds = compute_cos_sim_across_logits(
                                                                                hiddens=hiddens,
                                                                                s_log_probs=s_log_probs[i],
