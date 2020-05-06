@@ -512,7 +512,7 @@ def compute_similarities_across_layers(
                     print()
 
                 elif layer_no > 3:
-                #TODO: the if statement below is just a work-around for now (must be fixed later)
+                #TODO: the if statement below is just a work-around for now (must be fixed properly later)
                     if not (version == 'test' and source.lower() == 'subjqa'):
                         cos_similarities_preds = compute_cos_sim_across_logits(
                                                                                hiddens=hiddens,
@@ -603,7 +603,7 @@ def compute_similarities_across_layers(
             if layer_no in est_layers:
                 j += 1
 
-    #TODO: the if statement below is just a work-around for now (must be fixed later)
+    #TODO: the if statement below is just a work-around for now (must be fixed properly later)
     if not (version == 'test' and source.lower() == 'subjqa'):
         cos_similarities_preds = compute_rel_freq(cos_similarities_preds)
     ans_similarities = adjust_p_values(ans_similarities)
