@@ -750,7 +750,7 @@ def evaluate_estimations_and_cosines(
                                  y=y if version == 'train' else None,
                                  )
 
-        model_name = 'fc_nn' + '_' + layers + '_' w_strategy + '_' + interp_computation
+        model_name = 'fc_nn' + '_' + layers + '_' + w_strategy + '_' + interp_computation
         M = X.shape[1] #M = number of input features (i.e., x $\in$ R^M)
         #X, y = shuffle_arrays(X, y) if version == 'train' else X, y #shuffle order of examples during training (this step is not necessary at inference time)
         tensor_ds = create_tensor_dataset(X, y)
@@ -889,6 +889,6 @@ if __name__ == "__main__":
         os.makedirs(PATH)
 
     # save results
-    with open(PATH + file_name + '_' + args.layers + '_' + 'interpolation' + '_' + args.w_strategy + '_' + interp_computation + '.json', 'w') as json_file:
+    with open(PATH + file_name + '_' + args.layers + '_' + 'interpolation' + '_' + args.w_strategy + '_' + args.interp_computation + '.json', 'w') as json_file:
         json.dump(hidden_reps_results, json_file)
 
