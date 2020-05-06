@@ -369,6 +369,7 @@ def interp_cos_per_layer(
                          X:np.ndarray,
                          source:str,
                          version:str,
+                         layers:str,
                          w_strategy:str='cdf',
                          computation:str='replace',
                          y=None,
@@ -382,14 +383,7 @@ def interp_cos_per_layer(
     PATH = './results_hidden_reps/' + source.lower() + '/cosines'
     subdir_correct = '/correct'
     subdir_incorrect = '/incorrect'
-    file_name = '/cosine_distrib_per_layer.mat'
-
-    """
-    with open(PATH + subdir_correct + file_name, 'rb') as f:
-        cos_distrib_correct_preds = np.load(f)
-    with open(PATH + subdir_incorrect + file_name, 'rb') as f:
-        cos_distrib_incorrect_preds = np.load(f)
-    """
+    file_name = 'cosine_distrib' + '_' + layers + '.mat'
 
     cos_distrib_correct_preds = io.loadmat(PATH + subdir_correct + file_name)['out']
     cos_distrib_incorrect_preds = io.loadmat(PATH + subdir_incorrect + file_name)['out']
@@ -432,33 +426,35 @@ def interp_cos_per_layer(
             cos_mean = X[i, 2*l]
             cos_std = X[i, 2*l+1]
             
+            """
             if version == 'train':
                 assert isinstance(y, np.ndarray), 'y must be provided at train time'
                 p_cos_mean = interp_cos(x=cos_mean, cos=cos_correct_means if y[i] == 1 else cos_incorrect_means)
                 p_cos_std = interp_cos(x=cos_std, cos=cos_correct_stds if y[i] == 1 else cos_incorrect_stds)
 
             else:
-                #NOTE: we shall not exploit gold labels (i.e., QA model answer span predictions) at test time
-                if w_strategy == 'distance':
-                    cos_mean_w_correct = 1 - abs(np.mean(cos_correct_means) - cos_mean)
-                    cos_mean_w_incorrect = 1 - abs(np.mean(cos_incorrect_means) - cos_mean)
-                    cos_std_w_correct = 1 - abs(np.mean(cos_correct_stds) - cos_std)
-                    cos_std_w_incorrect = 1 - abs(np.mean(cos_incorrect_stds) - cos_std)
+            """
+            #NOTE: we shall not exploit gold labels (i.e., QA model answer span predictions) at test time
+            if w_strategy == 'distance':
+                cos_mean_w_correct = 1 - abs(np.mean(cos_correct_means) - cos_mean)
+                cos_mean_w_incorrect = 1 - abs(np.mean(cos_incorrect_means) - cos_mean)
+                cos_std_w_correct = 1 - abs(np.mean(cos_correct_stds) - cos_std)
+                cos_std_w_incorrect = 1 - abs(np.mean(cos_incorrect_stds) - cos_std)
 
-                elif w_strategy == 'cdf':
-                    #compute Q-function (i.e., 1 - probability values obtained from CDFs)
-                    cos_mean_w_correct = 1 - interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
-                    cos_mean_w_incorrect = 1 - interp_cos(x=cos_mean, cos=cos_incorrect_means, weighting=True)
-                    cos_std_w_correct = 1 - interp_cos(x=cos_std, cos=cos_correct_stds, weighting=True)
-                    cos_std_w_incorrect = 1 - interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
+            elif w_strategy == 'cdf':
+                #compute Q-function (i.e., 1 - probability values obtained from CDFs)
+                cos_mean_w_correct = 1 - interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
+                cos_mean_w_incorrect = 1 - interp_cos(x=cos_mean, cos=cos_incorrect_means, weighting=True)
+                cos_std_w_correct = 1 - interp_cos(x=cos_std, cos=cos_correct_stds, weighting=True)
+                cos_std_w_incorrect = 1 - interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
 
-                p_cos_mean_correct = interp_cos(x=cos_mean, cos=cos_correct_means)
-                p_cos_mean_incorrect = interp_cos(x=cos_mean, cos=cos_incorrect_means)
-                p_cos_std_correct = interp_cos(x=cos_std, cos=cos_correct_stds)
-                p_cos_std_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds)
+            p_cos_mean_correct = interp_cos(x=cos_mean, cos=cos_correct_means)
+            p_cos_mean_incorrect = interp_cos(x=cos_mean, cos=cos_incorrect_means)
+            p_cos_std_correct = interp_cos(x=cos_std, cos=cos_correct_stds)
+            p_cos_std_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds)
 
-                p_cos_mean = ((p_cos_mean_correct * cos_mean_w_correct) + (p_cos_mean_incorrect * cos_mean_w_incorrect)) / 2
-                p_cos_std = ((p_cos_std_correct * cos_std_w_correct) + (p_cos_std_incorrect * cos_std_w_incorrect)) / 2
+            p_cos_mean = ((p_cos_mean_correct * cos_mean_w_correct) + (p_cos_mean_incorrect * cos_mean_w_incorrect)) / 2
+            p_cos_std = ((p_cos_std_correct * cos_std_w_correct) + (p_cos_std_incorrect * cos_std_w_incorrect)) / 2
 
             if computation == 'replace':
                 X[i, 2*l] = p_cos_mean
@@ -473,7 +469,7 @@ def interp_cos_per_layer(
                 cdfs_per_layer.append((p_cos_mean, p_cos_std))
 
         if computation == 'concat':
-            cdfs[:, 2*l:2*l+2] += np.stack(zip(*cdfs_per_layer), axis=1)
+            cdfs[:, 2*l:2*l+2] += np.column_stack(zip(*cdfs_per_layer)) #np.stack(zip(*cdfs_per_layer), axis=1)
 
     if computation == 'concat':
         X = np.hstack(X, cdfs)
@@ -502,6 +498,7 @@ def compute_similarities_across_layers(
     cos_similarities_preds = defaultdict(dict)    
     
     if prediction == 'learned':
+        assert isinstance(layers, str)
         est_layers = list(range(1, 7)) if layers == 'all_layers' else list(range(4, 7))
         L = len(est_layers) #total number of layers
         M = 2 #number of statistical features wrt cos(h_a) (i.e., mean(cos(h_a)), std(cos(h_a)))
@@ -655,7 +652,7 @@ def compute_similarities_across_layers(
             PATH = './results_hidden_reps/' + source.lower() + '/cosines/'
             subdir_correct = 'correct/'
             subdir_incorrect = 'incorrect/'
-            file_name = 'cosine_distrib_per_layer.mat'
+            file_name = 'cosine_distrib' + '_' + layers + '.mat'
             
             if not os.path.exists(PATH + subdir_correct):
                 os.makedirs(PATH + subdir_correct)
@@ -744,6 +741,7 @@ def evaluate_estimations_and_cosines(
                                  X=X,
                                  source=source,
                                  version=version,
+                                 layers=layers,
                                  w_strategy=w_strategy,
                                  computation=interp_computation,
                                  y=y if version == 'train' else None,
