@@ -738,7 +738,6 @@ def evaluate_estimations_and_cosines(
                                  y=y if version == 'train' else None,
                                  )
 
-        ### THE ERROR WAS THAT I DID NOT PROVIDE "layers" ####
         model_name = 'fc_nn' + '_' + layers + '_' + w_strategy + '_' + interp_computation
         M = X.shape[1] #M = number of input features (i.e., x $\in$ R^M)
         #X, y = shuffle_arrays(X, y) if version == 'train' else X, y #shuffle order of examples during training (this step is not necessary at inference time)
