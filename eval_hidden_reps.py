@@ -335,7 +335,7 @@ def compute_cos_sim_across_logits(
     #sort log-probabilities in decreasing order (0 to -inf)
     s_positions = np.argsort(s_log_probs)[::-1]
     e_positions = np.argsort(e_log_probs)[::-1]
-    #remove answer span predictions that are not possible (i.e., remove answer spans where s_pos >= e_pos) to yield an array of possible candidate answers
+    #remove impossible answer span predictions to yield an array of possible candidate answers (i.e., remove answer spans where s_pos >= e_pos)
     s_candidates, e_candidates = remove_impossible_candidates(s_positions, e_positions)
     top_k_s_candidates = s_candidates[:top_k]
     top_k_e_candidates = e_candidates[:top_k]
