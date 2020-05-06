@@ -383,7 +383,7 @@ def interp_cos_per_layer(
     PATH = './results_hidden_reps/' + source.lower() + '/cosines'
     subdir_correct = '/correct'
     subdir_incorrect = '/incorrect'
-    file_name = 'cosine_distrib' + '_' + layers + '.mat'
+    file_name = '/cosine_distrib' + '_' + layers + '.mat'
 
     cos_distrib_correct_preds = io.loadmat(PATH + subdir_correct + file_name)['out']
     cos_distrib_incorrect_preds = io.loadmat(PATH + subdir_incorrect + file_name)['out']
@@ -498,11 +498,10 @@ def compute_similarities_across_layers(
     cos_similarities_preds = defaultdict(dict)    
     
     if prediction == 'learned':
-        assert isinstance(layers, str)
         est_layers = list(range(1, 7)) if layers == 'all_layers' else list(range(4, 7))
-        L = len(est_layers) #total number of layers
-        M = 2 #number of statistical features wrt cos(h_a) (i.e., mean(cos(h_a)), std(cos(h_a)))
-        X = np.zeros((N, M*L)) #feature matrix wrt M to train ff neural net
+        L = len(est_layers)
+        M = 2
+        X = np.zeros((N, M*L))
         j = 0 #running idx to update X_i for each l in L_est
 
     elif prediction == 'hand_engineered':
@@ -649,22 +648,16 @@ def compute_similarities_across_layers(
             correct_preds_cosines_per_layer = np.asarray(correct_preds_cosines_per_layer)
             incorrect_preds_cosines_per_layer = np.asarray(incorrect_preds_cosines_per_layer)
             
-            PATH = './results_hidden_reps/' + source.lower() + '/cosines/'
-            subdir_correct = 'correct/'
-            subdir_incorrect = 'incorrect/'
-            file_name = 'cosine_distrib' + '_' + layers + '.mat'
+            PATH = './results_hidden_reps/' + source.lower() + '/cosines'
+            subdir_correct = '/correct'
+            subdir_incorrect = '/incorrect'
+            file_name = '/cosine_distrib' + '_' + layers + '.mat'
             
             if not os.path.exists(PATH + subdir_correct):
                 os.makedirs(PATH + subdir_correct)
             if not os.path.exists(PATH + subdir_incorrect):
                 os.makedirs(PATH + subdir_incorrect)
 
-            """
-            with open(PATH + subdir_correct + file_name, 'wb') as f:
-                np.save(f, correct_preds_cosines_per_layer)
-            with open(PATH + subdir_incorrect + file_name, 'wb') as f:
-                np.save(f, incorrect_preds_cosines_per_layer)
-            """
             io.savemat(PATH + subdir_correct + file_name,  mdict={'out': correct_preds_cosines_per_layer}, oned_as='row')
             io.savemat(PATH + subdir_incorrect + file_name,  mdict={'out': incorrect_preds_cosines_per_layer}, oned_as='row')
 
@@ -718,8 +711,6 @@ def evaluate_estimations_and_cosines(
     pred_indices = np.asarray(pred_indices)
     true_preds = np.asarray(true_preds)
 
-    #compute (dis-)similarities among hidden reps in H_a for both correct and erroneous model predictions at each layer
-    #AND estimate model predictions wrt hidden reps in the penultimate layer
     if prediction == 'learned':
         y = true_preds
         ans_similarities, cos_similarities_preds, X = compute_similarities_across_layers(
@@ -747,6 +738,7 @@ def evaluate_estimations_and_cosines(
                                  y=y if version == 'train' else None,
                                  )
 
+        ### THE ERROR WAS THAT I DID NOT PROVIDE "layers" ####
         model_name = 'fc_nn' + '_' + layers + '_' + w_strategy + '_' + interp_computation
         M = X.shape[1] #M = number of input features (i.e., x $\in$ R^M)
         #X, y = shuffle_arrays(X, y) if version == 'train' else X, y #shuffle order of examples during training (this step is not necessary at inference time)
@@ -871,10 +863,11 @@ if __name__ == "__main__":
                                                                                                  version=args.version,
                                                                                                  model_dir=args.model_dir,
                                                                                                  batch_size=args.batch_size,
+                                                                                                 layers=args.layers,
                                                                                                  w_strategy=args.w_strategy,
                                                                                                  interp_computation=args.interp_computation,
                                                                                                  )
-            hidden_reps_results['test_f1'] = test_f1
+            hidden_reps_results['test_f1'] = test_f1 
     else:
         raise ValueError('Prediction must be one of {hand_engineered, learned}')
     
