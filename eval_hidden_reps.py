@@ -388,7 +388,7 @@ def interp_cos_per_layer(
         """
         p = np.arange(1, len(cos)+1) / len(cos) #np.linspace(0, 1, len(cos), endpoint=False)
         cos_sorted = np.sort(cos) #sort values in ascending order
-        assert np.all(np.diff(cos_sorted) >= 0), 'x-coordinate sequence xp must be passed in increasing order' #use >= 0 since some values might be equivalent
+        assert np.all(np.diff(cos_sorted) >= 0), 'x-coordinate sequence xp must be passed in increasing order' #use >= 0 since some values might be equivalent (hence, > 0 will yield False)
         p_interval = np.interp(x+delta, cos_sorted, p) - np.interp(x-delta, cos_sorted, p) #P(cos(h_a) < x_i+delta) - P(cos(h_a) < x_i-delta) 
         return p_interval
     
