@@ -73,7 +73,7 @@ def get_hidden_reps(source:str='SubjQA', version:str='train'):
     f = files.pop()
 
     #load hidden representations into memory
-    with open(PATH + f) as json_file:
+    with open(PATH + f, encoding="utf-8") as json_file:
         results = json.load(json_file)
         file_name = 'hidden_rep_cosines' + '_' +  task + '_' + version
         print()
@@ -399,8 +399,8 @@ def interp_cos_per_layer(
         for i in range(X.shape[0]):
             cos_mean = X[i, 2*l]
             cos_std = X[i, 2*l+1]
-            p_cos_mean = interp_cos(cos_mean, cos_correct_means if y[i] == 1 else cos_incorrect_means)
-            p_cos_std = interp_cos(cos_std, cos_correct_stds if y[i] == 1 else cos_incorrect_std)
+            p_cos_mean = interp_cos(x=cos_mean, cos=cos_correct_means if y[i] == 1 else cos_incorrect_means)
+            p_cos_std = interp_cos(x=cos_std, cos=cos_correct_stds if y[i] == 1 else cos_incorrect_stds)
             if computation == 'replace':
                 X[i, 2*l] = p_cos_mean
                 X[i, 2*l+1] = p_cos_std
