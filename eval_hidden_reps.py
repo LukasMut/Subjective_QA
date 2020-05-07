@@ -393,7 +393,7 @@ def interp_cos_per_layer(
     if computation == 'concat':
         assert len(cos_distrib_correct_preds) == len(cos_distrib_incorrect_preds)
         L = len(cos_distrib_correct_preds)
-        cdf_probas = np.zeros((X.shape[0], L*2))      
+        cdf_probas = np.zeros((X.shape[0], 2*L))      
     
     def interp_cos(
                    x:float,
