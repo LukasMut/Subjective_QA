@@ -53,8 +53,10 @@ try:
 except:
     pass
 
-def get_hidden_reps(source:str='SubjQA', version:str='train'):
-    
+def get_hidden_reps(
+                    source:str,
+                    version:str,
+):    
     #set folder and subdirectories
     folder = '/results_test/'
     subdir = '/feat_reps/'
@@ -797,7 +799,7 @@ if __name__ == "__main__":
     parser.add_argument('--n_epochs', type=int, default=20,
         help='Set number of epochs model should be trained for. Only necessary if args.prediction == learned.')
     parser.add_argument('--layers', type=str, default='',
-        help='Must be one of {all_layers, top_three_layers}. Only necessary if args.prediction == learned.')
+        help='Must be one of {all_layers, top_three_layers, bottom_three_layers}. Only necessary if args.prediction == learned.')
     parser.add_argument('--w_strategy', type=str, default='',
         help='Must be one of {distance, cdf}. Only necessary if args.prediction == learned.')
     parser.add_argument('--interp_computation', type=str, default='',
