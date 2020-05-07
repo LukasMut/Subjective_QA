@@ -643,6 +643,7 @@ def compute_similarities_across_layers(
     #TODO: the if statement below is just a work-around for now (must be fixed properly later)
     if not (version == 'test' and source.lower() == 'subjqa'):
         cos_similarities_preds = compute_rel_freq(cos_similarities_preds)
+
     ans_similarities = adjust_p_values(ans_similarities)
 
     if prediction == 'learned':
@@ -703,9 +704,7 @@ def evaluate_estimations_and_cosines(
         if len(true_ans.split()) > 1:
             if compute_exact(true_ans, pred_ans):
                 true_preds.append(1)
-                #pred_indices.append(i)
             else:
-                #pass
                 true_preds.append(0)
             pred_indices.append(i)
     
