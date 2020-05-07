@@ -428,35 +428,33 @@ def interp_cos_per_layer(
             cos_mean = X[i, 2*l]
             cos_std = X[i, 2*l+1]
             
-            """
             if version == 'train':
                 assert isinstance(y, np.ndarray), 'y must be provided at train time'
                 p_cos_mean = interp_cos(x=cos_mean, cos=cos_correct_means if y[i] == 1 else cos_incorrect_means)
                 p_cos_std = interp_cos(x=cos_std, cos=cos_correct_stds if y[i] == 1 else cos_incorrect_stds)
 
             else:
-            """
-            #NOTE: we shall not exploit gold labels (i.e., QA model answer span predictions) at test time
-            if w_strategy == 'distance':
-                cos_mean_w_correct = 1 - abs(np.mean(cos_correct_means) - cos_mean)
-                cos_mean_w_incorrect = 1 - abs(np.mean(cos_incorrect_means) - cos_mean)
-                cos_std_w_correct = 1 - abs(np.mean(cos_correct_stds) - cos_std)
-                cos_std_w_incorrect = 1 - abs(np.mean(cos_incorrect_stds) - cos_std)
+                #NOTE: we shall not exploit gold labels (i.e., QA model predictions) at test time
+                if w_strategy == 'distance':
+                    cos_mean_w_correct = 1 - abs(np.mean(cos_correct_means) - cos_mean)
+                    cos_mean_w_incorrect = 1 - abs(np.mean(cos_incorrect_means) - cos_mean)
+                    cos_std_w_correct = 1 - abs(np.mean(cos_correct_stds) - cos_std)
+                    cos_std_w_incorrect = 1 - abs(np.mean(cos_incorrect_stds) - cos_std)
 
-            elif w_strategy == 'cdf':
-                #compute Q-function (i.e., 1 - probability values obtained from CDFs)
-                cos_mean_w_correct = 1 - interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
-                cos_mean_w_incorrect = 1 - interp_cos(x=cos_mean, cos=cos_incorrect_means, weighting=True)
-                cos_std_w_correct = 1 - interp_cos(x=cos_std, cos=cos_correct_stds, weighting=True)
-                cos_std_w_incorrect = 1 - interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
+                elif w_strategy == 'cdf':
+                    #compute Q-function (i.e., 1 - probability values obtained from CDFs)
+                    cos_mean_w_correct = 1 - interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
+                    cos_mean_w_incorrect = 1 - interp_cos(x=cos_mean, cos=cos_incorrect_means, weighting=True)
+                    cos_std_w_correct = 1 - interp_cos(x=cos_std, cos=cos_correct_stds, weighting=True)
+                    cos_std_w_incorrect = 1 - interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
 
-            p_cos_mean_correct = interp_cos(x=cos_mean, cos=cos_correct_means)
-            p_cos_mean_incorrect = interp_cos(x=cos_mean, cos=cos_incorrect_means)
-            p_cos_std_correct = interp_cos(x=cos_std, cos=cos_correct_stds)
-            p_cos_std_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds)
+                p_cos_mean_correct = interp_cos(x=cos_mean, cos=cos_correct_means)
+                p_cos_mean_incorrect = interp_cos(x=cos_mean, cos=cos_incorrect_means)
+                p_cos_std_correct = interp_cos(x=cos_std, cos=cos_correct_stds)
+                p_cos_std_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds)
 
-            p_cos_mean = ((p_cos_mean_correct * cos_mean_w_correct) + (p_cos_mean_incorrect * cos_mean_w_incorrect)) / 2
-            p_cos_std = ((p_cos_std_correct * cos_std_w_correct) + (p_cos_std_incorrect * cos_std_w_incorrect)) / 2
+                p_cos_mean = ((p_cos_mean_correct * cos_mean_w_correct) + (p_cos_mean_incorrect * cos_mean_w_incorrect)) / 2
+                p_cos_std = ((p_cos_std_correct * cos_std_w_correct) + (p_cos_std_incorrect * cos_std_w_incorrect)) / 2
 
             if computation == 'replace':
                 X[i, 2*l] = p_cos_mean
