@@ -393,7 +393,7 @@ def interp_cos_per_layer(
     if computation == 'concat':
         assert len(cos_distrib_correct_preds) == len(cos_distrib_incorrect_preds)
         L = len(cos_distrib_correct_preds)
-        cdfs = np.zeros((X.shape[0], L*2))      
+        cdf_probas = np.zeros((X.shape[0], L*2))      
     
     def interp_cos(
                    x:float,
@@ -422,7 +422,7 @@ def interp_cos_per_layer(
         cos_incorrect_means, cos_incorrect_stds = zip(*cos_incorrect)
         
         if computation == 'concat':
-            cdfs_per_layer = []
+            cdf_probas_per_layer = []
 
         for i in range(X.shape[0]):
             cos_mean = X[i, 2*l]
@@ -468,13 +468,13 @@ def interp_cos_per_layer(
                 X[i, 2*l+1] *= p_cos_std
             
             elif computation == 'concat':
-                cdfs_per_layer.append((p_cos_mean, p_cos_std))
+                cdf_probas_per_layer.append((p_cos_mean, p_cos_std))
 
         if computation == 'concat':
-            cdfs[:, 2*l:2*l+2] += np.stack(zip(*cdfs_per_layer), axis=1)
+            cdf_probas[:, 2*l:2*l+2] += np.stack(zip(*cdf_probas_per_layer), axis=1)
 
     if computation == 'concat':
-        X = np.hstack(X, cdfs)
+        X = np.hstack((X, cdf_probas))
 
     return X
 
