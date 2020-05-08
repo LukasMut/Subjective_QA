@@ -447,7 +447,8 @@ def interp_cos_per_layer(
                     cos_std_w_incorrect = 1 - dist_cos_std_incorrect
 
                 elif w_strategy == 'cdf':
-                    #NOTE: P(cos(h_a) < x_i) is always higher for incorrect preds, whereas P(cos(h_a) > x_i) always is higher for correct preds (!)
+                    #NOTE: P(cos(h_a) < x_i) is always higher for incorrect preds (more probability mass towards cosine similarity of 0), 
+                    #      whereas P(cos(h_a) > x_i) always is higher for correct preds (more probability mass towards cosine similarity of 1)
                     if dist_cos_mean_correct < dist_cos_mean_incorrect:
                         #compute Q-function (i.e., P(mean(cos(h_a)) > mean_cos_i))
                         cos_mean_w_correct = 1 - interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
