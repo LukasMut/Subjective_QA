@@ -770,7 +770,10 @@ def evaluate_estimations_and_cosines(
                                      y=y if version == 'train' else None,
                                      )
 
-        model_name = 'fc_nn' + '_' + layers + '_' + w_strategy + '_' + interp_computation
+            model_name = 'fc_nn' + '_' + layers + '_' + w_strategy + '_' + interp_computation
+        else:
+            model_name = 'fc_nn' + '_' + layers + '_' + interp_computation
+            
         M = X.shape[1] #M = number of input features (i.e., x $\in$ R^M)
         #X, y = shuffle_arrays(X, y) if version == 'train' else X, y #shuffle order of examples during training (this step is not necessary at inference time)
         tensor_ds = create_tensor_dataset(X, y)
