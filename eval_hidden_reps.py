@@ -417,7 +417,7 @@ def interp_cos_per_layer(
             return p_interval
     
     for l, (cos_correct, cos_incorrect) in enumerate(zip(cos_distrib_correct_preds, cos_distrib_incorrect_preds)):
-        #unpack *train* cos(h_a) distributions
+        #unpack mean(cos(h_a)) and std(cos(h_a)) *train* distributions
         cos_correct_means, cos_correct_stds = zip(*cos_correct)
         cos_incorrect_means, cos_incorrect_stds = zip(*cos_incorrect)
         
