@@ -448,12 +448,12 @@ def interp_cos_per_layer(
 
                 elif w_strategy == 'cdf':
 
-                    ########################################################################################################################
-                    ## P(cos(h_a) < x_i) is always higher for incorrect preds (more probability mass towards a cosine similarity of 0), 
-                    ## whereas P(cos(h_a) > x_i) always is higher for correct preds (more probability mass towards a cosine similarity of 1).
-                    ## Hence, we must switch between the two probability computations dependent on the distance of *observed* test cos(h_a) 
-                    ## to the mean value of the respective distributions.
-                    ########################################################################################################################
+                    ###########################################################################################################################
+                    ## P(cos(h_a) < x_i) is always higher for incorrect preds (more probability mass towards a cosine similarity of 0),      ##
+                    ## whereas P(cos(h_a) > x_i) always is higher for correct preds (more probability mass towards a cosine similarity of 1).##
+                    ## Hence, we must switch between the two probability computations dependent on the distance of *observed* test cos(h_a)  ##
+                    ## to the mean value of the respective distributions.                                                                    ##
+                    ###########################################################################################################################
 
                     if dist_cos_mean_correct < dist_cos_mean_incorrect:
                         #compute Q-function (i.e., P(mean(cos(h_a)) > mean_cos_i))
