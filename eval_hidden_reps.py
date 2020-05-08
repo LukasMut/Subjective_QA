@@ -410,11 +410,9 @@ def interp_cos_per_layer(
         assert np.all(np.diff(cos_sorted) >= 0), 'x-coordinate sequence xp must be passed in increasing order' #use >= 0 since some values might be equivalent (hence, > 0 will yield AssertionError)
         
         if weighting:
-            p_cdf = np.interp(x, cos_sorted, p) #P(cos(h_a) < x_i)
-            return p_cdf
+            return np.interp(x, cos_sorted, p) #P(cos(h_a) < x_i)
         else:
-            p_interval = np.interp(x+delta, cos_sorted, p) - np.interp(x-delta, cos_sorted, p) #P(cos(h_a) < x_i + delta) - P(cos(h_a) < x_i - delta) 
-            return p_interval
+            return np.interp(x+delta, cos_sorted, p) - np.interp(x-delta, cos_sorted, p) #P(cos(h_a) < x_i + delta) - P(cos(h_a) < x_i - delta) 
     
     for l, (cos_correct, cos_incorrect) in enumerate(zip(cos_distrib_correct_preds, cos_distrib_incorrect_preds)):
         #unpack mean(cos(h_a)) and std(cos(h_a)) *train* distributions
@@ -811,8 +809,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--source', type=str, default='SubjQA',
         help='Estimate model predictions (i.e., correct or erroneous) wrt hidden reps obtained from fine-tuning (and evaluating) on *source*.')
-    parser.add_argument('--version', type=str, default='train',
-        help='Must be one of {train, test}')
     parser.add_argument('--prediction', type=str, default='learned',
         help='If "learned", compute feature matrix X and labels vector y wrt cos(h_a) obtained from fine-tuning on *source* to train feed-forward neural net')
     parser.add_argument('--model_dir', type=str, default='./saved_models/ans_pred',
@@ -825,84 +821,77 @@ if __name__ == "__main__":
         help='Must be one of {all_layers, top_three_layers, bottom_three_layers}. Only necessary if args.prediction == learned.')
     parser.add_argument('--w_strategy', type=str, default='',
         help='Must be one of {distance, cdf}. Only necessary if args.prediction == learned.')
-    parser.add_argument('--interp_computation', type=str, default='',
-        help='Must be one of {replace, weighting, concat}. Only necessary if args.prediction == learned.')
-
-
-    args = parser.parse_args()
-    assert isinstance(args.version, str), 'Version must be one of {train, test}'
-    # get feat reps
-    results, file_name = get_hidden_reps(source=args.source, version=args.version)
-
-    # estimate model predictions wrt answer and context hidden reps in latent space (per transformer layer) AND
-    # compute (dis-)similarities among hidden representations in h_a for both correct and erroneous model predictions (at each layer)
-
-    hidden_reps_results = {}
-    if args.prediction == 'hand_engineered':
-        estimations, ans_similarities, cos_similarities_preds = evaluate_estimations_and_cosines(
-                                                                                                 test_results=results,
-                                                                                                 source=args.source, 
-                                                                                                 prediction=args.prediction,
-                                                                                                 version=args.version,
-                                                                                                 model_dir=args.model_dir,
-                                                                                                 batch_size=args.batch_size,
-                                                                                                 n_epochs=args.n_epochs,
-                                                                                                 layers=args.layers,
-                                                                                                 )
-        hidden_reps_results['estimations'] = estimations
-
-    elif args.prediction == 'learned':
-        assert isinstance(args.layers, str) and len(args.layers) > 0, 'Layers for which we want to store statistical characteristics wrt cos(h_a) must be specified'
-        assert isinstance(args.batch_size, int), 'Batch size must be defined'
-        assert isinstance(args.model_dir, str), 'Directory to save and load model weights must be defined'
-        assert isinstance(args.w_strategy, str), 'Weighting strategy must be defined'
-        assert isinstance(args.interp_computation, str), 'How to leverage probabilities obtained from CDFs must be defined'
-        
-        if args.version == 'train':
-            assert isinstance(args.n_epochs, int), 'Number of epochs must be defined'
-            
-            if not os.path.exists(args.model_dir):
-                os.makedirs(args.model_dir)
-            
-            ans_similarities, cos_similarities_preds, losses, f1_scores  = evaluate_estimations_and_cosines(
-                                                                                                            test_results=results,
-                                                                                                            source=args.source, 
-                                                                                                            prediction=args.prediction,
-                                                                                                            version=args.version,
-                                                                                                            model_dir=args.model_dir,
-                                                                                                            batch_size=args.batch_size,
-                                                                                                            n_epochs=args.n_epochs,
-                                                                                                            layers=args.layers,
-                                                                                                            w_strategy=args.w_strategy,
-                                                                                                            interp_computation=args.interp_computation,
-                                                                                                            )
-            hidden_reps_results['train_losses'] = losses
-            hidden_reps_results['train_f1s'] = f1_scores
-
-        else:
-            ans_similarities, cos_similarities_preds, test_f1 = evaluate_estimations_and_cosines(
-                                                                                                 test_results=results,
-                                                                                                 source=args.source, 
-                                                                                                 prediction=args.prediction,
-                                                                                                 version=args.version,
-                                                                                                 model_dir=args.model_dir,
-                                                                                                 batch_size=args.batch_size,
-                                                                                                 layers=args.layers,
-                                                                                                 w_strategy=args.w_strategy,
-                                                                                                 interp_computation=args.interp_computation,
-                                                                                                 )
-            hidden_reps_results['test_f1'] = test_f1 
-    else:
-        raise ValueError('Prediction must be one of {hand_engineered, learned}')
     
-    hidden_reps_results['cos_similarities_true'] = ans_similarities
-    hidden_reps_results['cos_similarities_preds'] = cos_similarities_preds
+    args = parser.parse_args()
+    
+    versions = ['train', 'test']
+    interp_computations = ['weighting', 'concat']
 
-    PATH = './results_hidden_reps/' + '/' + args.source.lower() + '/' + args.prediction + '/'
-    if not os.path.exists(PATH):
-        os.makedirs(PATH)
+    for version in versions:
+        results, file_name = get_hidden_reps(source=args.source, version=version)
+        for interp_computation in interp_computations:
+            hidden_reps_results = {}
+            if args.prediction == 'hand_engineered':
+                estimations, ans_similarities, cos_similarities_preds = evaluate_estimations_and_cosines(
+                                                                                                         test_results=results,
+                                                                                                         source=args.source, 
+                                                                                                         prediction=args.prediction,
+                                                                                                         version=version,
+                                                                                                         model_dir=args.model_dir,
+                                                                                                         batch_size=args.batch_size,
+                                                                                                         n_epochs=args.n_epochs,
+                                                                                                         layers=args.layers,
+                                                                                                         )
+                hidden_reps_results['estimations'] = estimations
 
-    # save results
-    with open(PATH + file_name + '_' + args.layers + '_' + 'interpolation' + '_' + args.w_strategy + '_' + args.interp_computation + '.json', 'w') as json_file:
-        json.dump(hidden_reps_results, json_file)
+            elif args.prediction == 'learned':
+                assert isinstance(args.layers, str) and len(args.layers) > 0, 'Layers for which we want to store statistical characteristics wrt cos(h_a) must be specified'
+                assert isinstance(args.batch_size, int), 'Batch size must be defined'
+                assert isinstance(args.model_dir, str), 'Directory to save and load model weights must be defined'
+                assert isinstance(args.w_strategy, str), 'Weighting strategy must be defined'
+                
+                if version == 'train':
+                    assert isinstance(args.n_epochs, int), 'Number of epochs must be defined'
+                    if not os.path.exists(args.model_dir):
+                        os.makedirs(args.model_dir)
+                    
+                    ans_similarities, cos_similarities_preds, losses, f1_scores  = evaluate_estimations_and_cosines(
+                                                                                                                    test_results=results,
+                                                                                                                    source=args.source, 
+                                                                                                                    prediction=args.prediction,
+                                                                                                                    version=version,
+                                                                                                                    model_dir=args.model_dir,
+                                                                                                                    batch_size=args.batch_size,
+                                                                                                                    n_epochs=args.n_epochs,
+                                                                                                                    layers=args.layers,
+                                                                                                                    w_strategy=args.w_strategy,
+                                                                                                                    interp_computation=interp_computation,
+                                                                                                                    )
+                    hidden_reps_results['train_losses'] = losses
+                    hidden_reps_results['train_f1s'] = f1_scores
+                else:
+                    ans_similarities, cos_similarities_preds, test_f1 = evaluate_estimations_and_cosines(
+                                                                                                         test_results=results,
+                                                                                                         source=args.source, 
+                                                                                                         prediction=args.prediction,
+                                                                                                         version=version,
+                                                                                                         model_dir=args.model_dir,
+                                                                                                         batch_size=args.batch_size,
+                                                                                                         layers=args.layers,
+                                                                                                         w_strategy=args.w_strategy,
+                                                                                                         interp_computation=interp_computation,
+                                                                                                         )
+                    hidden_reps_results['test_f1'] = test_f1
+            
+            hidden_reps_results['cos_similarities_true'] = ans_similarities
+            hidden_reps_results['cos_similarities_preds'] = cos_similarities_preds
+
+            #create PATH
+            PATH = './results_hidden_reps/' + '/' + args.source.lower() + '/' + args.prediction + '/'
+            if not os.path.exists(PATH):
+                os.makedirs(PATH)
+
+            #save results
+            with open(PATH + file_name + '_' + args.layers + '_' + 'interpolation' + '_' + args.w_strategy + '_' + interp_computation + '.json', 'w') as json_file:
+                json.dump(hidden_reps_results, json_file)
 
