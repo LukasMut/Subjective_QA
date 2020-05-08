@@ -407,13 +407,13 @@ def interp_cos_per_layer(
         """
         p = np.arange(1, len(cos)+1) / len(cos) #np.linspace(0, 1, len(cos), endpoint=False)
         cos_sorted = np.sort(cos) #sort values in ascending order
-        assert np.all(np.diff(cos_sorted) >= 0), 'x-coordinate sequence xp must be passed in increasing order' #use >= 0 since some values might be equivalent (hence, > 0 will yield False)
+        assert np.all(np.diff(cos_sorted) >= 0), 'x-coordinate sequence xp must be passed in increasing order' #use >= 0 since some values might be equivalent (hence, > 0 will yield AssertionError)
         
         if weighting:
-            p_cdf = np.interp(x, cos_sorted, p) #P(cos(h_a) < x)
+            p_cdf = np.interp(x, cos_sorted, p) #P(cos(h_a) < x_i)
             return p_cdf
         else:
-            p_interval = np.interp(x+delta, cos_sorted, p) - np.interp(x-delta, cos_sorted, p) #P(cos(h_a) < x + delta) - P(cos(h_a) < x - delta) 
+            p_interval = np.interp(x+delta, cos_sorted, p) - np.interp(x-delta, cos_sorted, p) #P(cos(h_a) < x_i + delta) - P(cos(h_a) < x_i - delta) 
             return p_interval
     
     for l, (cos_correct, cos_incorrect) in enumerate(zip(cos_distrib_correct_preds, cos_distrib_incorrect_preds)):
@@ -435,24 +435,43 @@ def interp_cos_per_layer(
 
             else:
                 #NOTE: we shall not exploit gold labels (i.e., QA model predictions) at test time
+                dist_cos_mean_correct = abs(np.mean(cos_correct_means) - cos_mean)
+                dist_cos_mean_incorrect = abs(np.mean(cos_incorrect_means) - cos_mean)
+                dist_cos_std_correct = abs(np.mean(cos_correct_stds) - cos_std)
+                dist_cos_std_incorrect = abs(np.mean(cos_incorrect_stds) - cos_std)
+
                 if w_strategy == 'distance':
-                    cos_mean_w_correct = 1 - abs(np.mean(cos_correct_means) - cos_mean)
-                    cos_mean_w_incorrect = 1 - abs(np.mean(cos_incorrect_means) - cos_mean)
-                    cos_std_w_correct = 1 - abs(np.mean(cos_correct_stds) - cos_std)
-                    cos_std_w_incorrect = 1 - abs(np.mean(cos_incorrect_stds) - cos_std)
+                    cos_mean_w_correct = 1 - dist_cos_mean_correct
+                    cos_mean_w_incorrect = 1 - dist_cos_mean_incorrect
+                    cos_std_w_correct = 1 - dist_cos_std_correct
+                    cos_std_w_incorrect = 1 - dist_cos_std_incorrect
 
                 elif w_strategy == 'cdf':
-                    #compute Q-function (i.e., 1 - probability values obtained from CDFs)
-                    cos_mean_w_correct = 1 - interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
-                    cos_mean_w_incorrect = 1 - interp_cos(x=cos_mean, cos=cos_incorrect_means, weighting=True)
-                    cos_std_w_correct = 1 - interp_cos(x=cos_std, cos=cos_correct_stds, weighting=True)
-                    cos_std_w_incorrect = 1 - interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
+                    #NOTE: P(cos(h_a) < x_i) is always higher for incorrect preds, whereas P(cos(h_a) > x_i) always is higher for correct preds (!)
+                    if dist_cos_mean_correct < dist_cos_mean_incorrect:
+                        #compute Q-function (i.e., P(mean(cos(h_a)) > mean_cos_i))
+                        cos_mean_w_correct = 1 - interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
+                        cos_mean_w_incorrect = 1 - interp_cos(x=cos_mean, cos=cos_incorrect_means, weighting=True)
+                    else:
+                        #compute CDF (i.e., P(mean(cos(h_a)) < mean_cos_i))
+                        cos_mean_w_correct = interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
+                        cos_mean_w_incorrect = interp_cos(x=cos_mean, cos=cos_incorrect_means, weighting=True)
+
+                    if dist_cos_std_correct < dist_cos_std_incorrect:
+                        #compute Q-function (i.e., P(std(cos(h_a)) > std_cos_i))
+                        cos_std_w_correct = 1 - interp_cos(x=cos_std, cos=cos_correct_stds, weighting=True)
+                        cos_std_w_incorrect = 1 - interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
+                    else:
+                        #compute CDF (i.e., P(std(cos(h_a)) < std_cos_i))
+                        cos_std_w_correct = interp_cos(x=cos_std, cos=cos_correct_stds, weighting=True)
+                        cos_std_w_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
 
                 p_cos_mean_correct = interp_cos(x=cos_mean, cos=cos_correct_means)
                 p_cos_mean_incorrect = interp_cos(x=cos_mean, cos=cos_incorrect_means)
                 p_cos_std_correct = interp_cos(x=cos_std, cos=cos_correct_stds)
                 p_cos_std_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds)
 
+                #TODO: figure out whether normalization factor (i.e., dividing by two) is necessary
                 p_cos_mean = ((p_cos_mean_correct * cos_mean_w_correct) + (p_cos_mean_incorrect * cos_mean_w_incorrect)) / 2
                 p_cos_std = ((p_cos_std_correct * cos_std_w_correct) + (p_cos_std_incorrect * cos_std_w_incorrect)) / 2
 
@@ -793,7 +812,7 @@ if __name__ == "__main__":
         help='Set model save directory for ans prediction model. Only necessary if args.prediction == learned.')
     parser.add_argument('--batch_size', type=int, default=8,
         help='Specify mini-batch size. Only necessary if args.prediction == learned.')
-    parser.add_argument('--n_epochs', type=int, default=15,
+    parser.add_argument('--n_epochs', type=int, default=20,
         help='Set number of epochs model should be trained for. Only necessary if args.prediction == learned.')
     parser.add_argument('--layers', type=str, default='',
         help='Must be one of {all_layers, top_three_layers, bottom_three_layers}. Only necessary if args.prediction == learned.')
