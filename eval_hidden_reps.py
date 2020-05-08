@@ -373,7 +373,7 @@ def interp_cos_per_layer(
                          version:str,
                          layers:str,
                          w_strategy:str='cdf',
-                         computation:str='replace',
+                         computation:str='concat',
                          y=None,
 ):
     """
@@ -479,12 +479,8 @@ def interp_cos_per_layer(
                 #TODO: figure out whether normalization factor (i.e., dividing by two) is necessary
                 p_cos_mean = ((p_cos_mean_correct * cos_mean_w_correct) + (p_cos_mean_incorrect * cos_mean_w_incorrect)) / 2
                 p_cos_std = ((p_cos_std_correct * cos_std_w_correct) + (p_cos_std_incorrect * cos_std_w_incorrect)) / 2
-
-            if computation == 'replace':
-                X[i, 2*l] = p_cos_mean
-                X[i, 2*l+1] = p_cos_std
             
-            elif computation == 'weighting':
+            if computation == 'weighting':
                 #instead of replacing "raw" mean and std wrt cos(h_a) with p, use p as a weighting factor for mean and std wrt cos(h_a)
                 X[i, 2*l] *= p_cos_mean
                 X[i, 2*l+1] *= p_cos_std
@@ -496,7 +492,19 @@ def interp_cos_per_layer(
             cdf_probas[:, 2*l:2*l+2] += np.stack(zip(*cdf_probas_per_layer), axis=1)
 
     if computation == 'concat':
+
+        def rearrange_values(x:np.ndarray):
+            M = len(x)
+            means = x[slice(0, M//2, 2)]
+            stds = x[slice(1, M//2, 2)]
+            p_means = x[slice(M//2, None, 2)]
+            p_stds = x[slice(M//2+1, None, 2)]
+            assert len(means) == len(stds) == len(p_means) == len(p_stds)
+            rearranged_array = np.array([(mean, p_means[i], stds[i], p_stds[i]) for i, mean in enumerate(means)]).flatten()
+            return rearranged_array
+
         X = np.hstack((X, cdf_probas))
+        X = np.asarray(list(map(lambda x: rearrange_values(x), X)))
 
     return X
 
@@ -749,17 +757,18 @@ def evaluate_estimations_and_cosines(
                                                                                         prediction=prediction,
                                                                                         version=version,
                                                                                         layers=layers,
-                                                                                        )
-        #interpolate values wrt to *train* CDFs
-        X = interp_cos_per_layer(
-                                 X=X,
-                                 source=source,
-                                 version=version,
-                                 layers=layers,
-                                 w_strategy=w_strategy,
-                                 computation=interp_computation,
-                                 y=y if version == 'train' else None,
-                                 )
+                                                                                         )
+        if interp_computation != 'raw':
+            #interpolate values wrt to *train* CDFs
+            X = interp_cos_per_layer(
+                                     X=X,
+                                     source=source,
+                                     version=version,
+                                     layers=layers,
+                                     w_strategy=w_strategy,
+                                     computation=interp_computation,
+                                     y=y if version == 'train' else None,
+                                     )
 
         model_name = 'fc_nn' + '_' + layers + '_' + w_strategy + '_' + interp_computation
         M = X.shape[1] #M = number of input features (i.e., x $\in$ R^M)
@@ -825,7 +834,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     versions = ['train', 'test']
-    interp_computations = ['concat', 'weighting']
+    interp_computations = ['raw', 'concat', 'weighting']
 
     for version in versions:
         results, file_name = get_hidden_reps(source=args.source, version=version)
