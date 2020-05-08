@@ -163,7 +163,7 @@ def train(
     assert isinstance(y_weights, torch.Tensor), 'Tensor of weights wrt model predictions is not provided'
     loss_func = nn.BCEWithLogitsLoss(pos_weight=y_weights.to(device))
     optimizer = Adam(model.parameters(), lr=1e-2, weight_decay=0.005) #L2 Norm (i.e., weight decay)
-    max_grad_norm = 10
+    max_grad_norm = 5
     losses = []
     f1_scores = []
 
@@ -197,7 +197,7 @@ def train(
         print()
 
         if epoch >= min_n_epochs:
-            if losses[-1] >= losses[-2]:
+            if losses[-1] >= losses[-2] or f1_scores[-1] < f1_scores[-2]:
                 break
 
     model.eval()
@@ -750,7 +750,7 @@ def evaluate_estimations_and_cosines(
                                                                                         version=version,
                                                                                         layers=layers,
                                                                                         )
-        #interpolate values wrt to *train* CDFs (i.e., replace raw cos similarities with probability values according to *train* CDFs wrt cos(h_a))
+        #interpolate values wrt to *train* CDFs
         X = interp_cos_per_layer(
                                  X=X,
                                  source=source,
