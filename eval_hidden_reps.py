@@ -825,7 +825,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     versions = ['train', 'test']
-    interp_computations = ['weighting', 'concat']
+    interp_computations = ['concat', 'weighting']
 
     for version in versions:
         results, file_name = get_hidden_reps(source=args.source, version=version)
