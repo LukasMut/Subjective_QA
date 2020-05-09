@@ -777,7 +777,8 @@ def evaluate_estimations_and_cosines(
         M = X.shape[1] #M = number of input features (i.e., x $\in$ R^M)
         #X, y = shuffle_arrays(X, y) if version == 'train' else X, y #shuffle order of examples during training (this step is not necessary at inference time)
         tensor_ds = create_tensor_dataset(X, y)
-        dl = BatchGenerator(dataset=tensor_ds, batch_size=batch_size)
+        #dl = BatchGenerator(dataset=tensor_ds, batch_size=batch_size)
+        dl = DataLoader(dataset=tensor_ds, batch_size=batch_size, shuffle=True if version == 'train' else False, drop_last=True if version == 'test' else False)
 
         if version == 'train':
             y_distribution = Counter(y)
