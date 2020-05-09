@@ -496,6 +496,9 @@ def interp_cos_per_layer(
     if computation == 'concat':
 
         def rearrange_values(x:np.ndarray):
+            """
+            rearrange values to enhance proximity between features that are correlated
+            """
             M = len(x)
             means = x[slice(0, M//2, 2)]
             stds = x[slice(1, M//2, 2)]
