@@ -374,6 +374,7 @@ def interp_cos_per_layer(
                          layers:str,
                          w_strategy:str='cdf',
                          computation:str='concat',
+                         concatenation:str='rearrange',
                          delta:float=.1,
                          y=None,
 ):
@@ -494,23 +495,28 @@ def interp_cos_per_layer(
             cdf_probas[:, 2*l:2*l+2] += np.stack(zip(*cdf_probas_per_layer), axis=1)
 
     if computation == 'concat':
+        assert isinstance(concatenation, str), 'how to concatenate feature matrices must be specified'
+        if concatenation == 'rearrange':
+            def rearrange_values(x:np.ndarray):
+                """
+                rearrange values to enhance proximity between features that are correlated;
+                this might inform neural network better about likelihood that *observed* cos(h_a) belongs to one or the other class;
+                """
+                M = len(x)
+                means = x[slice(0, M//2, 2)]
+                stds = x[slice(1, M//2, 2)]
+                p_means = x[slice(M//2, None, 2)]
+                p_stds = x[slice(M//2+1, None, 2)]
+                assert len(means) == len(stds) == len(p_means) == len(p_stds)
+                rearranged_array = np.array([(mean, p_means[l], stds[l], p_stds[l]) for l, mean in enumerate(means)]).flatten()
+                return rearranged_array
 
-        def rearrange_values(x:np.ndarray):
-            """
-            rearrange values to enhance proximity between features that are correlated;
-            this might inform the neural network better about that likelihood of an *observed* cos(h_a)
-            """
-            M = len(x)
-            means = x[slice(0, M//2, 2)]
-            stds = x[slice(1, M//2, 2)]
-            p_means = x[slice(M//2, None, 2)]
-            p_stds = x[slice(M//2+1, None, 2)]
-            assert len(means) == len(stds) == len(p_means) == len(p_stds)
-            rearranged_array = np.array([(mean, p_means[l], stds[l], p_stds[l]) for l, mean in enumerate(means)]).flatten()
-            return rearranged_array
+            X = np.hstack((X, cdf_probas))
+            X = np.asarray(list(map(lambda x: rearrange_values(x), X)))
 
-        X = np.hstack((X, cdf_probas))
-        X = np.asarray(list(map(lambda x: rearrange_values(x), X)))
+        elif concatenation == 'reversed':
+            #concatenate matrix of probability scores in reversed order to increase proximity between correlated features (i.e., features that belong to the same layer)
+            X = np.hstack((X, cdf_probas[:, ::-1])) 
 
     return X
 
