@@ -502,7 +502,7 @@ def interp_cos_per_layer(
             p_means = x[slice(M//2, None, 2)]
             p_stds = x[slice(M//2+1, None, 2)]
             assert len(means) == len(stds) == len(p_means) == len(p_stds)
-            rearranged_array = np.array([(mean, p_means[i], stds[i], p_stds[i]) for i, mean in enumerate(means)]).flatten()
+            rearranged_array = np.array([(mean, p_means[l], stds[l], p_stds[l]) for l, mean in enumerate(means)]).flatten()
             return rearranged_array
 
         X = np.hstack((X, cdf_probas))
