@@ -484,7 +484,7 @@ def interp_cos_per_layer(
                 p_cos_std = ((p_cos_std_correct * cos_std_w_correct) + (p_cos_std_incorrect * cos_std_w_incorrect))
             
             if computation == 'weighting':
-                #instead of replacing "raw" mean and std wrt cos(h_a) with p, use p as a weighting factor for mean and std wrt cos(h_a)
+                #use p as a weighting factor for mean and std wrt cos(h_a)
                 X[i, 2*l] *= p_cos_mean
                 X[i, 2*l+1] *= p_cos_std
             
