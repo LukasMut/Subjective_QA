@@ -842,7 +842,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     versions = ['train', 'test']
-    interp_computations = ['concat', 'weighting'] #['raw', 'concat', 'weighting'] 
+    interp_computations = ['concat', 'weighting']
     deltas = [.15, .1, .05]
 
     for version in versions:
