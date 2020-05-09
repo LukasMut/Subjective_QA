@@ -480,8 +480,8 @@ def interp_cos_per_layer(
                 p_cos_std_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds, delta=delta)
 
                 #weighted sum of the probabilities that *observed* cos(h_a) belongs to the distribution of correct or incorrect answer predictions respectively
-                p_cos_mean = ((p_cos_mean_correct * cos_mean_w_correct) + (p_cos_mean_incorrect * cos_mean_w_incorrect))
-                p_cos_std = ((p_cos_std_correct * cos_std_w_correct) + (p_cos_std_incorrect * cos_std_w_incorrect))
+                p_cos_mean = ((p_cos_mean_correct * cos_mean_w_correct) + (p_cos_mean_incorrect * cos_mean_w_incorrect)) / 2
+                p_cos_std = ((p_cos_std_correct * cos_std_w_correct) + (p_cos_std_incorrect * cos_std_w_incorrect)) / 2
             
             if computation == 'weighting':
                 #use p as a weighting factor for mean and std wrt cos(h_a)
@@ -788,7 +788,8 @@ def evaluate_estimations_and_cosines(
         M = X.shape[1] #M = number of input features (i.e., x $\in$ R^M)
         #X, y = shuffle_arrays(X, y) if version == 'train' else X, y #shuffle order of examples during training (this step is not necessary at inference time)
         tensor_ds = create_tensor_dataset(X, y)
-        dl = BatchGenerator(dataset=tensor_ds, batch_size=batch_size)
+        #dl = BatchGenerator(dataset=tensor_ds, batch_size=batch_size)
+        dl = DataLoader(dataset=tensor_ds, batch_size=batch_size, shuffle=True if version =='train' else False)
 
         if version == 'train':
             y_distribution = Counter(y)
@@ -848,7 +849,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     versions = ['train', 'test']
-    interp_computations = ['concat', 'weighting']
+    interp_computations = ['raw', 'concat', 'weighting']
 
     for version in versions:
         results, file_name = get_hidden_reps(source=args.source, version=version)
