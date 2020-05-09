@@ -506,7 +506,7 @@ def interp_cos_per_layer(
             return rearranged_array
 
         X = np.hstack((X, cdf_probas))
-        #X = np.asarray(list(map(lambda x: rearrange_values(x), X)))
+        X = np.asarray(list(map(lambda x: rearrange_values(x), X)))
 
     return X
 
