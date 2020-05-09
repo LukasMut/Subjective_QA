@@ -413,7 +413,7 @@ def interp_cos_per_layer(
         if weighting:
             return np.interp(x, cos_sorted, p) #P(cos(h_a) < x_i)
         else:
-            assert isinstance(delta, float), 'cut-off value to compute interval must be provided'
+            assert isinstance(delta, float), 'cutoff value to compute interval must be provided'
             return np.interp(x+delta, cos_sorted, p) - np.interp(x-delta, cos_sorted, p) #P(cos(h_a) < x_i + delta) - P(cos(h_a) < x_i - delta) 
     
     for l, (cos_correct, cos_incorrect) in enumerate(zip(cos_distrib_correct_preds, cos_distrib_incorrect_preds)):
