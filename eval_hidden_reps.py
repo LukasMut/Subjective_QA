@@ -426,61 +426,59 @@ def interp_cos_per_layer(
             cos_mean = X[i, 2*l]
             cos_std = X[i, 2*l+1]
             
-            """
             if version == 'train':
                 assert isinstance(y, np.ndarray), 'y must be provided at train time'
                 p_cos_mean = interp_cos(x=cos_mean, cos=cos_correct_means if y[i] == 1 else cos_incorrect_means)
                 p_cos_std = interp_cos(x=cos_std, cos=cos_correct_stds if y[i] == 1 else cos_incorrect_stds)
 
             else:
-            """
-            #NOTE: we shall not exploit gold labels (i.e., QA model predictions) at test time
-            dist_cos_mean_correct = abs(np.mean(cos_correct_means) - cos_mean)
-            dist_cos_mean_incorrect = abs(np.mean(cos_incorrect_means) - cos_mean)
-            dist_cos_std_correct = abs(np.mean(cos_correct_stds) - cos_std)
-            dist_cos_std_incorrect = abs(np.mean(cos_incorrect_stds) - cos_std)
+                #NOTE: we shall not exploit gold labels (i.e., QA model predictions) at test time
+                dist_cos_mean_correct = abs(np.mean(cos_correct_means) - cos_mean)
+                dist_cos_mean_incorrect = abs(np.mean(cos_incorrect_means) - cos_mean)
+                dist_cos_std_correct = abs(np.mean(cos_correct_stds) - cos_std)
+                dist_cos_std_incorrect = abs(np.mean(cos_incorrect_stds) - cos_std)
 
-            if w_strategy == 'distance':
-                cos_mean_w_correct = 1 - dist_cos_mean_correct
-                cos_mean_w_incorrect = 1 - dist_cos_mean_incorrect
-                cos_std_w_correct = 1 - dist_cos_std_correct
-                cos_std_w_incorrect = 1 - dist_cos_std_incorrect
+                if w_strategy == 'distance':
+                    cos_mean_w_correct = 1 - dist_cos_mean_correct
+                    cos_mean_w_incorrect = 1 - dist_cos_mean_incorrect
+                    cos_std_w_correct = 1 - dist_cos_std_correct
+                    cos_std_w_incorrect = 1 - dist_cos_std_incorrect
 
-            elif w_strategy == 'cdf':
+                elif w_strategy == 'cdf':
 
-                ###########################################################################################################################
-                ## P(cos(h_a) < x_i) is always higher for incorrect preds (more probability mass towards a cosine similarity of 0),      ##
-                ## whereas P(cos(h_a) > x_i) always is higher for correct preds (more probability mass towards a cosine similarity of 1).##
-                ## Hence, we must switch between the two probability computations dependent on the distance of *observed* cos(h_a) to    ##
-                ## to the mean value (i.e., centroid) of the respective distributions.                                                   ##
-                ###########################################################################################################################
+                    ###########################################################################################################################
+                    ## P(cos(h_a) < x_i) is always higher for incorrect preds (more probability mass towards a cosine similarity of 0),      ##
+                    ## whereas P(cos(h_a) > x_i) always is higher for correct preds (more probability mass towards a cosine similarity of 1).##
+                    ## Hence, we must switch between the two probability computations dependent on the distance of *observed* cos(h_a) to    ##
+                    ## to the mean value (i.e., centroid) of the respective distributions.                                                   ##
+                    ###########################################################################################################################
 
-                if dist_cos_mean_correct < dist_cos_mean_incorrect:
-                    #compute Q-function (i.e., P(mean(cos(h_a)) > mean_cos_i))
-                    cos_mean_w_correct = 1 - interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
-                    cos_mean_w_incorrect = 1 - interp_cos(x=cos_mean, cos=cos_incorrect_means, weighting=True)
-                else:
-                    #compute CDF (i.e., P(mean(cos(h_a)) < mean_cos_i))
-                    cos_mean_w_correct = interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
-                    cos_mean_w_incorrect = interp_cos(x=cos_mean, cos=cos_incorrect_means, weighting=True)
+                    if dist_cos_mean_correct < dist_cos_mean_incorrect:
+                        #compute Q-function (i.e., P(mean(cos(h_a)) > mean_cos_i))
+                        cos_mean_w_correct = 1 - interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
+                        cos_mean_w_incorrect = 1 - interp_cos(x=cos_mean, cos=cos_incorrect_means, weighting=True)
+                    else:
+                        #compute CDF (i.e., P(mean(cos(h_a)) < mean_cos_i))
+                        cos_mean_w_correct = interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
+                        cos_mean_w_incorrect = interp_cos(x=cos_mean, cos=cos_incorrect_means, weighting=True)
 
-                if dist_cos_std_correct < dist_cos_std_incorrect:
-                    #compute Q-function (i.e., P(std(cos(h_a)) > std_cos_i))
-                    cos_std_w_correct = 1 - interp_cos(x=cos_std, cos=cos_correct_stds, weighting=True)
-                    cos_std_w_incorrect = 1 - interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
-                else:
-                    #compute CDF (i.e., P(std(cos(h_a)) < std_cos_i))
-                    cos_std_w_correct = interp_cos(x=cos_std, cos=cos_correct_stds, weighting=True)
-                    cos_std_w_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
+                    if dist_cos_std_correct < dist_cos_std_incorrect:
+                        #compute Q-function (i.e., P(std(cos(h_a)) > std_cos_i))
+                        cos_std_w_correct = 1 - interp_cos(x=cos_std, cos=cos_correct_stds, weighting=True)
+                        cos_std_w_incorrect = 1 - interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
+                    else:
+                        #compute CDF (i.e., P(std(cos(h_a)) < std_cos_i))
+                        cos_std_w_correct = interp_cos(x=cos_std, cos=cos_correct_stds, weighting=True)
+                        cos_std_w_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
 
-            p_cos_mean_correct = interp_cos(x=cos_mean, cos=cos_correct_means)
-            p_cos_mean_incorrect = interp_cos(x=cos_mean, cos=cos_incorrect_means)
-            p_cos_std_correct = interp_cos(x=cos_std, cos=cos_correct_stds)
-            p_cos_std_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds)
+                p_cos_mean_correct = interp_cos(x=cos_mean, cos=cos_correct_means)
+                p_cos_mean_incorrect = interp_cos(x=cos_mean, cos=cos_incorrect_means)
+                p_cos_std_correct = interp_cos(x=cos_std, cos=cos_correct_stds)
+                p_cos_std_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds)
 
-            #TODO: figure out whether normalization factor (i.e., dividing by two) is necessary
-            p_cos_mean = ((p_cos_mean_correct * cos_mean_w_correct) + (p_cos_mean_incorrect * cos_mean_w_incorrect)) / 2
-            p_cos_std = ((p_cos_std_correct * cos_std_w_correct) + (p_cos_std_incorrect * cos_std_w_incorrect)) / 2
+                #TODO: figure out whether normalization factor (i.e., dividing by two) is necessary
+                p_cos_mean = ((p_cos_mean_correct * cos_mean_w_correct) + (p_cos_mean_incorrect * cos_mean_w_incorrect)) #/ 2
+                p_cos_std = ((p_cos_std_correct * cos_std_w_correct) + (p_cos_std_incorrect * cos_std_w_incorrect)) #/ 2
             
             if computation == 'weighting':
                 #instead of replacing "raw" mean and std wrt cos(h_a) with p, use p as a weighting factor for mean and std wrt cos(h_a)
