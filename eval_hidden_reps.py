@@ -497,7 +497,8 @@ def interp_cos_per_layer(
 
         def rearrange_values(x:np.ndarray):
             """
-            rearrange values to enhance proximity between features that are correlated
+            rearrange values to enhance proximity between features that are correlated;
+            this might inform the neural network better about that likelihood of an *observed* cos(h_a)
             """
             M = len(x)
             means = x[slice(0, M//2, 2)]
