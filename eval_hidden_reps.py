@@ -197,7 +197,7 @@ def train(
         print()
 
         if epoch >= min_n_epochs:
-            if losses[-1] >= losses[-2] or f1_scores[-1] < f1_scores[-2]:
+            if losses[-1] >= losses[-2]:
                 break
 
     model.eval()
