@@ -374,7 +374,7 @@ def interp_cos_per_layer(
                          layers:str,
                          w_strategy:str='cdf',
                          computation:str='concat',
-                         concatenation:str='reversed',
+                         concatenation:str='rearrange',
                          delta:float=.1,
                          y=None,
 ):
@@ -517,7 +517,6 @@ def interp_cos_per_layer(
         elif concatenation == 'reversed':
             #concatenate matrix of probability scores in reversed order to increase proximity between correlated features (i.e., features that belong to the same layer)
             X = np.hstack((X, cdf_probas[:, ::-1])) 
-
     return X
 
 def compute_similarities_across_layers(
@@ -724,7 +723,6 @@ def evaluate_estimations_and_cosines(
                                      layers=None,
                                      w_strategy=None,
                                      interp_computation=None,
-                                     delta=None,
 ):
     pred_answers = test_results['predicted_answers']
     true_answers = test_results['true_answers']
@@ -780,19 +778,17 @@ def evaluate_estimations_and_cosines(
                                      layers=layers,
                                      w_strategy=w_strategy,
                                      computation=interp_computation,
-                                     delta=delta,
                                      y=y if version == 'train' else None,
                                      )
 
-            model_name = 'fc_nn' + '_' + layers + '_' + w_strategy + '_' + interp_computation + '_' + str(delta)
+            model_name = 'fc_nn' + '_' + layers + '_' + w_strategy + '_' + interp_computation
         else:
             model_name = 'fc_nn' + '_' + layers + '_' + interp_computation
             
         M = X.shape[1] #M = number of input features (i.e., x $\in$ R^M)
         #X, y = shuffle_arrays(X, y) if version == 'train' else X, y #shuffle order of examples during training (this step is not necessary at inference time)
         tensor_ds = create_tensor_dataset(X, y)
-        #dl = BatchGenerator(dataset=tensor_ds, batch_size=batch_size)
-        dl = DataLoader(dataset=tensor_ds, batch_size=batch_size, shuffle=True if version == 'train' else False, drop_last=True if version == 'test' else False)
+        dl = BatchGenerator(dataset=tensor_ds, batch_size=batch_size)
 
         if version == 'train':
             y_distribution = Counter(y)
@@ -853,76 +849,72 @@ if __name__ == "__main__":
     
     versions = ['train', 'test']
     interp_computations = ['concat', 'weighting']
-    deltas = [.15, .1, .05]
 
     for version in versions:
         results, file_name = get_hidden_reps(source=args.source, version=version)
         for interp_computation in interp_computations:
-            for delta in deltas:
-                hidden_reps_results = {}
-                if args.prediction == 'hand_engineered':
-                    estimations, ans_similarities, cos_similarities_preds = evaluate_estimations_and_cosines(
-                                                                                                             test_results=results,
-                                                                                                             source=args.source, 
-                                                                                                             prediction=args.prediction,
-                                                                                                             version=version,
-                                                                                                             model_dir=args.model_dir,
-                                                                                                             batch_size=args.batch_size,
-                                                                                                             n_epochs=args.n_epochs,
-                                                                                                             layers=args.layers,
-                                                                                                             )
-                    hidden_reps_results['estimations'] = estimations
+            hidden_reps_results = {}
+            if args.prediction == 'hand_engineered':
+                estimations, ans_similarities, cos_similarities_preds = evaluate_estimations_and_cosines(
+                                                                                                         test_results=results,
+                                                                                                         source=args.source, 
+                                                                                                         prediction=args.prediction,
+                                                                                                         version=version,
+                                                                                                         model_dir=args.model_dir,
+                                                                                                         batch_size=args.batch_size,
+                                                                                                         n_epochs=args.n_epochs,
+                                                                                                         layers=args.layers,
+                                                                                                         )
+                hidden_reps_results['estimations'] = estimations
 
-                elif args.prediction == 'learned':
-                    assert isinstance(args.layers, str) and len(args.layers) > 0, 'Layers for which we want to store statistical characteristics wrt cos(h_a) must be specified'
-                    assert isinstance(args.batch_size, int), 'Batch size must be defined'
-                    assert isinstance(args.model_dir, str), 'Directory to save and load model weights must be defined'
-                    assert isinstance(args.w_strategy, str), 'Weighting strategy must be defined'
-                    
-                    if version == 'train':
-                        assert isinstance(args.n_epochs, int), 'Number of epochs must be defined'
-                        if not os.path.exists(args.model_dir):
-                            os.makedirs(args.model_dir)
-                        
-                        ans_similarities, cos_similarities_preds, losses, f1_scores  = evaluate_estimations_and_cosines(
-                                                                                                                        test_results=results,
-                                                                                                                        source=args.source, 
-                                                                                                                        prediction=args.prediction,
-                                                                                                                        version=version,
-                                                                                                                        model_dir=args.model_dir,
-                                                                                                                        batch_size=args.batch_size,
-                                                                                                                        n_epochs=args.n_epochs,
-                                                                                                                        layers=args.layers,
-                                                                                                                        w_strategy=args.w_strategy,
-                                                                                                                        interp_computation=interp_computation,
-                                                                                                                        delta=delta,
-                                                                                                                        )
-                        hidden_reps_results['train_losses'] = losses
-                        hidden_reps_results['train_f1s'] = f1_scores
-                    else:
-                        ans_similarities, cos_similarities_preds, test_f1 = evaluate_estimations_and_cosines(
-                                                                                                             test_results=results,
-                                                                                                             source=args.source, 
-                                                                                                             prediction=args.prediction,
-                                                                                                             version=version,
-                                                                                                             model_dir=args.model_dir,
-                                                                                                             batch_size=args.batch_size,
-                                                                                                             layers=args.layers,
-                                                                                                             w_strategy=args.w_strategy,
-                                                                                                             interp_computation=interp_computation,
-                                                                                                             delta=delta,
-                                                                                                             )
-                        hidden_reps_results['test_f1'] = test_f1
+            elif args.prediction == 'learned':
+                assert isinstance(args.layers, str) and len(args.layers) > 0, 'Layers for which we want to store statistical characteristics wrt cos(h_a) must be specified'
+                assert isinstance(args.batch_size, int), 'Batch size must be defined'
+                assert isinstance(args.model_dir, str), 'Directory to save and load model weights must be defined'
+                assert isinstance(args.w_strategy, str), 'Weighting strategy must be defined'
                 
-                hidden_reps_results['cos_similarities_true'] = ans_similarities
-                hidden_reps_results['cos_similarities_preds'] = cos_similarities_preds
+                if version == 'train':
+                    assert isinstance(args.n_epochs, int), 'Number of epochs must be defined'
+                    if not os.path.exists(args.model_dir):
+                        os.makedirs(args.model_dir)
+                    
+                    ans_similarities, cos_similarities_preds, losses, f1_scores  = evaluate_estimations_and_cosines(
+                                                                                                                    test_results=results,
+                                                                                                                    source=args.source, 
+                                                                                                                    prediction=args.prediction,
+                                                                                                                    version=version,
+                                                                                                                    model_dir=args.model_dir,
+                                                                                                                    batch_size=args.batch_size,
+                                                                                                                    n_epochs=args.n_epochs,
+                                                                                                                    layers=args.layers,
+                                                                                                                    w_strategy=args.w_strategy,
+                                                                                                                    interp_computation=interp_computation,
+                                                                                                                    )
+                    hidden_reps_results['train_losses'] = losses
+                    hidden_reps_results['train_f1s'] = f1_scores
+                else:
+                    ans_similarities, cos_similarities_preds, test_f1 = evaluate_estimations_and_cosines(
+                                                                                                         test_results=results,
+                                                                                                         source=args.source, 
+                                                                                                         prediction=args.prediction,
+                                                                                                         version=version,
+                                                                                                         model_dir=args.model_dir,
+                                                                                                         batch_size=args.batch_size,
+                                                                                                         layers=args.layers,
+                                                                                                         w_strategy=args.w_strategy,
+                                                                                                         interp_computation=interp_computation,
+                                                                                                         )
+                    hidden_reps_results['test_f1'] = test_f1
+            
+            hidden_reps_results['cos_similarities_true'] = ans_similarities
+            hidden_reps_results['cos_similarities_preds'] = cos_similarities_preds
 
-                #create PATH
-                PATH = './results_hidden_reps/' + '/' + args.source.lower() + '/' + args.prediction + '/'
-                if not os.path.exists(PATH):
-                    os.makedirs(PATH)
+            #create PATH
+            PATH = './results_hidden_reps/' + '/' + args.source.lower() + '/' + args.prediction + '/'
+            if not os.path.exists(PATH):
+                os.makedirs(PATH)
 
-                #save results
-                with open(PATH + file_name + '_' + args.layers + '_' + 'interpolation' + '_' + args.w_strategy + '_' + interp_computation + '_' + str(delta) + '.json', 'w') as json_file:
-                    json.dump(hidden_reps_results, json_file)
+            #save results
+            with open(PATH + file_name + '_' + args.layers + '_' + 'interpolation' + '_' + args.w_strategy + '_' + interp_computation + '.json', 'w') as json_file:
+                json.dump(hidden_reps_results, json_file)
 
