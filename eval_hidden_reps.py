@@ -429,59 +429,62 @@ def interp_cos_per_layer(
             cos_mean = X[i, 2*l]
             cos_std = X[i, 2*l+1]
             
+            """
             if version == 'train':
                 assert isinstance(y, np.ndarray), 'y must be provided at train time'
                 p_cos_mean = interp_cos(x=cos_mean, cos=cos_correct_means if y[i] == 1 else cos_incorrect_means, delta=delta)
                 p_cos_std = interp_cos(x=cos_std, cos=cos_correct_stds if y[i] == 1 else cos_incorrect_stds, delta=delta)
 
             else:
-                #NOTE: we shall not exploit gold labels (i.e., QA model predictions) at test time
-                dist_cos_mean_correct = abs(np.mean(cos_correct_means) - cos_mean)
-                dist_cos_mean_incorrect = abs(np.mean(cos_incorrect_means) - cos_mean)
-                dist_cos_std_correct = abs(np.mean(cos_correct_stds) - cos_std)
-                dist_cos_std_incorrect = abs(np.mean(cos_incorrect_stds) - cos_std)
+            """
+            
+            #NOTE: we shall not exploit gold labels (i.e., QA model predictions) at test time
+            dist_cos_mean_correct = abs(np.mean(cos_correct_means) - cos_mean)
+            dist_cos_mean_incorrect = abs(np.mean(cos_incorrect_means) - cos_mean)
+            dist_cos_std_correct = abs(np.mean(cos_correct_stds) - cos_std)
+            dist_cos_std_incorrect = abs(np.mean(cos_incorrect_stds) - cos_std)
 
-                if w_strategy == 'distance':
-                    cos_mean_w_correct = 1 - dist_cos_mean_correct
-                    cos_mean_w_incorrect = 1 - dist_cos_mean_incorrect
-                    cos_std_w_correct = 1 - dist_cos_std_correct
-                    cos_std_w_incorrect = 1 - dist_cos_std_incorrect
+            if w_strategy == 'distance':
+                cos_mean_w_correct = 1 - dist_cos_mean_correct
+                cos_mean_w_incorrect = 1 - dist_cos_mean_incorrect
+                cos_std_w_correct = 1 - dist_cos_std_correct
+                cos_std_w_incorrect = 1 - dist_cos_std_incorrect
 
-                elif w_strategy == 'cdf':
+            elif w_strategy == 'cdf':
 
-                    ###########################################################################################################################
-                    ## P(cos(h_a) < x_i) is always higher for incorrect preds (more probability mass towards a cosine similarity of 0),      ##
-                    ## whereas P(cos(h_a) > x_i) always is higher for correct preds (more probability mass towards a cosine similarity of 1).##
-                    ## Hence, we must switch between the two probability computations dependent on the distance of *observed* cos(h_a) to    ##
-                    ## to the mean value (i.e., centroid) of the respective distributions.                                                   ##
-                    ###########################################################################################################################
+                ###########################################################################################################################
+                ## P(cos(h_a) < x_i) is always higher for incorrect preds (more probability mass towards a cosine similarity of 0),      ##
+                ## whereas P(cos(h_a) > x_i) always is higher for correct preds (more probability mass towards a cosine similarity of 1).##
+                ## Hence, we must switch between the two probability computations dependent on the distance of *observed* cos(h_a) to    ##
+                ## to the mean value (i.e., centroid) of the respective distributions.                                                   ##
+                ###########################################################################################################################
 
-                    if dist_cos_mean_correct < dist_cos_mean_incorrect:
-                        #compute Q-function (i.e., P(mean(cos(h_a)) > mean_cos_i))
-                        cos_mean_w_correct = 1 - interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
-                        cos_mean_w_incorrect = 1 - interp_cos(x=cos_mean, cos=cos_incorrect_means, weighting=True)
-                    else:
-                        #compute CDF (i.e., P(mean(cos(h_a)) < mean_cos_i))
-                        cos_mean_w_correct = interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
-                        cos_mean_w_incorrect = interp_cos(x=cos_mean, cos=cos_incorrect_means, weighting=True)
+                if dist_cos_mean_correct < dist_cos_mean_incorrect:
+                    #compute Q-function (i.e., P(mean(cos(h_a)) > mean_cos_i))
+                    cos_mean_w_correct = 1 - interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
+                    cos_mean_w_incorrect = 1 - interp_cos(x=cos_mean, cos=cos_incorrect_means, weighting=True)
+                else:
+                    #compute CDF (i.e., P(mean(cos(h_a)) < mean_cos_i))
+                    cos_mean_w_correct = interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
+                    cos_mean_w_incorrect = interp_cos(x=cos_mean, cos=cos_incorrect_means, weighting=True)
 
-                    if dist_cos_std_correct < dist_cos_std_incorrect:
-                        #compute Q-function (i.e., P(std(cos(h_a)) > std_cos_i))
-                        cos_std_w_correct = 1 - interp_cos(x=cos_std, cos=cos_correct_stds, weighting=True)
-                        cos_std_w_incorrect = 1 - interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
-                    else:
-                        #compute CDF (i.e., P(std(cos(h_a)) < std_cos_i))
-                        cos_std_w_correct = interp_cos(x=cos_std, cos=cos_correct_stds, weighting=True)
-                        cos_std_w_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
+                if dist_cos_std_correct < dist_cos_std_incorrect:
+                    #compute Q-function (i.e., P(std(cos(h_a)) > std_cos_i))
+                    cos_std_w_correct = 1 - interp_cos(x=cos_std, cos=cos_correct_stds, weighting=True)
+                    cos_std_w_incorrect = 1 - interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
+                else:
+                    #compute CDF (i.e., P(std(cos(h_a)) < std_cos_i))
+                    cos_std_w_correct = interp_cos(x=cos_std, cos=cos_correct_stds, weighting=True)
+                    cos_std_w_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
 
-                p_cos_mean_correct = interp_cos(x=cos_mean, cos=cos_correct_means, delta=delta)
-                p_cos_mean_incorrect = interp_cos(x=cos_mean, cos=cos_incorrect_means, delta=delta)
-                p_cos_std_correct = interp_cos(x=cos_std, cos=cos_correct_stds, delta=delta)
-                p_cos_std_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds, delta=delta)
+            p_cos_mean_correct = interp_cos(x=cos_mean, cos=cos_correct_means, delta=delta)
+            p_cos_mean_incorrect = interp_cos(x=cos_mean, cos=cos_incorrect_means, delta=delta)
+            p_cos_std_correct = interp_cos(x=cos_std, cos=cos_correct_stds, delta=delta)
+            p_cos_std_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds, delta=delta)
 
-                #weighted sum of the probabilities that *observed* cos(h_a) belongs to the distribution of correct or incorrect answer predictions respectively
-                p_cos_mean = ((p_cos_mean_correct * cos_mean_w_correct) + (p_cos_mean_incorrect * cos_mean_w_incorrect)) / 2
-                p_cos_std = ((p_cos_std_correct * cos_std_w_correct) + (p_cos_std_incorrect * cos_std_w_incorrect)) / 2
+            #weighted sum of the probabilities that *observed* cos(h_a) belongs to the distribution of correct or incorrect answer predictions respectively
+            p_cos_mean = ((p_cos_mean_correct * cos_mean_w_correct) + (p_cos_mean_incorrect * cos_mean_w_incorrect)) / 2
+            p_cos_std = ((p_cos_std_correct * cos_std_w_correct) + (p_cos_std_incorrect * cos_std_w_incorrect)) / 2
             
             if computation == 'weighting':
                 #use p as a weighting factor for mean and std wrt cos(h_a)
@@ -849,73 +852,72 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     versions = ['train', 'test']
-    interp_computations = ['concat', 'weighting']
+    interp_computation = 'concat' if args.source.lower() == 'subja' else 'weighting'
 
     for version in versions:
         results, file_name = get_hidden_reps(source=args.source, version=version)
-        for interp_computation in interp_computations:
-            hidden_reps_results = {}
-            if args.prediction == 'hand_engineered':
-                estimations, ans_similarities, cos_similarities_preds = evaluate_estimations_and_cosines(
-                                                                                                         test_results=results,
-                                                                                                         source=args.source, 
-                                                                                                         prediction=args.prediction,
-                                                                                                         version=version,
-                                                                                                         model_dir=args.model_dir,
-                                                                                                         batch_size=args.batch_size,
-                                                                                                         n_epochs=args.n_epochs,
-                                                                                                         layers=args.layers,
-                                                                                                         )
-                hidden_reps_results['estimations'] = estimations
+        hidden_reps_results = {}
+        if args.prediction == 'hand_engineered':
+            estimations, ans_similarities, cos_similarities_preds = evaluate_estimations_and_cosines(
+                                                                                                     test_results=results,
+                                                                                                     source=args.source, 
+                                                                                                     prediction=args.prediction,
+                                                                                                     version=version,
+                                                                                                     model_dir=args.model_dir,
+                                                                                                     batch_size=args.batch_size,
+                                                                                                     n_epochs=args.n_epochs,
+                                                                                                     layers=args.layers,
+                                                                                                     )
+            hidden_reps_results['estimations'] = estimations
 
-            elif args.prediction == 'learned':
-                assert isinstance(args.layers, str) and len(args.layers) > 0, 'Layers for which we want to store statistical characteristics wrt cos(h_a) must be specified'
-                assert isinstance(args.batch_size, int), 'Batch size must be defined'
-                assert isinstance(args.model_dir, str), 'Directory to save and load model weights must be defined'
-                assert isinstance(args.w_strategy, str), 'Weighting strategy must be defined'
-                
-                if version == 'train':
-                    assert isinstance(args.n_epochs, int), 'Number of epochs must be defined'
-                    if not os.path.exists(args.model_dir):
-                        os.makedirs(args.model_dir)
-                    
-                    ans_similarities, cos_similarities_preds, losses, f1_scores  = evaluate_estimations_and_cosines(
-                                                                                                                    test_results=results,
-                                                                                                                    source=args.source, 
-                                                                                                                    prediction=args.prediction,
-                                                                                                                    version=version,
-                                                                                                                    model_dir=args.model_dir,
-                                                                                                                    batch_size=args.batch_size,
-                                                                                                                    n_epochs=args.n_epochs,
-                                                                                                                    layers=args.layers,
-                                                                                                                    w_strategy=args.w_strategy,
-                                                                                                                    interp_computation=interp_computation,
-                                                                                                                    )
-                    hidden_reps_results['train_losses'] = losses
-                    hidden_reps_results['train_f1s'] = f1_scores
-                else:
-                    ans_similarities, cos_similarities_preds, test_f1 = evaluate_estimations_and_cosines(
-                                                                                                         test_results=results,
-                                                                                                         source=args.source, 
-                                                                                                         prediction=args.prediction,
-                                                                                                         version=version,
-                                                                                                         model_dir=args.model_dir,
-                                                                                                         batch_size=args.batch_size,
-                                                                                                         layers=args.layers,
-                                                                                                         w_strategy=args.w_strategy,
-                                                                                                         interp_computation=interp_computation,
-                                                                                                         )
-                    hidden_reps_results['test_f1'] = test_f1
+        elif args.prediction == 'learned':
+            assert isinstance(args.layers, str) and len(args.layers) > 0, 'Layers for which we want to store statistical characteristics wrt cos(h_a) must be specified'
+            assert isinstance(args.batch_size, int), 'Batch size must be defined'
+            assert isinstance(args.model_dir, str), 'Directory to save and load model weights must be defined'
+            assert isinstance(args.w_strategy, str), 'Weighting strategy must be defined'
             
-            hidden_reps_results['cos_similarities_true'] = ans_similarities
-            hidden_reps_results['cos_similarities_preds'] = cos_similarities_preds
+            if version == 'train':
+                assert isinstance(args.n_epochs, int), 'Number of epochs must be defined'
+                if not os.path.exists(args.model_dir):
+                    os.makedirs(args.model_dir)
+                
+                ans_similarities, cos_similarities_preds, losses, f1_scores  = evaluate_estimations_and_cosines(
+                                                                                                                test_results=results,
+                                                                                                                source=args.source, 
+                                                                                                                prediction=args.prediction,
+                                                                                                                version=version,
+                                                                                                                model_dir=args.model_dir,
+                                                                                                                batch_size=args.batch_size,
+                                                                                                                n_epochs=args.n_epochs,
+                                                                                                                layers=args.layers,
+                                                                                                                w_strategy=args.w_strategy,
+                                                                                                                interp_computation=interp_computation,
+                                                                                                                )
+                hidden_reps_results['train_losses'] = losses
+                hidden_reps_results['train_f1s'] = f1_scores
+            else:
+                ans_similarities, cos_similarities_preds, test_f1 = evaluate_estimations_and_cosines(
+                                                                                                     test_results=results,
+                                                                                                     source=args.source, 
+                                                                                                     prediction=args.prediction,
+                                                                                                     version=version,
+                                                                                                     model_dir=args.model_dir,
+                                                                                                     batch_size=args.batch_size,
+                                                                                                     layers=args.layers,
+                                                                                                     w_strategy=args.w_strategy,
+                                                                                                     interp_computation=interp_computation,
+                                                                                                     )
+                hidden_reps_results['test_f1'] = test_f1
+        
+        hidden_reps_results['cos_similarities_true'] = ans_similarities
+        hidden_reps_results['cos_similarities_preds'] = cos_similarities_preds
 
-            #create PATH
-            PATH = './results_hidden_reps/' + '/' + args.source.lower() + '/' + args.prediction + '/'
-            if not os.path.exists(PATH):
-                os.makedirs(PATH)
+        #create PATH
+        PATH = './results_hidden_reps/' + '/' + args.source.lower() + '/' + args.prediction + '/'
+        if not os.path.exists(PATH):
+            os.makedirs(PATH)
 
-            #save results
-            with open(PATH + file_name + '_' + args.layers + '_' + 'interpolation' + '_' + args.w_strategy + '_' + interp_computation + '.json', 'w') as json_file:
-                json.dump(hidden_reps_results, json_file)
+        #save results
+        with open(PATH + file_name + '_' + args.layers + '_' + 'interpolation' + '_' + args.w_strategy + '_' + interp_computation + '.json', 'w') as json_file:
+            json.dump(hidden_reps_results, json_file)
 
