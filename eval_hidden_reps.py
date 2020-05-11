@@ -762,7 +762,7 @@ def evaluate_estimations_and_cosines(
                                                                                         prediction=prediction,
                                                                                         version=version,
                                                                                         layers=layers,
-                                                                                         )
+                                                                                        )
         if interp_computation != 'raw':
             #interpolate values wrt to *train* CDFs
             X = interp_cos_per_layer(
@@ -845,10 +845,8 @@ if __name__ == "__main__":
     #set NumPy random seed for reproducibility of results
     np.random.seed(42)
     
-    #iterate over five different random seeds to draw more robust conclusions about approach
-    rnd_seeds = np.random.randint(0, 100, 4).tolist()
-    rnd_seeds.append(42)
-
+    #iterate over five different random seeds to draw more robust conclusions about results
+    rnd_seeds = np.random.randint(0, 100, 5)
 
     versions = ['train', 'test']
     interp_computations = ['raw', 'concat', 'weighting']
