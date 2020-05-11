@@ -44,14 +44,6 @@ except ImportError:
 #move model and tensors to GPU, if GPU is available (device must be defined)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-#set random seeds for reproducibility
-np.random.seed(42)
-torch.manual_seed(42)
-
-try:
-    torch.cuda.manual_seed_all(42)
-except:
-    pass
 
 def get_hidden_reps(
                     source:str,
@@ -480,8 +472,8 @@ def interp_cos_per_layer(
                 p_cos_std_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds, delta=delta)
 
                 #weighted sum of the probabilities that *observed* cos(h_a) belongs to the distribution of correct or incorrect answer predictions respectively
-                p_cos_mean = ((p_cos_mean_correct * cos_mean_w_correct) + (p_cos_mean_incorrect * cos_mean_w_incorrect))
-                p_cos_std = ((p_cos_std_correct * cos_std_w_correct) + (p_cos_std_incorrect * cos_std_w_incorrect))
+                p_cos_mean = ((p_cos_mean_correct * cos_mean_w_correct) + (p_cos_mean_incorrect * cos_mean_w_incorrect)) / 2
+                p_cos_std = ((p_cos_std_correct * cos_std_w_correct) + (p_cos_std_incorrect * cos_std_w_incorrect)) / 2
             
             if computation == 'weighting':
                 #use p as a weighting factor for mean and std wrt cos(h_a)
@@ -723,6 +715,7 @@ def evaluate_estimations_and_cosines(
                                      layers=None,
                                      w_strategy=None,
                                      interp_computation=None,
+                                     rnd_seed=None,
 ):
     pred_answers = test_results['predicted_answers']
     true_answers = test_results['true_answers']
@@ -754,6 +747,7 @@ def evaluate_estimations_and_cosines(
     true_preds = np.asarray(true_preds)
 
     if prediction == 'learned':
+        assert isinstance(rnd_seed, int), 'random seed must be provided'
         y = true_preds
         ans_similarities, cos_similarities_preds, X = compute_similarities_across_layers(
                                                                                         feat_reps=feat_reps,
@@ -781,9 +775,9 @@ def evaluate_estimations_and_cosines(
                                      y=y if version == 'train' else None,
                                      )
 
-            model_name = 'fc_nn' + '_' + layers + '_' + w_strategy + '_' + interp_computation
+            model_name = 'fc_nn' + '_' + layers + '_' + w_strategy + '_' + interp_computation + '_' + str(rnd_seed)
         else:
-            model_name = 'fc_nn' + '_' + layers + '_' + interp_computation
+            model_name = 'fc_nn' + '_' + layers + '_' + interp_computation + '_' + str(rnd_seed)
             
         M = X.shape[1] #M = number of input features (i.e., x $\in$ R^M)
         #X, y = shuffle_arrays(X, y) if version == 'train' else X, y #shuffle order of examples during training (this step is not necessary at inference time)
@@ -847,14 +841,22 @@ if __name__ == "__main__":
         help='Must be one of {distance, cdf}. Only necessary if args.prediction == learned.')
     
     args = parser.parse_args()
+
+    #set NumPy random seed for reproducibility of results
+    np.random.seed(42)
     
+    #iterate over five different random seeds to draw more robust conclusions about approach
+    rnd_seeds = np.random.randint(0, 100, 4).tolist()
+    rnd_seeds.append(42)
+
+
     versions = ['train', 'test']
-    interp_computation = 'concat' if args.source.lower() == 'subja' else 'weighting'
+    interp_computations = ['raw', 'concat', 'weighting']
 
     for version in versions:
         results, file_name = get_hidden_reps(source=args.source, version=version)
-        hidden_reps_results = {}
         if args.prediction == 'hand_engineered':
+            hidden_reps_results = {}
             estimations, ans_similarities, cos_similarities_preds = evaluate_estimations_and_cosines(
                                                                                                      test_results=results,
                                                                                                      source=args.source, 
@@ -866,55 +868,93 @@ if __name__ == "__main__":
                                                                                                      layers=args.layers,
                                                                                                      )
             hidden_reps_results['estimations'] = estimations
+            hidden_reps_results['cos_similarities_true'] = ans_similarities
+            hidden_reps_results['cos_similarities_preds'] = cos_similarities_preds
+
+
+            #create PATH
+            PATH = './results_hidden_reps/' + '/' + args.source.lower() + '/' + args.prediction + '/'
+            if not os.path.exists(PATH):
+                os.makedirs(PATH)
+
+            #save results
+            with open(PATH + file_name + '_' + args.layers + '_' + args.prediction + '.json', 'w') as json_file:
+                json.dump(hidden_reps_results, json_file)
 
         elif args.prediction == 'learned':
             assert isinstance(args.layers, str) and len(args.layers) > 0, 'Layers for which we want to store statistical characteristics wrt cos(h_a) must be specified'
             assert isinstance(args.batch_size, int), 'Batch size must be defined'
             assert isinstance(args.model_dir, str), 'Directory to save and load model weights must be defined'
             assert isinstance(args.w_strategy, str), 'Weighting strategy must be defined'
-            
-            if version == 'train':
-                assert isinstance(args.n_epochs, int), 'Number of epochs must be defined'
-                if not os.path.exists(args.model_dir):
-                    os.makedirs(args.model_dir)
+            assert isinstance(rnd_seeds, list), 'an array of different random seeds to iterate over must be provided'
+
+            for interp_computation in interp_computations:
+                hidden_reps_results = {}
+                for k, rnd_seed in enumerate(rnd_seeds):
+                    np.random.seed(rnd_seed)
+                    torch.manual_seed(rnd_seed)
+
+                    try:
+                        torch.cuda.manual_seed_all(rnd_seed)
+                    except:
+                        pass
                 
-                ans_similarities, cos_similarities_preds, losses, f1_scores  = evaluate_estimations_and_cosines(
-                                                                                                                test_results=results,
-                                                                                                                source=args.source, 
-                                                                                                                prediction=args.prediction,
-                                                                                                                version=version,
-                                                                                                                model_dir=args.model_dir,
-                                                                                                                batch_size=args.batch_size,
-                                                                                                                n_epochs=args.n_epochs,
-                                                                                                                layers=args.layers,
-                                                                                                                w_strategy=args.w_strategy,
-                                                                                                                interp_computation=interp_computation,
-                                                                                                                )
-                hidden_reps_results['train_losses'] = losses
-                hidden_reps_results['train_f1s'] = f1_scores
-            else:
-                ans_similarities, cos_similarities_preds, test_f1 = evaluate_estimations_and_cosines(
-                                                                                                     test_results=results,
-                                                                                                     source=args.source, 
-                                                                                                     prediction=args.prediction,
-                                                                                                     version=version,
-                                                                                                     model_dir=args.model_dir,
-                                                                                                     batch_size=args.batch_size,
-                                                                                                     layers=args.layers,
-                                                                                                     w_strategy=args.w_strategy,
-                                                                                                     interp_computation=interp_computation,
-                                                                                                     )
-                hidden_reps_results['test_f1'] = test_f1
-        
-        hidden_reps_results['cos_similarities_true'] = ans_similarities
-        hidden_reps_results['cos_similarities_preds'] = cos_similarities_preds
+                    if version == 'train':
+                        assert isinstance(args.n_epochs, int), 'Number of epochs must be defined'
+                        
+                        if not os.path.exists(args.model_dir):
+                            os.makedirs(args.model_dir)
+                        
+                        ans_similarities, cos_similarities_preds, losses, f1_scores  = evaluate_estimations_and_cosines(
+                                                                                                                        test_results=results,
+                                                                                                                        source=args.source, 
+                                                                                                                        prediction=args.prediction,
+                                                                                                                        version=version,
+                                                                                                                        model_dir=args.model_dir,
+                                                                                                                        batch_size=args.batch_size,
+                                                                                                                        n_epochs=args.n_epochs,
+                                                                                                                        layers=args.layers,
+                                                                                                                        w_strategy=args.w_strategy,
+                                                                                                                        interp_computation=interp_computation,
+                                                                                                                        rnd_seed=rnd_seed,
+                                                                                                                        )
+                        try:
+                            hidden_reps_results['train_losses'].append(losses)
+                            hidden_reps_results['train_f1s'].append(f1_scores)
+                        except KeyError:
+                            hidden_reps_results['train_losses'] = [losses]
+                            hidden_reps_results['train_f1s'] = [f1_scores]
+                    else:
+                        ans_similarities, cos_similarities_preds, test_f1 = evaluate_estimations_and_cosines(
+                                                                                                             test_results=results,
+                                                                                                             source=args.source, 
+                                                                                                             prediction=args.prediction,
+                                                                                                             version=version,
+                                                                                                             model_dir=args.model_dir,
+                                                                                                             batch_size=args.batch_size,
+                                                                                                             layers=args.layers,
+                                                                                                             w_strategy=args.w_strategy,
+                                                                                                             interp_computation=interp_computation,
+                                                                                                             rnd_seed=rnd_seed,
+                                                                                                             )
+                        try:
+                            hidden_reps_results['test_f1'] += test_f1
+                        except KeyError:
+                            hidden_reps_results['test_f1'] = test_f1
+                
+                    if k == 0:
+                        hidden_reps_results['cos_similarities_true'] = ans_similarities
+                        hidden_reps_results['cos_similarities_preds'] = cos_similarities_preds
 
-        #create PATH
-        PATH = './results_hidden_reps/' + '/' + args.source.lower() + '/' + args.prediction + '/'
-        if not os.path.exists(PATH):
-            os.makedirs(PATH)
+                #compute mean F1 score
+                hidden_reps_results['test_f1'] /= len(rnd_seeds) 
 
-        #save results
-        with open(PATH + file_name + '_' + args.layers + '_' + 'interpolation' + '_' + args.w_strategy + '_' + interp_computation + '.json', 'w') as json_file:
-            json.dump(hidden_reps_results, json_file)
+                #create PATH
+                PATH = './results_hidden_reps/' + '/' + args.source.lower() + '/' + args.prediction + '/'
+                if not os.path.exists(PATH):
+                    os.makedirs(PATH)
+
+                #save results
+                with open(PATH + file_name + '_' + args.layers + '_' + args.w_strategy + '_' + interp_computation + '.json', 'w') as json_file:
+                    json.dump(hidden_reps_results, json_file)
 
