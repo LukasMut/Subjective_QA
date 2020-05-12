@@ -875,14 +875,14 @@ if __name__ == "__main__":
 
     for version in versions:
         results, file_name = get_hidden_reps(source=args.source, version=version)
-
-        assert isinstance(args.layers, str) and len(args.layers) > 0, 'Layers for which we want to store statistical characteristics wrt cos(h_a) must be specified'
-        assert isinstance(args.batch_size, int), 'Batch size must be defined'
-        assert isinstance(args.model_dir, str), 'Directory to save and load model weights must be defined'
-        assert isinstance(args.w_strategy, str), 'Weighting strategy must be defined'
-        assert isinstance(rnd_seeds, np.ndarray), 'an array of different random seeds to iterate over must be provided'
-
-        if prediction == 'learned':
+        if args.prediction == 'learned':
+            
+            assert isinstance(args.layers, str) and len(args.layers) > 0, 'Layers for which we want to store statistical characteristics wrt cos(h_a) must be specified'
+            assert isinstance(args.batch_size, int), 'Batch size must be defined'
+            assert isinstance(args.model_dir, str), 'Directory to save and load model weights must be defined'
+            assert isinstance(args.w_strategy, str), 'Weighting strategy must be defined'
+            assert isinstance(rnd_seeds, np.ndarray), 'an array of different random seeds to iterate over must be provided'
+            
             for computation in computations:
                 hidden_reps_results = {}
                 #perform computations for different random seeds (results might vary as a function of random seeds)
@@ -962,7 +962,7 @@ if __name__ == "__main__":
                 with open(PATH + file_name + '_' + args.layers + '_' + args.w_strategy + '_' + computation + '.json', 'w') as json_file:
                     json.dump(hidden_reps_results, json_file)
 
-        elif prediction == 'majority':
+        elif args.prediction == 'majority':
             hidden_reps_results = {}
             hidden_reps_results['f1_score'] = evaluate_estimations_and_cosines(
                                                                                test_results=results,
