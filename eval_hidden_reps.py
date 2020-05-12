@@ -524,7 +524,7 @@ def compute_baseline_features(
                               last_layer:str='Layer_6',
 ):
     N = len(sent_pairs)
-    M = 2 #ans_length, bleu_score
+    M = 3 #ans_length, bleu_score
     X = np.zeros((N, M))
     for i, sent_pair in enumerate(sent_pairs):
         #compute BLEU score between q and a_pred and length of a_pred
