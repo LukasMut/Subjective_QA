@@ -876,7 +876,6 @@ if __name__ == "__main__":
     for version in versions:
         results, file_name = get_hidden_reps(source=args.source, version=version)
         if args.prediction == 'learned':
-            
             assert isinstance(args.layers, str) and len(args.layers) > 0, 'Layers for which we want to store statistical characteristics wrt cos(h_a) must be specified'
             assert isinstance(args.batch_size, int), 'Batch size must be defined'
             assert isinstance(args.model_dir, str), 'Directory to save and load model weights must be defined'
