@@ -888,6 +888,7 @@ if __name__ == "__main__":
 
             for interp_computation in interp_computations:
                 hidden_reps_results = {}
+                #perform computations for different random seeds
                 for k, rnd_seed in enumerate(rnd_seeds):
                     np.random.seed(rnd_seed)
                     torch.manual_seed(rnd_seed)
