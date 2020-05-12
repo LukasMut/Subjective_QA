@@ -884,7 +884,7 @@ if __name__ == "__main__":
             assert isinstance(args.batch_size, int), 'Batch size must be defined'
             assert isinstance(args.model_dir, str), 'Directory to save and load model weights must be defined'
             assert isinstance(args.w_strategy, str), 'Weighting strategy must be defined'
-            assert isinstance(rnd_seeds, list), 'an array of different random seeds to iterate over must be provided'
+            assert isinstance(rnd_seeds, np.ndarray), 'an array of different random seeds to iterate over must be provided'
 
             for interp_computation in interp_computations:
                 hidden_reps_results = {}
