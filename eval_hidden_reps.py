@@ -860,7 +860,7 @@ if __name__ == "__main__":
     rnd_seeds = np.random.randint(0, 100, 5)
 
     versions = ['train', 'test']
-    computations = ['baseline', 'raw', 'concat', 'weighting'] if args.w_strategy == 'distance' else ['concat', 'weighting']
+    computations = ['baseline', 'raw', 'concat', 'weighting'] if args.w_strategy == 'distance' and args.layers == 'all_layers' else ['concat', 'weighting']
 
     for version in versions:
         results, file_name = get_hidden_reps(source=args.source, version=version)
