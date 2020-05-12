@@ -813,7 +813,7 @@ def evaluate_estimations_and_cosines(
             clf.fit(X, y)
             dump(clf, model_dir + '/' + model_name + '.joblib')
             y_hat = clf.predict(X)
-            train_f1 = f1(probas=y_hat, y_true=y, task='binary') 
+            train_f1 = f1_score(y_true=y, y_pred=y_hat, average='macro') 
             """
             y_distribution = Counter(y)
             y_weights = torch.tensor(y_distribution[0]/y_distribution[1], dtype=torch.float)
@@ -828,7 +828,7 @@ def evaluate_estimations_and_cosines(
         else:
             clf = load(model_dir + '/' + model_name + '.joblib') 
             y_hat = clf.predict(X)
-            test_f1 = f1(probas=y_hat, y_true=y, task='binary')
+            test_f1 = f1_score(y_true=y, y_pred=y_hat, average='macro')
             """
             model = FFNN(in_size=M)
             model.load_state_dict(torch.load(model_dir + '/%s' % (model_name))) #load model's weights
@@ -842,8 +842,7 @@ def evaluate_estimations_and_cosines(
             y_hat = np.ones(len(y))
         else:
             y_hat = np.zeros(len(y))    
-        f1_score = f1(probas=y_hat, y_true=y, task='binary')
-        return f1_score
+        return f1_score(y_true=y, y_pred=y_hat, average='macro') 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
