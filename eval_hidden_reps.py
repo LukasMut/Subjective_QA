@@ -860,7 +860,7 @@ if __name__ == "__main__":
     rnd_seeds = np.random.randint(0, 100, 5)
 
     versions = ['train', 'test']
-    computations = ['baseline', 'raw', 'concat', 'weighting']
+    computations = ['baseline', 'raw', 'concat', 'weighting'] if args.w_strategy == 'distance' else ['concat', 'weighting']
 
     for version in versions:
         results, file_name = get_hidden_reps(source=args.source, version=version)
@@ -874,7 +874,7 @@ if __name__ == "__main__":
 
         for computation in computations:
             hidden_reps_results = {}
-            #perform computations for different random seeds
+            #perform computations for different random seeds (results might vary as a function of random seeds)
             for k, rnd_seed in enumerate(rnd_seeds):
                 np.random.seed(rnd_seed)
                 torch.manual_seed(rnd_seed)
