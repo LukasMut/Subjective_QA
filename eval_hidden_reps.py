@@ -944,8 +944,9 @@ if __name__ == "__main__":
                         hidden_reps_results['cos_similarities_true'] = ans_similarities
                         hidden_reps_results['cos_similarities_preds'] = cos_similarities_preds
 
-                #compute mean F1 score
-                hidden_reps_results['test_f1'] /= len(rnd_seeds) 
+                if version == 'test':
+                    #compute mean F1 score
+                    hidden_reps_results['test_f1'] /= len(rnd_seeds) 
 
                 #create PATH
                 PATH = './results_hidden_reps/' + '/' + args.source.lower() + '/' + args.prediction + '/'
