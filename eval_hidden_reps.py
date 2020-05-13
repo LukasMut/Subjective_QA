@@ -548,10 +548,11 @@ def compute_baseline_features(
     X = np.zeros((N, M)) if method == 'heuristic' else np.zeros((N, 2*D))
     for i, sent_pair in enumerate(sent_pairs):
         if i in pred_indices:
-
             #extract hidden reps for question and candidate answer
             hiddens = np.asarray(feat_reps[last_layer][i])
             q_hiddens = hiddens[1:sep_idx]
+            s_pos = np.argmax(s_log_probs[i])
+            e_pos = np.argmax(e_log_probs[i])
             a_hiddens = hiddens[s_pos:e_pos+1]
             q_mean_rep = q_hiddens.mean(axis=0)
 
@@ -568,17 +569,15 @@ def compute_baseline_features(
                 #compute length of a_pred
                 sent_pair = sent_pair.strip().split()
                 sep_idx = sent_pair.index('[SEP]')
-                q = [sent_pair[1:sep_idx]]
-                s_pos = np.argmax(s_log_probs[i])
-                e_pos = np.argmax(e_log_probs[i])
+                q = sent_pair[1:sep_idx]
                 a_candidate = sent_pair[s_pos:e_pos+1]
                 a_candidate_len = len(a_candidate)
 
                 #compute BLEU score, where q serves as the reference and a_pred as the hypothesis (i.e., translation)
                 try:
-                    bleu_score = sentence_bleu(q, a_candidate)
+                    bleu_score = sentence_bleu([q], a_candidate)
                 except ZeroDivisionError:
-                    bleu_score = sentence_bleu(q, a_candidate, weights=(0.5, 0.5))
+                    bleu_score = sentence_bleu([q], a_candidate, weights=(0.5, 0.5))
                 except:
                     bleu_score = 0 
 
@@ -589,6 +588,7 @@ def compute_baseline_features(
                 X[i] += np.concatenate((np.array([a_candidate_len, cos_sim, bleu_score]), n_gram_overlaps))
 
             else:
+                #concat hiddens w.r.t. q and a_pred
                 X[i] += np.concatenate((q_mean_rep, a_mean_rep))
     return X
 
