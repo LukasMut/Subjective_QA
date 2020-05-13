@@ -561,10 +561,11 @@ def compute_baseline_features(
                 a_mean_rep = np.zeros(D)
 
             if method == 'heuristic':
+                #compute cos sim between avg q_hidden and avg a_pred_hidden
                 cos_sim = cosine_sim(q_mean_rep, a_mean_rep)
                 cos_sim = 0 if np.isnan(cos_sim) else cos_sim
 
-                #compute BLEU score between q and a_pred and length of a_pred
+                #compute length of a_pred
                 sent_pair = sent_pair.strip().split()
                 sep_idx = sent_pair.index('[SEP]')
                 q = [sent_pair[1:sep_idx]]
@@ -583,7 +584,6 @@ def compute_baseline_features(
 
                 #compute n_gram overlaps between q and a_pred
                 n_gram_overlaps = compute_n_gram_overlap(q, a_candidate)
-
 
                 #concatenate features
                 X[i] += np.concatenate((np.array([a_candidate_len, cos_sim, bleu_score]), n_gram_overlaps))
