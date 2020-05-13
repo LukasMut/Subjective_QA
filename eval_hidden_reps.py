@@ -426,59 +426,61 @@ def interp_cos_per_layer(
             cos_mean = X[i, 2*l]
             cos_std = X[i, 2*l+1]
             
+            """
             if version == 'train':
                 assert isinstance(y, np.ndarray), 'y must be provided at train time'
                 p_cos_mean = interp_cos(x=cos_mean, cos=cos_correct_means if y[i] == 1 else cos_incorrect_means, delta=delta)
                 p_cos_std = interp_cos(x=cos_std, cos=cos_correct_stds if y[i] == 1 else cos_incorrect_stds, delta=delta)
 
             else:
-                #NOTE: we shall not exploit gold labels (i.e., QA model predictions) at test time
-                dist_cos_mean_correct = abs(np.mean(cos_correct_means) - cos_mean)
-                dist_cos_mean_incorrect = abs(np.mean(cos_incorrect_means) - cos_mean)
-                dist_cos_std_correct = abs(np.mean(cos_correct_stds) - cos_std)
-                dist_cos_std_incorrect = abs(np.mean(cos_incorrect_stds) - cos_std)
+            """
+            #NOTE: we shall not exploit gold labels (i.e., QA model predictions) at test time
+            dist_cos_mean_correct = abs(np.mean(cos_correct_means) - cos_mean)
+            dist_cos_mean_incorrect = abs(np.mean(cos_incorrect_means) - cos_mean)
+            dist_cos_std_correct = abs(np.mean(cos_correct_stds) - cos_std)
+            dist_cos_std_incorrect = abs(np.mean(cos_incorrect_stds) - cos_std)
 
-                if w_strategy == 'distance':
-                    cos_mean_w_correct = 1 - dist_cos_mean_correct
-                    cos_mean_w_incorrect = 1 - dist_cos_mean_incorrect
-                    cos_std_w_correct = 1 - dist_cos_std_correct
-                    cos_std_w_incorrect = 1 - dist_cos_std_incorrect
+            if w_strategy == 'distance':
+                cos_mean_w_correct = 1 - dist_cos_mean_correct
+                cos_mean_w_incorrect = 1 - dist_cos_mean_incorrect
+                cos_std_w_correct = 1 - dist_cos_std_correct
+                cos_std_w_incorrect = 1 - dist_cos_std_incorrect
 
-                elif w_strategy == 'cdf':
+            elif w_strategy == 'cdf':
 
-                    ###########################################################################################################################
-                    ## P(cos(h_a) < x_i) is always higher for incorrect preds (more probability mass towards a cosine similarity of 0),      ##
-                    ## whereas P(cos(h_a) > x_i) always is higher for correct preds (more probability mass towards a cosine similarity of 1).##
-                    ## Hence, we must switch between the two probability computations dependent on the distance of *observed* cos(h_a) to    ##
-                    ## to the mean value (i.e., centroid) of the respective distributions.                                                   ##
-                    ###########################################################################################################################
+                ###########################################################################################################################
+                ## P(cos(h_a) < x_i) is always higher for incorrect preds (more probability mass towards a cosine similarity of 0),      ##
+                ## whereas P(cos(h_a) > x_i) always is higher for correct preds (more probability mass towards a cosine similarity of 1).##
+                ## Hence, we must switch between the two probability computations dependent on the distance of *observed* cos(h_a) to    ##
+                ## to the mean value (i.e., centroid) of the respective distributions.                                                   ##
+                ###########################################################################################################################
 
-                    if dist_cos_mean_correct < dist_cos_mean_incorrect:
-                        #compute Q-function (i.e., P(mean(cos(h_a)) > mean_cos_i))
-                        cos_mean_w_correct = 1 - interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
-                        cos_mean_w_incorrect = 1 - interp_cos(x=cos_mean, cos=cos_incorrect_means, weighting=True)
-                    else:
-                        #compute CDF (i.e., P(mean(cos(h_a)) < mean_cos_i))
-                        cos_mean_w_correct = interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
-                        cos_mean_w_incorrect = interp_cos(x=cos_mean, cos=cos_incorrect_means, weighting=True)
+                if dist_cos_mean_correct < dist_cos_mean_incorrect:
+                    #compute Q-function (i.e., P(mean(cos(h_a)) > mean_cos_i))
+                    cos_mean_w_correct = 1 - interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
+                    cos_mean_w_incorrect = 1 - interp_cos(x=cos_mean, cos=cos_incorrect_means, weighting=True)
+                else:
+                    #compute CDF (i.e., P(mean(cos(h_a)) < mean_cos_i))
+                    cos_mean_w_correct = interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
+                    cos_mean_w_incorrect = interp_cos(x=cos_mean, cos=cos_incorrect_means, weighting=True)
 
-                    if dist_cos_std_correct < dist_cos_std_incorrect:
-                        #compute Q-function (i.e., P(std(cos(h_a)) > std_cos_i))
-                        cos_std_w_correct = 1 - interp_cos(x=cos_std, cos=cos_correct_stds, weighting=True)
-                        cos_std_w_incorrect = 1 - interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
-                    else:
-                        #compute CDF (i.e., P(std(cos(h_a)) < std_cos_i))
-                        cos_std_w_correct = interp_cos(x=cos_std, cos=cos_correct_stds, weighting=True)
-                        cos_std_w_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
+                if dist_cos_std_correct < dist_cos_std_incorrect:
+                    #compute Q-function (i.e., P(std(cos(h_a)) > std_cos_i))
+                    cos_std_w_correct = 1 - interp_cos(x=cos_std, cos=cos_correct_stds, weighting=True)
+                    cos_std_w_incorrect = 1 - interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
+                else:
+                    #compute CDF (i.e., P(std(cos(h_a)) < std_cos_i))
+                    cos_std_w_correct = interp_cos(x=cos_std, cos=cos_correct_stds, weighting=True)
+                    cos_std_w_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
 
-                p_cos_mean_correct = interp_cos(x=cos_mean, cos=cos_correct_means, delta=delta)
-                p_cos_mean_incorrect = interp_cos(x=cos_mean, cos=cos_incorrect_means, delta=delta)
-                p_cos_std_correct = interp_cos(x=cos_std, cos=cos_correct_stds, delta=delta)
-                p_cos_std_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds, delta=delta)
+            p_cos_mean_correct = interp_cos(x=cos_mean, cos=cos_correct_means, delta=delta)
+            p_cos_mean_incorrect = interp_cos(x=cos_mean, cos=cos_incorrect_means, delta=delta)
+            p_cos_std_correct = interp_cos(x=cos_std, cos=cos_correct_stds, delta=delta)
+            p_cos_std_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds, delta=delta)
 
-                #weighted sum of the probabilities that *observed* cos(h_a) belongs to the distribution of correct or incorrect answer predictions respectively
-                p_cos_mean = ((p_cos_mean_correct * cos_mean_w_correct) + (p_cos_mean_incorrect * cos_mean_w_incorrect)) / 2
-                p_cos_std = ((p_cos_std_correct * cos_std_w_correct) + (p_cos_std_incorrect * cos_std_w_incorrect)) / 2
+            #weighted sum of the probabilities that *observed* cos(h_a) belongs to the distribution of correct or incorrect answer predictions respectively
+            p_cos_mean = ((p_cos_mean_correct * cos_mean_w_correct) + (p_cos_mean_incorrect * cos_mean_w_incorrect)) #/ 2
+            p_cos_std = ((p_cos_std_correct * cos_std_w_correct) + (p_cos_std_incorrect * cos_std_w_incorrect)) #/ 2
             
             if computation == 'weighting':
                 #use p as a weighting factor for mean and std wrt cos(h_a)
@@ -516,6 +518,21 @@ def interp_cos_per_layer(
             X = np.hstack((X, cdf_probas[:, ::-1])) 
     return X
 
+def compute_n_gram_overlap(q:list, a_candidate:list):
+    n_grams = list(range(1, 4))
+    n_gram_overlaps = np.zeros(len(n_grams))
+    def compute_unique_n_grams(sent:list, n_gram:int):
+        return set([sent[i:i+n_gram] for i in range(len(sent)) if i <= len(q)-n_gram])
+    for k, n_gram in enumerate(n_grams):
+        q_n_grams = compute_unique_n_grams(q, n_gram)
+        a_n_grams = compute_unique_n_grams(a, n_gram)
+        try:
+            overlap = (sum([1 for a_n_gram in a_n_grams if a_n_gram in q_n_grams]) * 2) / (len(q_n_grams) + len(a_n_grams))
+        except:
+            overlap = 0
+        n_gram_overlaps[k] += overlap
+    return n_gram_overlaps
+
 def compute_baseline_features(
                               feat_reps:dict,
                               sent_pairs:list,
@@ -523,36 +540,56 @@ def compute_baseline_features(
                               s_log_probs:np.ndarray,
                               e_log_probs:np.ndarray,
                               last_layer:str='Layer_6',
+                              method:str='heuristic',
 ):
     N = len(pred_indices)
-    M = 3 #ans_length, bleu_score
-    X = np.zeros((N, M))
+    M = 6 #ans_length, cos_sim, bleu_score, n_gram_overlaps
+    D = 768
+    X = np.zeros((N, M)) if method == 'heuristic' else np.zeros((N, 2*D))
     for i, sent_pair in enumerate(sent_pairs):
         if i in pred_indices:
-            #compute BLEU score between q and a_pred and length of a_pred
-            sent_pair = sent_pair.strip().split()
-            sep_idx = sent_pair.index('[SEP]')
-            q = [sent_pair[1:sep_idx]]
-            s_pos = np.argmax(s_log_probs[i])
-            e_pos = np.argmax(e_log_probs[i])
-            a_candidate = sent_pair[s_pos:e_pos+1]
-            a_candidate_len = len(a_candidate)
 
-            try:
-                bleu_score = sentence_bleu(q, a_candidate)
-            except ZeroDivisionError:
-                bleu_score = sentence_bleu(q, a_candidate, weights=(0.5, 0.5))
-            
             #extract hidden reps for question and candidate answer
             hiddens = np.asarray(feat_reps[last_layer][i])
             q_hiddens = hiddens[1:sep_idx]
             a_hiddens = hiddens[s_pos:e_pos+1]
             q_mean_rep = q_hiddens.mean(axis=0)
-            a_mean_rep = a_hiddens.mean(axis=0)
-            cos_sim = cosine_sim(q_mean_rep, a_mean_rep)
 
-            #concatenate features
-            X[i] += np.array([a_candidate_len, bleu_score, cos_sim])
+            try:
+                a_mean_rep = a_hiddens.mean(axis=0)
+            except:
+                a_mean_rep = np.zeros(D)
+
+            if method == 'heuristic':
+                cos_sim = cosine_sim(q_mean_rep, a_mean_rep)
+                cos_sim = 0 if np.isnan(cos_sim) else cos_sim
+
+                #compute BLEU score between q and a_pred and length of a_pred
+                sent_pair = sent_pair.strip().split()
+                sep_idx = sent_pair.index('[SEP]')
+                q = [sent_pair[1:sep_idx]]
+                s_pos = np.argmax(s_log_probs[i])
+                e_pos = np.argmax(e_log_probs[i])
+                a_candidate = sent_pair[s_pos:e_pos+1]
+                a_candidate_len = len(a_candidate)
+
+                #compute BLEU score, where q serves as the reference and a_pred as the hypothesis (i.e., translation)
+                try:
+                    bleu_score = sentence_bleu(q, a_candidate)
+                except ZeroDivisionError:
+                    bleu_score = sentence_bleu(q, a_candidate, weights=(0.5, 0.5))
+                except:
+                    bleu_score = 0 
+
+                #compute n_gram overlaps between q and a_pred
+                n_gram_overlaps = compute_n_gram_overlap(q, a_candidate)
+
+
+                #concatenate features
+                X[i] += np.concatenate((np.array([a_candidate_len, cos_sim, bleu_score]), n_gram_overlaps))
+
+            else:
+                X[i] += np.concatenate((q_mean_rep, a_mean_rep))
     return X
 
 def compute_similarities_across_layers(
@@ -791,16 +828,17 @@ def evaluate_estimations_and_cosines(
 
             model_name = 'fc_nn' + '_' + layers + '_' + w_strategy + '_' + computation + '_' + str(rnd_seed)
 
-        elif computation == 'baseline':
+        elif re.search(r'baseline', computation):
             X = compute_baseline_features(
                                           feat_reps=feat_reps,
                                           sent_pairs=sent_pairs,
                                           pred_indices=pred_indices,
                                           s_log_probs=s_log_probs,
                                           e_log_probs=e_log_probs,
+                                          method='qa_concat' if re.search(r'concat', computation) else 'heuristic',
                                           )
 
-            model_name = 'fc_nn' + '_' + 'baseline' + str(rnd_seed)
+            model_name = 'fc_nn' + '_' + computation + str(rnd_seed)
 
         else:
             model_name = 'fc_nn' + '_' + layers + '_' + computation + '_' + str(rnd_seed)
@@ -874,7 +912,7 @@ if __name__ == "__main__":
     rnd_seeds = np.random.randint(0, 100, 5)
 
     versions = ['train', 'test']
-    computations = ['baseline', 'raw', 'concat', 'weighting'] if args.w_strategy == 'distance' and args.layers == 'all_layers' else ['concat', 'weighting']
+    computations = ['baseline_concat', 'baseline_heuristic' 'raw', 'concat', 'weighting'] if args.w_strategy == 'distance' and args.layers == 'all_layers' else ['concat', 'weighting']
 
     for version in versions:
         results, file_name = get_hidden_reps(source=args.source, version=version)
