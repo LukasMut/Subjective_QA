@@ -551,10 +551,10 @@ def compute_baseline_features(
             #extract hidden reps for question and candidate answer
             hiddens = np.asarray(feat_reps[last_layer][i])
             q_hiddens = hiddens[1:sep_idx]
+            q_mean_rep = q_hiddens.mean(axis=0)
             s_pos = np.argmax(s_log_probs[i])
             e_pos = np.argmax(e_log_probs[i])
             a_hiddens = hiddens[s_pos:e_pos+1]
-            q_mean_rep = q_hiddens.mean(axis=0)
 
             try:
                 a_mean_rep = a_hiddens.mean(axis=0)
