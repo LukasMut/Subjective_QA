@@ -536,11 +536,15 @@ def compute_baseline_features(
             s_pos = np.argmax(s_log_probs[i])
             e_pos = np.argmax(e_log_probs[i])
             a_candidate = sent_pair[s_pos:e_pos+1]
-            bleu_score = sentence_bleu(q, a_candidate)
             a_candidate_len = len(a_candidate)
 
+            try:
+                bleu_score = sentence_bleu(q, a_candidate)
+            except ZeroDivisionError:
+                bleu_score = sentence_bleu(q, a_candidate, weights=(0.5, 0.5))
+            
             #extract hidden reps for question and candidate answer
-            hiddens = feat_reps[last_layer][i]
+            hiddens = np.asarray(feat_reps[last_layer][i])
             q_hiddens = hiddens[1:sep_idx]
             a_hiddens = hiddens[s_pos:e_pos+1]
             q_mean_rep = q_hiddens.mean(axis=0)
@@ -823,7 +827,7 @@ def evaluate_estimations_and_cosines(
             torch.save(model.state_dict(), model_dir + '/%s' % (model_name)) #save model's weights
             return ans_similarities, cos_similarities_preds, losses, f1_scores
             """
-            return ans_similarities, cos_distrib_correct_preds, train_f1
+            return ans_similarities, cos_similarities_preds, train_f1
 
         else:
             clf = load(model_dir + '/' + model_name + '.joblib') 
@@ -883,7 +887,7 @@ if __name__ == "__main__":
             
             for computation in computations:
                 hidden_reps_results = {}
-                #perform computations for different random seeds (results might vary as a function of random seeds)
+                #perform computations for different random seeds (results might vary as a function of random seeds due to different initialisations)
                 for k, rnd_seed in enumerate(rnd_seeds):
                     np.random.seed(rnd_seed)
                     torch.manual_seed(rnd_seed)
