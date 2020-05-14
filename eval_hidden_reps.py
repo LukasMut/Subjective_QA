@@ -854,8 +854,7 @@ def evaluate_estimations_and_cosines(
 
         if version == 'train':
             """               
-            clf = LogisticRegression(random_state=rnd_seed)
-            clf.fit(X, y)
+            clf = LogisticRegression(random_state=rnd_seed).fit(X, y)
             dump(clf, model_dir + '/' + model_name + '.joblib')
             y_hat = clf.predict(X)
             train_f1 = f1_score(y_true=y, y_pred=y_hat, average='macro')
