@@ -371,7 +371,7 @@ def interp_cos_per_layer(
                          layers:str,
                          w_strategy:str='cdf',
                          computation:str='concat',
-                         concatenation:str='reversed',
+                         concatenation:str='rearrange',
                          delta:float=.1,
                          y=None,
 ):
