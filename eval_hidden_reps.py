@@ -451,7 +451,7 @@ def interp_cos_per_layer(
                 ###########################################################################################################################
                 ## P(cos(h_a) < x_i) is always higher for incorrect preds (more probability mass towards a cosine similarity of 0),      ##
                 ## whereas P(cos(h_a) > x_i) always is higher for correct preds (more probability mass towards a cosine similarity of 1).##
-                ## Hence, we must switch between the two probability computations dependent on the distance of *observed* cos(h_a) to    ##
+                ## Hence, we must switch between the two probability computations dependent on the distance of *observed* cos(h_a)       ##
                 ## to the mean value (i.e., centroid) of the respective distributions.                                                   ##
                 ###########################################################################################################################
 
@@ -520,17 +520,20 @@ def interp_cos_per_layer(
 
 def compute_n_gram_overlap(q:list, a_candidate:list):
     n_grams = list(range(1, 4))
-    n_gram_overlaps = np.zeros(len(n_grams))
+    n_gram_overlaps = []
     def compute_unique_n_grams(sent:list, n_gram:int):
         return set([sent[i:i+n_gram] for i in range(len(sent)) if i <= len(q)-n_gram])
     for k, n_gram in enumerate(n_grams):
         q_n_grams = compute_unique_n_grams(q, n_gram)
         a_n_grams = compute_unique_n_grams(a, n_gram)
         try:
-            overlap = (sum([1 for a_n_gram in a_n_grams if a_n_gram in q_n_grams]) * 2) / (len(q_n_grams) + len(a_n_grams))
+            overlap_prop_q = len(q_n_grams.intersection(a_n_grams))/len(q_n_grams)
+            overlap_prop_a = len(a_n_grams.intersection(q_n_grams))/len(a_n_grams)
         except:
-            overlap = 0
-        n_gram_overlaps[k] += overlap
+            overlap_prop_q = float(0)
+            overlap_prop_a = float(0)
+        n_gram_overlaps.append((overlap_prop_q, overlap_prop_a))
+    n_gram_overlaps = np.asarray(n_gram_overlaps).flatten()
     return n_gram_overlaps
 
 def compute_baseline_features(
@@ -543,11 +546,14 @@ def compute_baseline_features(
                               method:str='heuristic',
 ):
     N = len(pred_indices)
-    M = 6 #ans_length, cos_sim, bleu_score, n_gram_overlaps
+    M = 9 #ans_length, cos_sim, bleu_score, n_gram_overlaps
     D = 768
     X = np.zeros((N, M)) if method == 'heuristic' else np.zeros((N, 2*D))
     for i, sent_pair in enumerate(sent_pairs):
         if i in pred_indices:
+            sent_pair = sent_pair.strip().split()
+            sep_idx = sent_pair.index('[SEP]')
+            q = sent_pair[1:sep_idx]
             #extract hidden reps for question and candidate answer
             hiddens = np.asarray(feat_reps[last_layer][i])
             q_hiddens = hiddens[1:sep_idx]
@@ -567,9 +573,6 @@ def compute_baseline_features(
                 cos_sim = 0 if np.isnan(cos_sim) else cos_sim
 
                 #compute length of a_pred
-                sent_pair = sent_pair.strip().split()
-                sep_idx = sent_pair.index('[SEP]')
-                q = sent_pair[1:sep_idx]
                 a_candidate = sent_pair[s_pos:e_pos+1]
                 a_candidate_len = len(a_candidate)
 
