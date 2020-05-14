@@ -1032,7 +1032,8 @@ if __name__ == "__main__":
                 
                 #compute mean F1 score
                 #hidden_reps_results['train_f1' if version == 'train' else 'test_f1'] /= len(rnd_seeds)
-                hidden_reps_results['test_f1'] /= len(rnd_seeds)
+                if version == 'test':
+                    hidden_reps_results['test_f1'] /= len(rnd_seeds)
 
                 #create PATH
                 PATH = './results_hidden_reps/' + '/' + args.source.lower() + '/' + args.prediction + '/'
