@@ -709,7 +709,7 @@ def compute_similarities_across_layers(
         ans_similarities[l]['ttest_p_val'] = np.mean([ttest_ind(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means])
         ans_similarities[l]['anova_p_val'] = np.mean([f_oneway(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means])
 
-
+        """
         #plot cos(h_a) distributions for both correct and erroneous model predictions across all transformer layers
         plot_cosine_distrib(
                             a_correct_cosines_mean=np.asarray(a_correct_cosines_mean),
@@ -728,6 +728,7 @@ def compute_similarities_across_layers(
                                  layer_no=str(layer_no),
                                  boxplot_version=boxplot_version,
                                 )
+        """
 
         if layer_no in est_layers:
             j += 1
