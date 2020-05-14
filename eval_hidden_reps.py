@@ -371,7 +371,7 @@ def interp_cos_per_layer(
                          layers:str,
                          w_strategy:str='cdf',
                          computation:str='concat',
-                         concatenation:str='rearrange',
+                         concatenation:str='reversed',
                          delta:float=.1,
                          y=None,
 ):
@@ -426,61 +426,59 @@ def interp_cos_per_layer(
             cos_mean = X[i, 2*l]
             cos_std = X[i, 2*l+1]
             
-            """
             if version == 'train':
                 assert isinstance(y, np.ndarray), 'y must be provided at train time'
                 p_cos_mean = interp_cos(x=cos_mean, cos=cos_correct_means if y[i] == 1 else cos_incorrect_means, delta=delta)
                 p_cos_std = interp_cos(x=cos_std, cos=cos_correct_stds if y[i] == 1 else cos_incorrect_stds, delta=delta)
 
             else:
-            """
-            #NOTE: we shall not exploit gold labels (i.e., QA model predictions) at test time
-            dist_cos_mean_correct = abs(np.mean(cos_correct_means) - cos_mean)
-            dist_cos_mean_incorrect = abs(np.mean(cos_incorrect_means) - cos_mean)
-            dist_cos_std_correct = abs(np.mean(cos_correct_stds) - cos_std)
-            dist_cos_std_incorrect = abs(np.mean(cos_incorrect_stds) - cos_std)
+                #NOTE: we shall not exploit gold labels (i.e., QA model predictions) at test time
+                dist_cos_mean_correct = abs(np.mean(cos_correct_means) - cos_mean)
+                dist_cos_mean_incorrect = abs(np.mean(cos_incorrect_means) - cos_mean)
+                dist_cos_std_correct = abs(np.mean(cos_correct_stds) - cos_std)
+                dist_cos_std_incorrect = abs(np.mean(cos_incorrect_stds) - cos_std)
 
-            if w_strategy == 'distance':
-                cos_mean_w_correct = 1 - dist_cos_mean_correct
-                cos_mean_w_incorrect = 1 - dist_cos_mean_incorrect
-                cos_std_w_correct = 1 - dist_cos_std_correct
-                cos_std_w_incorrect = 1 - dist_cos_std_incorrect
+                if w_strategy == 'distance':
+                    cos_mean_w_correct = 1 - dist_cos_mean_correct
+                    cos_mean_w_incorrect = 1 - dist_cos_mean_incorrect
+                    cos_std_w_correct = 1 - dist_cos_std_correct
+                    cos_std_w_incorrect = 1 - dist_cos_std_incorrect
 
-            elif w_strategy == 'cdf':
+                elif w_strategy == 'cdf':
 
-                ###########################################################################################################################
-                ## P(cos(h_a) < x_i) is always higher for incorrect preds (more probability mass towards a cosine similarity of 0),      ##
-                ## whereas P(cos(h_a) > x_i) always is higher for correct preds (more probability mass towards a cosine similarity of 1).##
-                ## Hence, we must switch between the two probability computations dependent on the distance of *observed* cos(h_a)       ##
-                ## to the mean value (i.e., centroid) of the respective distributions.                                                   ##
-                ###########################################################################################################################
+                    ###########################################################################################################################
+                    ## P(cos(h_a) < x_i) is always higher for incorrect preds (more probability mass towards a cosine similarity of 0),      ##
+                    ## whereas P(cos(h_a) > x_i) always is higher for correct preds (more probability mass towards a cosine similarity of 1).##
+                    ## Hence, we must switch between the two probability computations dependent on the distance of *observed* cos(h_a)       ##
+                    ## to the mean value (i.e., centroid) of the respective distributions.                                                   ##
+                    ###########################################################################################################################
 
-                if dist_cos_mean_correct < dist_cos_mean_incorrect:
-                    #compute Q-function (i.e., P(mean(cos(h_a)) > mean_cos_i))
-                    cos_mean_w_correct = 1 - interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
-                    cos_mean_w_incorrect = 1 - interp_cos(x=cos_mean, cos=cos_incorrect_means, weighting=True)
-                else:
-                    #compute CDF (i.e., P(mean(cos(h_a)) < mean_cos_i))
-                    cos_mean_w_correct = interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
-                    cos_mean_w_incorrect = interp_cos(x=cos_mean, cos=cos_incorrect_means, weighting=True)
+                    if dist_cos_mean_correct < dist_cos_mean_incorrect:
+                        #compute Q-function (i.e., P(mean(cos(h_a)) > mean_cos_i))
+                        cos_mean_w_correct = 1 - interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
+                        cos_mean_w_incorrect = 1 - interp_cos(x=cos_mean, cos=cos_incorrect_means, weighting=True)
+                    else:
+                        #compute CDF (i.e., P(mean(cos(h_a)) < mean_cos_i))
+                        cos_mean_w_correct = interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
+                        cos_mean_w_incorrect = interp_cos(x=cos_mean, cos=cos_incorrect_means, weighting=True)
 
-                if dist_cos_std_correct < dist_cos_std_incorrect:
-                    #compute Q-function (i.e., P(std(cos(h_a)) > std_cos_i))
-                    cos_std_w_correct = 1 - interp_cos(x=cos_std, cos=cos_correct_stds, weighting=True)
-                    cos_std_w_incorrect = 1 - interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
-                else:
-                    #compute CDF (i.e., P(std(cos(h_a)) < std_cos_i))
-                    cos_std_w_correct = interp_cos(x=cos_std, cos=cos_correct_stds, weighting=True)
-                    cos_std_w_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
+                    if dist_cos_std_correct < dist_cos_std_incorrect:
+                        #compute Q-function (i.e., P(std(cos(h_a)) > std_cos_i))
+                        cos_std_w_correct = 1 - interp_cos(x=cos_std, cos=cos_correct_stds, weighting=True)
+                        cos_std_w_incorrect = 1 - interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
+                    else:
+                        #compute CDF (i.e., P(std(cos(h_a)) < std_cos_i))
+                        cos_std_w_correct = interp_cos(x=cos_std, cos=cos_correct_stds, weighting=True)
+                        cos_std_w_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
 
-            p_cos_mean_correct = interp_cos(x=cos_mean, cos=cos_correct_means, delta=delta)
-            p_cos_mean_incorrect = interp_cos(x=cos_mean, cos=cos_incorrect_means, delta=delta)
-            p_cos_std_correct = interp_cos(x=cos_std, cos=cos_correct_stds, delta=delta)
-            p_cos_std_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds, delta=delta)
+                p_cos_mean_correct = interp_cos(x=cos_mean, cos=cos_correct_means, delta=delta)
+                p_cos_mean_incorrect = interp_cos(x=cos_mean, cos=cos_incorrect_means, delta=delta)
+                p_cos_std_correct = interp_cos(x=cos_std, cos=cos_correct_stds, delta=delta)
+                p_cos_std_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds, delta=delta)
 
-            #weighted sum of the probabilities that *observed* cos(h_a) belongs to the distribution of correct or incorrect answer predictions respectively
-            p_cos_mean = ((p_cos_mean_correct * cos_mean_w_correct) + (p_cos_mean_incorrect * cos_mean_w_incorrect)) #/ 2
-            p_cos_std = ((p_cos_std_correct * cos_std_w_correct) + (p_cos_std_incorrect * cos_std_w_incorrect)) #/ 2
+                #weighted sum of the probabilities that *observed* cos(h_a) belongs to the distribution of correct or incorrect answer predictions respectively
+                p_cos_mean = ((p_cos_mean_correct * cos_mean_w_correct) + (p_cos_mean_incorrect * cos_mean_w_incorrect)) / 2
+                p_cos_std = ((p_cos_std_correct * cos_std_w_correct) + (p_cos_std_incorrect * cos_std_w_incorrect)) / 2
             
             if computation == 'weighting':
                 #use p as a weighting factor for mean and std wrt cos(h_a)
@@ -847,18 +845,20 @@ def evaluate_estimations_and_cosines(
             model_name = 'fc_nn' + '_' + layers + '_' + computation + '_' + str(rnd_seed)
             
         
-        #M = X.shape[1] #M = number of input features (i.e., x $\in$ R^M)
+        M = X.shape[1] #M = number of input features (i.e., x $\in$ R^M)
         #X, y = shuffle_arrays(X, y) if version == 'train' else X, y #shuffle order of examples during training (this step is not necessary at inference time)
-        #ensor_ds = create_tensor_dataset(X, y)
+        tensor_ds = create_tensor_dataset(X, y)
         #dl = BatchGenerator(dataset=tensor_ds, batch_size=batch_size)
-        #dl = DataLoader(dataset=tensor_ds, batch_size=batch_size, shuffle=True if version =='train' else False)
+        dl = DataLoader(dataset=tensor_ds, batch_size=batch_size, shuffle=True if version =='train' else False)
 
-        if version == 'train':               
+        if version == 'train':
+            """               
             clf = LogisticRegression(random_state=rnd_seed)
             clf.fit(X, y)
             dump(clf, model_dir + '/' + model_name + '.joblib')
             y_hat = clf.predict(X)
-            train_f1 = f1_score(y_true=y, y_pred=y_hat, average='macro') 
+            train_f1 = f1_score(y_true=y, y_pred=y_hat, average='macro')
+            return ans_similarities, cos_similarities_preds, train_f1
             """
             y_distribution = Counter(y)
             y_weights = torch.tensor(y_distribution[0]/y_distribution[1], dtype=torch.float)
@@ -867,10 +867,9 @@ def evaluate_estimations_and_cosines(
             losses, f1_scores, model = train(model=model, train_dl=dl, n_epochs=n_epochs, batch_size=batch_size, y_weights=y_weights)
             torch.save(model.state_dict(), model_dir + '/%s' % (model_name)) #save model's weights
             return ans_similarities, cos_similarities_preds, losses, f1_scores
-            """
-            return ans_similarities, cos_similarities_preds, train_f1
 
         else:
+            """
             clf = load(model_dir + '/' + model_name + '.joblib') 
             y_hat = clf.predict(X)
             test_f1 = f1_score(y_true=y, y_pred=y_hat, average='macro')
@@ -879,7 +878,6 @@ def evaluate_estimations_and_cosines(
             model.load_state_dict(torch.load(model_dir + '/%s' % (model_name))) #load model's weights
             model.to(device)
             test_f1 = test(model=model, test_dl=dl)
-            """
             return ans_similarities, cos_similarities_preds, test_f1
     else:
         y_distrib = Counter(y)
@@ -967,6 +965,7 @@ if __name__ == "__main__":
                                                                                                                 computation=computation,
                                                                                                                 rnd_seed=rnd_seed,
                                                                                                                 )
+                        """
                         try:
                             hidden_reps_results['train_f1'] += train_f1
                         except KeyError:
@@ -979,7 +978,7 @@ if __name__ == "__main__":
                         except KeyError:
                             hidden_reps_results['train_losses'] = [losses]
                             hidden_reps_results['train_f1s'] = [f1_scores]
-                        """
+
                     else:
                         ans_similarities, cos_similarities_preds, test_f1 = evaluate_estimations_and_cosines(
                                                                                                              test_results=results,
@@ -1004,7 +1003,8 @@ if __name__ == "__main__":
 
                 
                 #compute mean F1 score
-                hidden_reps_results['train_f1' if version == 'train' else 'test_f1'] /= len(rnd_seeds)
+                #hidden_reps_results['train_f1' if version == 'train' else 'test_f1'] /= len(rnd_seeds)
+                hidden_reps_results['test_f1'] /= len(rnd_seeds)
 
                 #create PATH
                 PATH = './results_hidden_reps/' + '/' + args.source.lower() + '/' + args.prediction + '/'
