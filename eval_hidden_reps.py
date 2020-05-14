@@ -980,19 +980,19 @@ if __name__ == "__main__":
                         if not os.path.exists(args.model_dir):
                             os.makedirs(args.model_dir)
                         
-                        ans_similarities, cos_similarities_preds, train_f1  = evaluate_estimations_and_cosines(
-                                                                                                                test_results=results,
-                                                                                                                source=args.source,
-                                                                                                                prediction=args.prediction,
-                                                                                                                version=version,
-                                                                                                                model_dir=args.model_dir,
-                                                                                                                batch_size=args.batch_size,
-                                                                                                                n_epochs=args.n_epochs,
-                                                                                                                layers=args.layers,
-                                                                                                                w_strategy=args.w_strategy,
-                                                                                                                computation=computation,
-                                                                                                                rnd_seed=rnd_seed,
-                                                                                                                )
+                        ans_similarities, cos_similarities_preds, losses, f1_scores  = evaluate_estimations_and_cosines(
+                                                                                                                        test_results=results,
+                                                                                                                        source=args.source,
+                                                                                                                        prediction=args.prediction,
+                                                                                                                        version=version,
+                                                                                                                        model_dir=args.model_dir,
+                                                                                                                        batch_size=args.batch_size,
+                                                                                                                        n_epochs=args.n_epochs,
+                                                                                                                        layers=args.layers,
+                                                                                                                        w_strategy=args.w_strategy,
+                                                                                                                        computation=computation,
+                                                                                                                        rnd_seed=rnd_seed,
+                                                                                                                        )
                         """
                         try:
                             hidden_reps_results['train_f1'] += train_f1
