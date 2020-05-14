@@ -549,10 +549,10 @@ def compute_n_gram_overlap(q:list, a_candidate:list):
     n_grams = list(range(1, 4))
     n_gram_overlaps = []
     def compute_unique_n_grams(sent:list, n_gram:int):
-        return set([sent[i:i+n_gram] for i in range(len(sent)) if i <= len(q)-n_gram])
-    for k, n_gram in enumerate(n_grams):
+        return set([sent[i:i+n_gram] for i in range(len(sent)) if i <= len(sent)-n_gram])
+    for n_gram in n_grams:
         q_n_grams = compute_unique_n_grams(q, n_gram)
-        a_n_grams = compute_unique_n_grams(a, n_gram)
+        a_n_grams = compute_unique_n_grams(a_candidate, n_gram)
         try:
             overlap_prop_q = len(q_n_grams.intersection(a_n_grams))/len(q_n_grams)
             overlap_prop_a = len(a_n_grams.intersection(q_n_grams))/len(a_n_grams)
