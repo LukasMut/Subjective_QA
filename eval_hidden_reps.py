@@ -236,7 +236,7 @@ def plot_cosine_boxplots(
 
         ax.set_xticklabels(['correct', 'erroneous'])
         ax.set_xlabel('answer predictions', fontsize=lab_fontsize)
-        ax.set_ylabel('cosine similarities', fontsize=lab_fontsize)
+        ax.set_ylabel(r'$\cos$ sim', fontsize=lab_fontsize)
 
         for i, artist in enumerate(ax.artists):
             if i % 2 == 0:
@@ -266,7 +266,7 @@ def plot_cosine_boxplots(
                     labels=['correct', 'erroneous'],
                     )
         plt.xlabel('answer predictions', fontsize=lab_fontsize)
-        plt.ylabel('cosine similarities', fontsize=lab_fontsize)
+        plt.ylabel(r'$\cos$ sim', fontsize=lab_fontsize)
 
     plt.tight_layout()
 
@@ -784,7 +784,7 @@ def compute_similarities_across_layers(
                          version=version,
                          layer_no=str(layer_no),
                          )
-        
+
         #plot cos(h_a) distributions (i.e., PDFs) for both correct and erroneous model predictions across all transformer layers
         plot_cosine_distrib(
                             a_correct_cosines_mean=np.asarray(a_correct_cosines_mean),
@@ -793,7 +793,6 @@ def compute_similarities_across_layers(
                             version=version,
                             layer_no=str(layer_no),
                             )
-        """
         for boxplot_version in ['seaborn', 'matplotlib']:
             plot_cosine_boxplots(
                                  a_correct_cosines_mean=np.asarray(a_correct_cosines_mean),
@@ -803,8 +802,7 @@ def compute_similarities_across_layers(
                                  layer_no=str(layer_no),
                                  boxplot_version=boxplot_version,
                                 )
-        """
-
+            
         if layer_no in est_layers:
             j += 1
 
