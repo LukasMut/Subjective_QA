@@ -309,8 +309,8 @@ def plot_cosine_cdfs(
     ax.yaxis.set_ticks_position('left')
     ax.xaxis.set_ticks_position('bottom')
 
-    plt.plot(cos_correct_sorted, p_correct, label='correct predictions')
-    plt.plot(cos_incorrect_sorted, p_incorrect, label='erroneous predictions')
+    plt.plot(cos_correct_sorted, p_correct, label='correct answers')
+    plt.plot(cos_incorrect_sorted, p_incorrect, label='wrong answers')
     plt.xlabel(r'$\cos$ sim', fontsize=lab_fontsize)
     plt.ylabel(r'$p$', fontsize=lab_fontsize)
     plt.legend(fancybox=True, shadow=True, loc='best', fontsize=legend_fontsize)
@@ -350,7 +350,7 @@ def plot_cosine_distrib(
         
     sns.distplot(a_correct_cosines_mean, kde=True, norm_hist=True, label='correct answers')
     sns.distplot(a_incorrect_cosines_mean, kde=True, norm_hist=True, label='wrong answers')
-    plt.xlabel('cosine similarities', fontsize=lab_fontsize)
+    plt.xlabel(r'$\cos$ sim', fontsize=lab_fontsize)
     plt.ylabel('probability density', fontsize=lab_fontsize)
     plt.legend(fancybox=True, shadow=True, loc='best', fontsize=legend_fontsize)
     plt.tight_layout()
@@ -784,7 +784,7 @@ def compute_similarities_across_layers(
                          version=version,
                          layer_no=str(layer_no),
                          )
-        """
+        
         #plot cos(h_a) distributions (i.e., PDFs) for both correct and erroneous model predictions across all transformer layers
         plot_cosine_distrib(
                             a_correct_cosines_mean=np.asarray(a_correct_cosines_mean),
@@ -793,7 +793,7 @@ def compute_similarities_across_layers(
                             version=version,
                             layer_no=str(layer_no),
                             )
-
+        """
         for boxplot_version in ['seaborn', 'matplotlib']:
             plot_cosine_boxplots(
                                  a_correct_cosines_mean=np.asarray(a_correct_cosines_mean),
