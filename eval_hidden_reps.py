@@ -988,7 +988,7 @@ if __name__ == "__main__":
 
     if args.w_strategy == 'distance' and args.layers == 'all_layers':
         #we need to evaluate baseline approaches only once
-        computations = ['baseline_concat', 'baseline_heuristic' 'raw', 'concat', 'weighting']
+        computations = ['baseline_concat', 'baseline_heuristic', 'raw', 'concat', 'weighting']
 
     elif args.w_strategy == 'distance' and args.layers == 'top_three_layers':
         #*raw* does not need to be evaluated for both weighting strategies
