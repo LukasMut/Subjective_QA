@@ -278,6 +278,52 @@ def plot_cosine_boxplots(
     plt.savefig(PATH + 'layer' + '_' + layer_no +  '_' + boxplot_version + '.png')
     plt.close()
 
+def plot_cosine_cdfs(
+                     a_correct_cosines_mean:np.ndarray,
+                     a_incorrect_cosines_mean:np.ndarray,
+                     source:str,
+                     version:str,
+                     layer_no:str,
+):
+    cos_correct_sorted = np.sort(a_correct_cosines_mean)
+    cos_incorrect_sorted = np.sort(a_incorrect_cosines_mean)
+    assert np.all(np.diff(cos_correct_sorted) >= 0)
+    assert np.all(np.diff(cos_incorrect_sorted) >= 0)
+    p_correct = np.arange(1, len(cos_correct_sorted)+1) / len(cos_correct_sorted)
+    p_incorrect = np.arange(1, len(cos_incorrect_sorted)+1) / len(cos_incorrect_sorted)
+
+    #the higher the dpi, the better is the resolution of the plot (be aware that this will increase MB of .png file -> don't set dpi too high)
+    plt.figure(figsize=(6, 4), dpi=100)
+
+    #set vars
+    legend_fontsize = 8
+    lab_fontsize = 10
+
+    ax = plt.subplot(111)
+
+    #hide the right and top spines
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+
+    #only show ticks on the left (y-axis) and bottom (x-axis) spines
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+
+    plt.plot(cos_correct_sorted, p_correct, label='correct predictions')
+    plt.plot(cos_incorrect_sorted, p_incorrect, label='erroneous predictions')
+    plt.xlabel(r'$\cos$ sim', fontsize=lab_fontsize)
+    plt.ylabel(r'$p$', fontsize=lab_fontsize)
+    plt.legend(fancybox=True, shadow=True, loc='best', fontsize=legend_fontsize)
+    plt.tight_layout()
+
+    PATH = './plots/hidden_reps/cosine_distributions/' + source.lower() + '/' + version + '/' + 'cdfs' + '/'
+    
+    if not os.path.exists(PATH):
+        os.makedirs(PATH)
+
+    plt.savefig(PATH + 'layer' + '_' + layer_no + '.png')
+    plt.close()
+
 def plot_cosine_distrib(
                         a_correct_cosines_mean:np.ndarray,
                         a_incorrect_cosines_mean:np.ndarray,
@@ -730,8 +776,16 @@ def compute_similarities_across_layers(
         ans_similarities[l]['ttest_p_val'] = np.mean([ttest_ind(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means])
         ans_similarities[l]['anova_p_val'] = np.mean([f_oneway(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means])
 
+        #plot CDFs w.r.t. cos(h_a) for both correct and erroneous model predictions across all transformer layers
+        plot_cosine_cdfs(
+                         a_correct_cosines_mean=np.asarray(a_correct_cosines_mean),
+                         a_incorrect_cosines_mean=np.asarray(a_incorrect_cosines_mean),
+                         source=source,
+                         version=version,
+                         layer_no=str(layer_no),
+                         )
         """
-        #plot cos(h_a) distributions for both correct and erroneous model predictions across all transformer layers
+        #plot cos(h_a) distributions (i.e., PDFs) for both correct and erroneous model predictions across all transformer layers
         plot_cosine_distrib(
                             a_correct_cosines_mean=np.asarray(a_correct_cosines_mean),
                             a_incorrect_cosines_mean=np.asarray(a_incorrect_cosines_mean),
