@@ -981,8 +981,8 @@ if __name__ == "__main__":
     np.random.seed(42)
     
     #iterate over five different random seeds to draw more robust conclusions about results
-    #rnd_seeds = np.random.randint(0, 100, 5)
-    rnd_seeds = np.array([42])
+    rnd_seeds = np.random.randint(0, 100, 5)
+    #rnd_seeds = np.array([42])
 
     versions = ['train', 'test']
 
