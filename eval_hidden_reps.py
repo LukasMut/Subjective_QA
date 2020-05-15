@@ -287,8 +287,6 @@ def plot_cosine_cdfs(
 ):
     cos_correct_sorted = np.sort(a_correct_cosines_mean)
     cos_incorrect_sorted = np.sort(a_incorrect_cosines_mean)
-    assert np.all(np.diff(cos_correct_sorted) >= 0)
-    assert np.all(np.diff(cos_incorrect_sorted) >= 0)
     p_correct = np.arange(1, len(cos_correct_sorted)+1) / len(cos_correct_sorted)
     p_incorrect = np.arange(1, len(cos_incorrect_sorted)+1) / len(cos_incorrect_sorted)
 
