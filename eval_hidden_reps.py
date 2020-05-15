@@ -793,6 +793,7 @@ def compute_similarities_across_layers(
                             version=version,
                             layer_no=str(layer_no),
                             )
+        
         for boxplot_version in ['seaborn', 'matplotlib']:
             plot_cosine_boxplots(
                                  a_correct_cosines_mean=np.asarray(a_correct_cosines_mean),
@@ -802,7 +803,7 @@ def compute_similarities_across_layers(
                                  layer_no=str(layer_no),
                                  boxplot_version=boxplot_version,
                                 )
-            
+
         if layer_no in est_layers:
             j += 1
 
