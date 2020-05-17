@@ -487,14 +487,12 @@ def interp_cos_per_layer(
                 dist_cos_std_incorrect = abs(np.mean(cos_incorrect_stds) - cos_std)
 
                 if w_strategy == 'distance':
-
                     cos_mean_w_correct = 1 - dist_cos_mean_correct
                     cos_mean_w_incorrect = 1 - dist_cos_mean_incorrect
                     cos_std_w_correct = 1 - dist_cos_std_correct
                     cos_std_w_incorrect = 1 - dist_cos_std_incorrect
 
                 elif w_strategy == 'cdf':
-
                     #####################################################################################################################################
                     ## Note that P(cos(h_a) < x_i) is always higher for incorrect preds (more probability mass towards a cosine similarity of 0),      ##
                     ## whereas P(cos(h_a) > x_i) always is higher for correct preds (more probability mass towards a cosine similarity of 1).          ##
@@ -543,7 +541,7 @@ def interp_cos_per_layer(
 
                 #weighted sum of the probabilities that *observed* cos(h_a) belongs to the distribution of correct or incorrect answer predictions respectively
                 p_cos_mean = ((p_cos_mean_correct * cos_mean_w_correct) + (p_cos_mean_incorrect * cos_mean_w_incorrect)) #/ 2
-                p_cos_std = ((p_cos_std_correct * cos_std_w_correct) + (p_cos_std_incorrect * cos_std_w_incorrect)) # 2
+                p_cos_std = ((p_cos_std_correct * cos_std_w_correct) + (p_cos_std_incorrect * cos_std_w_incorrect)) # /2
                 
             if computation == 'weighting':
                 #use p as a weighting factor for mean and std wrt cos(h_a)
