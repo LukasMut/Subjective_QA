@@ -470,11 +470,10 @@ def interp_cos_per_layer(
             cos_mean = X[i, 2*l]
             cos_std = X[i, 2*l+1]
             
-            if version == 'train':
-                assert isinstance(y, np.ndarray), 'y must be provided at train time'
+            if version == 'train' or w_strategy == 'oracle':
+                assert isinstance(y, np.ndarray), 'y must be provided at train time or if w_strategy == oracle'
                 p_cos_mean = interp_cos(x=cos_mean, cos=cos_correct_means if y[i] == 1 else cos_incorrect_means, delta=delta)
                 p_cos_std = interp_cos(x=cos_std, cos=cos_correct_stds if y[i] == 1 else cos_incorrect_stds, delta=delta)
-
             else:
                 #NOTE: we shall not exploit gold labels (i.e., QA model predictions) at test time
                 p_cos_mean_correct = interp_cos(x=cos_mean, cos=cos_correct_means, delta=delta)
@@ -482,11 +481,12 @@ def interp_cos_per_layer(
                 p_cos_std_correct = interp_cos(x=cos_std, cos=cos_correct_stds, delta=delta)
                 p_cos_std_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds, delta=delta)
 
+                dist_cos_mean_correct = abs(np.mean(cos_correct_means) - cos_mean)
+                dist_cos_mean_incorrect = abs(np.mean(cos_incorrect_means) - cos_mean)
+                dist_cos_std_correct = abs(np.mean(cos_correct_stds) - cos_std)
+                dist_cos_std_incorrect = abs(np.mean(cos_incorrect_stds) - cos_std)
+
                 if w_strategy == 'distance':
-                    dist_cos_mean_correct = abs(np.mean(cos_correct_means) - cos_mean)
-                    dist_cos_mean_incorrect = abs(np.mean(cos_incorrect_means) - cos_mean)
-                    dist_cos_std_correct = abs(np.mean(cos_correct_stds) - cos_std)
-                    dist_cos_std_incorrect = abs(np.mean(cos_incorrect_stds) - cos_std)
 
                     cos_mean_w_correct = 1 - dist_cos_mean_correct
                     cos_mean_w_incorrect = 1 - dist_cos_mean_incorrect
@@ -542,9 +542,9 @@ def interp_cos_per_layer(
                     cos_std_w_incorrect = 1 - abs(q_cos_std_incorrect - cdf_cos_std_incorrect)
 
                 #weighted sum of the probabilities that *observed* cos(h_a) belongs to the distribution of correct or incorrect answer predictions respectively
-                p_cos_mean = ((p_cos_mean_correct * cos_mean_w_correct) + (p_cos_mean_incorrect * cos_mean_w_incorrect)) / 2
-                p_cos_std = ((p_cos_std_correct * cos_std_w_correct) + (p_cos_std_incorrect * cos_std_w_incorrect)) / 2
-            
+                p_cos_mean = ((p_cos_mean_correct * cos_mean_w_correct) + (p_cos_mean_incorrect * cos_mean_w_incorrect)) #/ 2
+                p_cos_std = ((p_cos_std_correct * cos_std_w_correct) + (p_cos_std_incorrect * cos_std_w_incorrect)) # 2
+                
             if computation == 'weighting':
                 #use p as a weighting factor for mean and std wrt cos(h_a)
                 X[i, 2*l] *= p_cos_mean
@@ -578,7 +578,9 @@ def interp_cos_per_layer(
 
         elif concatenation == 'reversed':
             #concatenate matrix of probability scores in reversed order to increase proximity between correlated features (i.e., features that belong to the same layer)
-            X = np.hstack((X, cdf_probas[:, ::-1])) 
+            X = np.hstack((X, cdf_probas[:, ::-1]))
+        else:
+            X = np.hstack((X, cdf_probas))
     return X
 
 def compute_n_gram_overlap(q:list, a_candidate:list):
@@ -774,6 +776,7 @@ def compute_similarities_across_layers(
         ans_similarities[l]['ttest_p_val'] = np.mean([ttest_ind(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means])
         ans_similarities[l]['anova_p_val'] = np.mean([f_oneway(a_correct_cosines_mean, rnd_sample)[1] for rnd_sample in rnd_samples_incorrect_means])
 
+        """
         #plot CDFs w.r.t. cos(h_a) for both correct and erroneous model predictions across all transformer layers
         plot_cosine_cdfs(
                          a_correct_cosines_mean=np.asarray(a_correct_cosines_mean),
@@ -801,6 +804,7 @@ def compute_similarities_across_layers(
                                  layer_no=str(layer_no),
                                  boxplot_version=boxplot_version,
                                 )
+        """
 
         if layer_no in est_layers:
             j += 1
@@ -897,7 +901,7 @@ def evaluate_estimations_and_cosines(
                                      layers=layers,
                                      w_strategy=w_strategy,
                                      computation=computation,
-                                     y=y if version == 'train' else None,
+                                     y=y if version == 'train' or w_strategy == 'oracle' else None,
                                      )
 
             model_name = 'fc_nn' + '_' + layers + '_' + w_strategy + '_' + computation + '_' + str(rnd_seed)
@@ -968,12 +972,12 @@ if __name__ == "__main__":
         help='Set model save directory for ans prediction model.')
     parser.add_argument('--batch_size', type=int, default=8,
         help='Specify mini-batch size.')
-    parser.add_argument('--n_epochs', type=int, default=20,
+    parser.add_argument('--n_epochs', type=int, default=15,
         help='Set number of epochs model should be trained for.')
     parser.add_argument('--layers', type=str, default='',
-        help='Must be one of {all_layers, top_three_layers, bottom_three_layers}.')
+        help='Must be one of {all_layers, top_three_layers}.')
     parser.add_argument('--w_strategy', type=str, default='',
-        help='Must be one of {distance, cdf, cdf_new}.')
+        help='Must be one of {distance, cdf, cdf_new, oracle}.')
     
     args = parser.parse_args()
 
@@ -981,8 +985,8 @@ if __name__ == "__main__":
     np.random.seed(42)
     
     #iterate over five different random seeds to draw more robust conclusions about results
-    rnd_seeds = np.random.randint(0, 100, 5)
-    #rnd_seeds = np.array([42])
+    #rnd_seeds = np.random.randint(0, 100, 5)
+    rnd_seeds = np.array([42])
 
     versions = ['train', 'test']
 
