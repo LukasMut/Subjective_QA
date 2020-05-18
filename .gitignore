@@ -90,3 +90,4 @@ saved_models/ans_pred/fc_nn_bottom_three_layers
 saved_models/ans_pred/fc_nn_top_three_layers
 *.zip
 *.pptx
+*.ipynb
