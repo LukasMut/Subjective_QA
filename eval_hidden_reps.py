@@ -1002,12 +1002,7 @@ if __name__ == "__main__":
     #get hidden representations
     results, file_name = get_hidden_reps(source=args.source, version=args.version)
     
-    if args.prediction == 'learned':
-        assert isinstance(args.batch_size, int), 'Batch size must be defined'
-        assert isinstance(args.model_dir, str), 'Directory to save and load model weights must be defined'
-        assert isinstance(args.w_strategy, str), 'Weighting strategy must be defined'
-        assert isinstance(rnd_seeds, np.ndarray), 'an array of different random seeds to iterate over must be provided'
-        
+    if args.prediction == 'learned':        
         for computation in computations:
             hidden_reps_results = {}
             #perform computations for different random seeds (results might vary as a function of random seeds due to different initialisations)
@@ -1021,7 +1016,7 @@ if __name__ == "__main__":
                     pass
             
                 if args.version == 'train':
-                    assert isinstance(args.n_epochs, int), 'Number of epochs must be defined'
+                    assert isinstance(args.n_epochs, int), 'Number of epochs must be defined in train mode'
                     
                     if not os.path.exists(args.model_dir):
                         os.makedirs(args.model_dir)
