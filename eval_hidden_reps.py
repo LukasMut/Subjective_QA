@@ -893,34 +893,32 @@ def evaluate_estimations_and_cosines(
         if computation in ['concat', 'weighting']:
             #interpolate values wrt to *train* CDFs
             X_cos = interp_cos_per_layer(
-                                     X=X,
-                                     source=source,
-                                     version=version,
-                                     layers=layers,
-                                     w_strategy=w_strategy,
-                                     computation=computation,
-                                     y=y if version == 'train' or w_strategy == 'oracle' else None,
-                                     )
+                                         X=X_cos,
+                                         source=source,
+                                         version=version,
+                                         layers=layers,
+                                         w_strategy=w_strategy,
+                                         computation=computation,
+                                         y=y if version == 'train' or w_strategy == 'oracle' else None,
+                                         )
 
             model_name = 'fc_nn' + '_' + layers + '_' + w_strategy + '_' + computation + '_' + 'heuristic' + '_' + str(rnd_seed)
 
-        """
-        elif re.search(r'baseline', computation):
-            X = compute_baseline_features(
-                                          feat_reps=feat_reps,
-                                          sent_pairs=sent_pairs,
-                                          pred_indices=pred_indices,
-                                          s_log_probs=s_log_probs,
-                                          e_log_probs=e_log_probs,
-                                          method='qa_concat' if re.search(r'concat', computation) else 'heuristic',
-                                          )
-
-            model_name = 'fc_nn' + '_' + computation + str(rnd_seed)
-        """
+        #elif re.search(r'baseline', computation):
+        #    X = compute_baseline_features(
+        #                                  feat_reps=feat_reps,
+        #                                  sent_pairs=sent_pairs,
+        #                                  pred_indices=pred_indices,
+        #                                  s_log_probs=s_log_probs,
+        #                                  e_log_probs=e_log_probs,
+        #                                  method='qa_concat' if re.search(r'concat', computation) else 'heuristic',
+        #                                  )
+        #
+        #    model_name = 'fc_nn' + '_' + computation + str(rnd_seed)
 
         else:
             model_name = 'fc_nn' + '_' + layers + '_' + computation + '_' + 'heuristic' + '_'  + str(rnd_seed)
-        
+
         X_baseline = compute_baseline_features(
                                               feat_reps=feat_reps,
                                               sent_pairs=sent_pairs,
