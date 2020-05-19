@@ -91,3 +91,5 @@ saved_models/ans_pred/fc_nn_top_three_layers
 *.zip
 *.pptx
 *.ipynb
+.batch_ans_pred_squad.sh.swp
+batch_ans_pred_squad.sh

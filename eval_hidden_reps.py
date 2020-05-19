@@ -876,23 +876,23 @@ def evaluate_estimations_and_cosines(
     y = true_preds
 
     if prediction == 'learned':
-        ans_similarities, cos_similarities_preds, X = compute_similarities_across_layers(
-                                                                                        feat_reps=feat_reps,
-                                                                                        true_start_pos=true_start_pos,
-                                                                                        true_end_pos=true_end_pos,
-                                                                                        sent_pairs=sent_pairs,
-                                                                                        pred_indices=pred_indices,
-                                                                                        true_preds=true_preds,
-                                                                                        s_log_probs=s_log_probs,
-                                                                                        e_log_probs=e_log_probs,
-                                                                                        source=source,
-                                                                                        version=version,
-                                                                                        layers=layers,
-                                                                                        )
+        ans_similarities, cos_similarities_preds, X_cos = compute_similarities_across_layers(
+                                                                                            feat_reps=feat_reps,
+                                                                                            true_start_pos=true_start_pos,
+                                                                                            true_end_pos=true_end_pos,
+                                                                                            sent_pairs=sent_pairs,
+                                                                                            pred_indices=pred_indices,
+                                                                                            true_preds=true_preds,
+                                                                                            s_log_probs=s_log_probs,
+                                                                                            e_log_probs=e_log_probs,
+                                                                                            source=source,
+                                                                                            version=version,
+                                                                                            layers=layers,
+                                                                                            )
 
         if computation in ['concat', 'weighting']:
             #interpolate values wrt to *train* CDFs
-            X = interp_cos_per_layer(
+            X_cos = interp_cos_per_layer(
                                      X=X,
                                      source=source,
                                      version=version,
@@ -902,8 +902,9 @@ def evaluate_estimations_and_cosines(
                                      y=y if version == 'train' or w_strategy == 'oracle' else None,
                                      )
 
-            model_name = 'fc_nn' + '_' + layers + '_' + w_strategy + '_' + computation + '_' + str(rnd_seed)
+            model_name = 'fc_nn' + '_' + layers + '_' + w_strategy + '_' + computation + '_' + 'heuristic' + '_' + str(rnd_seed)
 
+        """
         elif re.search(r'baseline', computation):
             X = compute_baseline_features(
                                           feat_reps=feat_reps,
@@ -915,9 +916,20 @@ def evaluate_estimations_and_cosines(
                                           )
 
             model_name = 'fc_nn' + '_' + computation + str(rnd_seed)
+        """
 
         else:
-            model_name = 'fc_nn' + '_' + layers + '_' + computation + '_' + str(rnd_seed)
+            model_name = 'fc_nn' + '_' + layers + '_' + computation + '_' + 'heuristic' + '_'  + str(rnd_seed)
+        
+        X_baseline = compute_baseline_features(
+                                              feat_reps=feat_reps,
+                                              sent_pairs=sent_pairs,
+                                              pred_indices=pred_indices,
+                                              s_log_probs=s_log_probs,
+                                              e_log_probs=e_log_probs,
+                                              method='heuristic',
+                                              )
+        X = np.hstack((X_baseline, X_cos))
             
         M = X.shape[1] #M = number of input features (i.e., x $\in$ R^M)
         #X, y = shuffle_arrays(X, y) if version == 'train' else X, y #shuffle order of examples during training (this step is not necessary at inference time)
@@ -987,16 +999,7 @@ if __name__ == "__main__":
     #iterate over five different random seeds to obtain more robust results
     rnd_seeds = np.random.randint(0, 100, 5)
 
-    if args.w_strategy == 'distance' and args.layers == 'all_layers':
-        #we need to evaluate baseline approaches only once
-        computations = ['baseline_concat', 'baseline_heuristic', 'raw', 'concat', 'weighting']
-
-    elif args.w_strategy == 'distance' and args.layers == 'top_three_layers':
-        #"raw" does not need to be evaluated for both weighting strategies
-        computations = ['raw', 'concat', 'weighting']
-    
-    else:
-        computations = ['concat', 'weighting']
+    computations = ['raw', 'concat', 'weighting'] if args.w_strategy == 'distance' else ['concat', 'weighting']
 
     #get hidden representations
     results, file_name = get_hidden_reps(source=args.source, version=args.version)
