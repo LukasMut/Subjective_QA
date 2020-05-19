@@ -964,6 +964,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--source', type=str, default='SubjQA',
         help='Estimate model predictions (i.e., correct or erroneous) wrt hidden reps obtained from fine-tuning (and evaluating) on *source*.')
+    parser.add_argument('--version', type=str, default='train',
+        help='Must be one of {train, test}')
     parser.add_argument('--prediction', type=str, default='learned',
         help='If "learned", compute feature matrix X and labels vector y wrt cos(h_a) obtained from fine-tuning on *source* to train feed-forward neural net')
     parser.add_argument('--model_dir', type=str, default='./saved_models/ans_pred',
@@ -982,128 +984,126 @@ if __name__ == "__main__":
     #set NumPy random seed for reproducibility of results
     np.random.seed(42)
     
-    #iterate over five different random seeds to draw more robust conclusions about results
-    #rnd_seeds = np.random.randint(0, 100, 5)
-    rnd_seeds = np.array([42])
-
-    versions = ['train', 'test']
+    #iterate over five different random seeds to obtain more robust results
+    rnd_seeds = np.random.randint(0, 100, 5)
+    #rnd_seeds = np.array([42])
 
     if args.w_strategy == 'distance' and args.layers == 'all_layers':
         #we need to evaluate baseline approaches only once
         computations = ['baseline_concat', 'baseline_heuristic', 'raw', 'concat', 'weighting']
 
     elif args.w_strategy == 'distance' and args.layers == 'top_three_layers':
-        #*raw* does not need to be evaluated for both weighting strategies
+        #"raw" does not need to be evaluated for both weighting strategies
         computations = ['raw', 'concat', 'weighting']
     
     else:
         computations = ['concat', 'weighting']
 
-    for version in versions:
-        results, file_name = get_hidden_reps(source=args.source, version=version)
-        if args.prediction == 'learned':
-            assert isinstance(args.layers, str) and len(args.layers) > 0, 'Layers for which we want to store statistical characteristics wrt cos(h_a) must be specified'
-            assert isinstance(args.batch_size, int), 'Batch size must be defined'
-            assert isinstance(args.model_dir, str), 'Directory to save and load model weights must be defined'
-            assert isinstance(args.w_strategy, str), 'Weighting strategy must be defined'
-            assert isinstance(rnd_seeds, np.ndarray), 'an array of different random seeds to iterate over must be provided'
-            
-            for computation in computations:
-                hidden_reps_results = {}
-                #perform computations for different random seeds (results might vary as a function of random seeds due to different initialisations)
-                for k, rnd_seed in enumerate(rnd_seeds):
-                    np.random.seed(rnd_seed)
-                    torch.manual_seed(rnd_seed)
-
-                    try:
-                        torch.cuda.manual_seed_all(rnd_seed)
-                    except:
-                        pass
-                
-                    if version == 'train':
-                        assert isinstance(args.n_epochs, int), 'Number of epochs must be defined'
-                        
-                        if not os.path.exists(args.model_dir):
-                            os.makedirs(args.model_dir)
-                        
-                        ans_similarities, cos_similarities_preds, losses, f1_scores  = evaluate_estimations_and_cosines(
-                                                                                                                        test_results=results,
-                                                                                                                        source=args.source,
-                                                                                                                        prediction=args.prediction,
-                                                                                                                        version=version,
-                                                                                                                        model_dir=args.model_dir,
-                                                                                                                        batch_size=args.batch_size,
-                                                                                                                        n_epochs=args.n_epochs,
-                                                                                                                        layers=args.layers,
-                                                                                                                        w_strategy=args.w_strategy,
-                                                                                                                        computation=computation,
-                                                                                                                        rnd_seed=rnd_seed,
-                                                                                                                        )
-                        """
-                        try:
-                            hidden_reps_results['train_f1'] += train_f1
-                        except KeyError:
-                            hidden_reps_results['train_f1'] = train_f1
-
-                        """
-                        try:
-                            hidden_reps_results['train_losses'].append(losses)
-                            hidden_reps_results['train_f1s'].append(f1_scores)
-                        except KeyError:
-                            hidden_reps_results['train_losses'] = [losses]
-                            hidden_reps_results['train_f1s'] = [f1_scores]
-
-                    else:
-                        ans_similarities, cos_similarities_preds, test_f1 = evaluate_estimations_and_cosines(
-                                                                                                             test_results=results,
-                                                                                                             source=args.source, 
-                                                                                                             prediction=args.prediction,
-                                                                                                             version=version,
-                                                                                                             model_dir=args.model_dir,
-                                                                                                             batch_size=args.batch_size,
-                                                                                                             layers=args.layers,
-                                                                                                             w_strategy=args.w_strategy,
-                                                                                                             computation=computation,
-                                                                                                             rnd_seed=rnd_seed,
-                                                                                                             )
-                        try:
-                            hidden_reps_results['test_f1'] += test_f1
-                        except KeyError:
-                            hidden_reps_results['test_f1'] = test_f1
-                
-                    if k == 0:
-                        hidden_reps_results['cos_similarities_true'] = ans_similarities
-                        hidden_reps_results['cos_similarities_preds'] = cos_similarities_preds
-
-                
-                #compute mean F1 score
-                #hidden_reps_results['train_f1' if version == 'train' else 'test_f1'] /= len(rnd_seeds)
-                if version == 'test':
-                    hidden_reps_results['test_f1'] /= len(rnd_seeds)
-
-                #create PATH
-                PATH = './results_hidden_reps/' + '/' + args.source.lower() + '/' + args.prediction + '/'
-                if not os.path.exists(PATH):
-                    os.makedirs(PATH)
-
-                #save results
-                with open(PATH + file_name + '_' + args.layers + '_' + args.w_strategy + '_' + computation + '.json', 'w') as json_file:
-                    json.dump(hidden_reps_results, json_file)
-
-        elif args.prediction == 'majority':
+    #get hidden representations
+    results, file_name = get_hidden_reps(source=args.source, version=args.version)
+    
+    if args.prediction == 'learned':
+        assert isinstance(args.batch_size, int), 'Batch size must be defined'
+        assert isinstance(args.model_dir, str), 'Directory to save and load model weights must be defined'
+        assert isinstance(args.w_strategy, str), 'Weighting strategy must be defined'
+        assert isinstance(rnd_seeds, np.ndarray), 'an array of different random seeds to iterate over must be provided'
+        
+        for computation in computations:
             hidden_reps_results = {}
-            hidden_reps_results['f1_score'] = evaluate_estimations_and_cosines(
-                                                                               test_results=results,
-                                                                               source=args.source,
-                                                                               prediction=args.prediction, 
-                                                                               version=version,
-                                                                               )
+            #perform computations for different random seeds (results might vary as a function of random seeds due to different initialisations)
+            for k, rnd_seed in enumerate(rnd_seeds):
+                np.random.seed(rnd_seed)
+                torch.manual_seed(rnd_seed)
+
+                try:
+                    torch.cuda.manual_seed_all(rnd_seed)
+                except:
+                    pass
+            
+                if args.version == 'train':
+                    assert isinstance(args.n_epochs, int), 'Number of epochs must be defined'
+                    
+                    if not os.path.exists(args.model_dir):
+                        os.makedirs(args.model_dir)
+                    
+                    ans_similarities, cos_similarities_preds, losses, f1_scores  = evaluate_estimations_and_cosines(
+                                                                                                                    test_results=results,
+                                                                                                                    source=args.source,
+                                                                                                                    prediction=args.prediction,
+                                                                                                                    version=args.version,
+                                                                                                                    model_dir=args.model_dir,
+                                                                                                                    batch_size=args.batch_size,
+                                                                                                                    n_epochs=args.n_epochs,
+                                                                                                                    layers=args.layers,
+                                                                                                                    w_strategy=args.w_strategy,
+                                                                                                                    computation=computation,
+                                                                                                                    rnd_seed=rnd_seed,
+                                                                                                                    )
+                    """
+                    try:
+                        hidden_reps_results['train_f1'] += train_f1
+                    except KeyError:
+                        hidden_reps_results['train_f1'] = train_f1
+
+                    """
+                    try:
+                        hidden_reps_results['train_losses'].append(losses)
+                        hidden_reps_results['train_f1s'].append(f1_scores)
+                    except KeyError:
+                        hidden_reps_results['train_losses'] = [losses]
+                        hidden_reps_results['train_f1s'] = [f1_scores]
+
+                else:
+                    ans_similarities, cos_similarities_preds, test_f1 = evaluate_estimations_and_cosines(
+                                                                                                         test_results=results,
+                                                                                                         source=args.source, 
+                                                                                                         prediction=args.prediction,
+                                                                                                         version=args.version,
+                                                                                                         model_dir=args.model_dir,
+                                                                                                         batch_size=args.batch_size,
+                                                                                                         layers=args.layers,
+                                                                                                         w_strategy=args.w_strategy,
+                                                                                                         computation=computation,
+                                                                                                         rnd_seed=rnd_seed,
+                                                                                                         )
+                    try:
+                        hidden_reps_results['test_f1'] += test_f1
+                    except KeyError:
+                        hidden_reps_results['test_f1'] = test_f1
+            
+                if k == 0:
+                    hidden_reps_results['cos_similarities_true'] = ans_similarities
+                    hidden_reps_results['cos_similarities_preds'] = cos_similarities_preds
+
+            
+            #compute mean F1 score
+            #hidden_reps_results['train_f1' if args.version == 'train' else 'test_f1'] /= len(rnd_seeds)
+            if args.version == 'test':
+                hidden_reps_results['test_f1'] /= len(rnd_seeds)
+
             #create PATH
             PATH = './results_hidden_reps/' + '/' + args.source.lower() + '/' + args.prediction + '/'
             if not os.path.exists(PATH):
                 os.makedirs(PATH)
 
             #save results
-            with open(PATH + file_name + '_' + 'majority' + '.json', 'w') as json_file:
+            with open(PATH + file_name + '_' + args.layers + '_' + args.w_strategy + '_' + computation + '.json', 'w') as json_file:
                 json.dump(hidden_reps_results, json_file)
+
+    elif args.prediction == 'majority':
+        hidden_reps_results = {}
+        hidden_reps_results['f1_score'] = evaluate_estimations_and_cosines(
+                                                                           test_results=results,
+                                                                           source=args.source,
+                                                                           prediction=args.prediction, 
+                                                                           version=args.version,
+                                                                           )
+        #create PATH
+        PATH = './results_hidden_reps/' + '/' + args.source.lower() + '/' + args.prediction + '/'
+        if not os.path.exists(PATH):
+            os.makedirs(PATH)
+
+        #save results
+        with open(PATH + file_name + '_' + 'majority' + '.json', 'w') as json_file:
+            json.dump(hidden_reps_results, json_file)
 
