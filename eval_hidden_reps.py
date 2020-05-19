@@ -985,8 +985,8 @@ if __name__ == "__main__":
     np.random.seed(42)
     
     #iterate over five different random seeds to obtain more robust results
-    #rnd_seeds = np.random.randint(0, 100, 5)
-    rnd_seeds = np.array([42])
+    rnd_seeds = np.random.randint(0, 100, 5)
+    #rnd_seeds = np.array([42])
 
     if args.w_strategy == 'distance' and args.layers == 'all_layers':
         #we need to evaluate baseline approaches only once
