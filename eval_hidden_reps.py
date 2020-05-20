@@ -41,7 +41,7 @@ from torch.optim import Adam, SGD
 from utils import BatchGenerator
 
 try:
-    from models.utils import to_cpu, f1
+    from models.utils import to_cpu, f1, soft_to_hard, accuracy
     from models.modules.NN import *
 except ImportError:
     pass
@@ -130,37 +130,49 @@ def create_tensor_dataset(X:np.ndarray, y:np.ndarray): return TensorDataset(torc
 def test(model, test_dl):
     n_iters = len(test_dl)
     test_f1 = 0
+    test_acc = 0
     test_steps = 0
+    i = 0
+    incorrect_preds = []
     model.eval()
     with torch.no_grad():
         for step, batch in enumerate(test_dl):
             batch = tuple(t.to(device) for t in batch)
             X, y = batch
             logits = model(X)
-            test_f1 += f1(probas=torch.sigmoid(logits), y_true=y, task='binary')
+            probas = torch.sigmoid(logits)
+            y_pred = soft_to_hard(probas)
+            incorrect_preds.append(np.where(y != y_pred)[0] + i)
+            test_f1 += f1(probas=probas, y_true=y, task='binary')
+            test_acc += accuracy(probas=probas, y_true=y, task='binary')
             test_steps += 1
+            i += len(y) #batch_size
         test_f1 /= test_steps
+        test_acc /= test_steps
+    incorrect_preds = np.asarray(incorrect_preds).flatten()
     print("===================")
     print("==== Inference ====")
     print("==== F1: {} ====".format(round(test_f1, 3)))
+    print("=== Acc: {} ===".format(round(test_acc, 3)))
     print("===================")
     print()
-    return test_f1
+    return test_f1, test_acc, incorrect_preds
 
 def train(
           model,
           train_dl,
+          version:str,
           n_epochs:int,
           batch_size:int,
           y_weights:torch.Tensor,
 ):
     n_steps = len(train_dl)
     n_iters = n_steps * n_epochs
-    min_n_epochs = 15
+    min_n_epochs = 15 if version.lower() == 'subjqa' else 10
     assert isinstance(y_weights, torch.Tensor), 'Tensor of weights wrt model predictions is not provided'
     loss_func = nn.BCEWithLogitsLoss(pos_weight=y_weights.to(device))
     optimizer = Adam(model.parameters(), lr=1e-2, weight_decay=0.005) #L2 Norm (i.e., weight decay)
-    max_grad_norm = 10
+    max_grad_norm = 10 if version.lower() == 'subjqa' else 5 
     losses = []
     f1_scores = []
 
@@ -924,7 +936,7 @@ def evaluate_estimations_and_cosines(
             y_weights = torch.tensor(y_distribution[0]/y_distribution[1], dtype=torch.float)
             model = FFNN(in_size=M)
             model.to(device)
-            losses, f1_scores, model = train(model=model, train_dl=dl, n_epochs=n_epochs, batch_size=batch_size, y_weights=y_weights)
+            losses, f1_scores, model = train(model=model, train_dl=dl, version=version, n_epochs=n_epochs, batch_size=batch_size, y_weights=y_weights)
             torch.save(model.state_dict(), model_dir + '/%s' % (model_name)) #save model's weights
             return ans_similarities, cos_similarities_preds, losses, f1_scores
 
@@ -937,8 +949,24 @@ def evaluate_estimations_and_cosines(
             model = FFNN(in_size=M)
             model.load_state_dict(torch.load(model_dir + '/%s' % (model_name))) #load model's weights
             model.to(device)
-            test_f1 = test(model=model, test_dl=dl)
-            return ans_similarities, cos_similarities_preds, test_f1
+            test_f1, test_acc, incorrect_preds = test(model=model, test_dl=dl)
+            
+            sent_pairs = np.array(sent_pairs)[pred_indices][incorrect_preds]
+            sent_pairs = np.asarray(list(map(lambda sent_pair: sent_pair.strip(), sent_pairs)))
+            y = y[incorrect_preds]
+
+            PATH = './incorrect_predictions/'
+
+            if not os.path.exists(PATH):
+                os.makedirs(PATH)
+
+            with open(PATH + 'sent_pairs.txt', 'wb') as f:
+                np.save(f, sent_pairs)
+
+            with open(PATH + 'labels.txt', 'wb') as f:
+                np.save(f, y)
+
+            return ans_similarities, cos_similarities_preds, test_f1, test_acc
     else:
         y_distrib = Counter(y)
         if y_distrib[1] > y_distrib[0]:
@@ -1026,22 +1054,24 @@ if __name__ == "__main__":
                         hidden_reps_results['train_f1s'] = [f1_scores]
 
                 else:
-                    ans_similarities, cos_similarities_preds, test_f1 = evaluate_estimations_and_cosines(
-                                                                                                         test_results=results,
-                                                                                                         source=args.source, 
-                                                                                                         prediction=args.prediction,
-                                                                                                         version=args.version,
-                                                                                                         model_dir=args.model_dir,
-                                                                                                         batch_size=args.batch_size,
-                                                                                                         layers=args.layers,
-                                                                                                         w_strategy=args.w_strategy,
-                                                                                                         computation=computation,
-                                                                                                         rnd_seed=rnd_seed,
-                                                                                                         )
+                    ans_similarities, cos_similarities_preds, test_f1, test_acc = evaluate_estimations_and_cosines(
+                                                                                                                 test_results=results,
+                                                                                                                 source=args.source, 
+                                                                                                                 prediction=args.prediction,
+                                                                                                                 version=args.version,
+                                                                                                                 model_dir=args.model_dir,
+                                                                                                                 batch_size=args.batch_size,
+                                                                                                                 layers=args.layers,
+                                                                                                                 w_strategy=args.w_strategy,
+                                                                                                                 computation=computation,
+                                                                                                                 rnd_seed=rnd_seed,
+                                                                                                                 )
                     try:
                         hidden_reps_results['test_f1'] += test_f1
+                        hidden_reps_results['test_acc'] += test_acc
                     except KeyError:
                         hidden_reps_results['test_f1'] = test_f1
+                        hidden_reps_results['test_acc'] = test_acc
             
                 if k == 0:
                     hidden_reps_results['cos_similarities_true'] = ans_similarities
@@ -1052,6 +1082,7 @@ if __name__ == "__main__":
             #hidden_reps_results['train_f1' if args.version == 'train' else 'test_f1'] /= len(rnd_seeds)
             if args.version == 'test':
                 hidden_reps_results['test_f1'] /= len(rnd_seeds)
+                hidden_reps_results['test_acc'] /= len(rnd_seeds)
 
             #create PATH
             PATH = './results_hidden_reps/' + '/' + args.source.lower() + '/' + args.prediction + '/'
