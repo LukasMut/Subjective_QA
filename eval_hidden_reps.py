@@ -952,14 +952,13 @@ def evaluate_estimations_and_cosines(
             test_f1, test_acc, incorrect_preds = test(model=model, test_dl=dl)
             
             #store Q & A, and corresponding answer span predictions for which the neural net failed to make a correct classification
-            true_start_pos = true_start_pos[pred_indices][incorrect_preds]
-            true_end_pos = true_end_pos[pred_indices][incorrect_preds]
             sent_pairs = np.asarray(sent_pairs)[pred_indices][incorrect_preds]
+            true_answers = np.asarray(true_answers)[pred_indices][incorrect_preds]
             qas = []
             for i, sent_pair in enumerate(sent_pairs):
                 sent_pair = sent_pair.strip().split()
                 q = sent_pair[:sent_pair.index('[SEP]')+1]
-                a = sent_pair[true_start_pos[i]:true_end_pos[i]+1]
+                a = true_answers[i]
                 qas.append(' '.join(q + a + ['[SEP]']))
             qas = np.asarray(qas)
             y = y[incorrect_preds]
