@@ -156,11 +156,11 @@ def train(
 ):
     n_steps = len(train_dl)
     n_iters = n_steps * n_epochs
-    min_n_epochs = 10
+    min_n_epochs = 15
     assert isinstance(y_weights, torch.Tensor), 'Tensor of weights wrt model predictions is not provided'
     loss_func = nn.BCEWithLogitsLoss(pos_weight=y_weights.to(device))
     optimizer = Adam(model.parameters(), lr=1e-2, weight_decay=0.005) #L2 Norm (i.e., weight decay)
-    max_grad_norm = 5
+    max_grad_norm = 10
     losses = []
     f1_scores = []
 
@@ -493,32 +493,14 @@ def interp_cos_per_layer(
                     cos_std_w_incorrect = 1 - dist_cos_std_incorrect
 
                 elif w_strategy == 'cdf':
-                    #####################################################################################################################################
-                    ## Note that P(cos(h_a) < x_i) is always higher for incorrect preds (more probability mass towards a cosine similarity of 0),      ##
-                    ## whereas P(cos(h_a) > x_i) always is higher for correct preds (more probability mass towards a cosine similarity of 1).          ##
-                    ## Hence, we must switch between the two probability computations dependent on the distance of *observed* cos(h_a)                 ##
-                    ## to the mean value (i.e., centroid) of the respective distributions.                                                             ##
-                    #####################################################################################################################################
 
-                    if dist_cos_mean_correct < dist_cos_mean_incorrect:
-                        #compute Q-function (i.e., P(mean(cos(h_a)) > mean_cos_i))
-                        cos_mean_w_correct = 1 - interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
-                        cos_mean_w_incorrect = 1 - interp_cos(x=cos_mean, cos=cos_incorrect_means, weighting=True)
-                    else:
-                        #compute CDF (i.e., P(mean(cos(h_a)) < mean_cos_i))
-                        cos_mean_w_correct = interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
-                        cos_mean_w_incorrect = interp_cos(x=cos_mean, cos=cos_incorrect_means, weighting=True)
+                    #################################################################################################################
+                    ## Note that the smaller abs(P(cos(h_a) > x_i) - P(cos(h_a) < x_i)) is,                                        ##
+                    ## the higher is the likelihood that x_i belongs to the respective distribution. This is a property of CDFs.   ##
+                    ## Hence, we must leverage 1 - abs(P(cos(h_a) > x_i) - P(cos(h_a) < x_i)) as a scaling factor (i.e., weights)  ##
+                    ## to approximate the *true* p_cdf values corresponding to the train CDFs.                                     ##
+                    #################################################################################################################
 
-                    if dist_cos_std_correct < dist_cos_std_incorrect:
-                        #compute Q-function (i.e., P(std(cos(h_a)) > std_cos_i))
-                        cos_std_w_correct = 1 - interp_cos(x=cos_std, cos=cos_correct_stds, weighting=True)
-                        cos_std_w_incorrect = 1 - interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
-                    else:
-                        #compute CDF (i.e., P(std(cos(h_a)) < std_cos_i))
-                        cos_std_w_correct = interp_cos(x=cos_std, cos=cos_correct_stds, weighting=True)
-                        cos_std_w_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
-
-                elif w_strategy == 'cdf_new':
                     q_cos_mean_correct = 1 - interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
                     cdf_cos_mean_correct = interp_cos(x=cos_mean, cos=cos_correct_means, weighting=True)
                     q_cos_std_correct = 1 - interp_cos(x=cos_std, cos=cos_correct_stds, weighting=True)
@@ -528,11 +510,6 @@ def interp_cos_per_layer(
                     cdf_cos_mean_incorrect = interp_cos(x=cos_mean, cos=cos_incorrect_means, weighting=True)
                     q_cos_std_incorrect = 1 - interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
                     cdf_cos_std_incorrect = interp_cos(x=cos_std, cos=cos_incorrect_stds, weighting=True)
-
-
-                    #Note that the smaller abs(P(cos(h_a) > x_i) - P(cos(h_a) < x_i)) is, 
-                    #the higher is the likelihood that x_i belongs to the respective distribution. This is a property of CDFs.
-                    #Hence, we must leverage 1 - abs(P(cos(h_a) > x_i) - P(cos(h_a) < x_i)) as a weighting factor.
 
                     cos_mean_w_correct = 1 - abs(q_cos_mean_correct - cdf_cos_mean_correct)
                     cos_mean_w_incorrect = 1 - abs(q_cos_mean_incorrect - cdf_cos_mean_incorrect)
@@ -987,7 +964,7 @@ if __name__ == "__main__":
     parser.add_argument('--layers', type=str, default='',
         help='Must be one of {all_layers, top_three_layers}.')
     parser.add_argument('--w_strategy', type=str, default='',
-        help='Must be one of {distance, cdf, cdf_new, oracle}.')
+        help='Must be one of {distance, cdf, oracle}.')
     
     args = parser.parse_args()
 
