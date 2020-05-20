@@ -951,6 +951,7 @@ def evaluate_estimations_and_cosines(
             model.to(device)
             test_f1, test_acc, incorrect_preds = test(model=model, test_dl=dl)
             
+            #store Q & A, and corresponding answer span predictions for which the neural net failed to make a correct classification
             true_start_pos = true_start_pos[pred_indices][incorrect_preds]
             true_end_pos = true_end_pos[pred_indices][incorrect_preds]
             sent_pairs = np.asarray(sent_pairs)[pred_indices][incorrect_preds]
