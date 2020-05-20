@@ -938,7 +938,7 @@ def evaluate_estimations_and_cosines(
             model.to(device)
             losses, f1_scores, model = train(model=model, train_dl=dl, version=version, n_epochs=n_epochs, batch_size=batch_size, y_weights=y_weights)
             torch.save(model.state_dict(), model_dir + '/%s' % (model_name)) #save model's weights
-            return ans_similarities, cos_similarities_preds, losses, f1_scores
+            return ans_similarities, cos_similarities_preds, losses, f1_scores, len(y)
 
         else:
             """
@@ -966,7 +966,7 @@ def evaluate_estimations_and_cosines(
             with open(PATH + 'labels.txt', 'wb') as f:
                 np.save(f, y)
 
-            return ans_similarities, cos_similarities_preds, test_f1, test_acc
+            return ans_similarities, cos_similarities_preds, test_f1, test_acc, len(y)
     else:
         y_distrib = Counter(y)
         if y_distrib[1] > y_distrib[0]:
@@ -1026,19 +1026,19 @@ if __name__ == "__main__":
                     if not os.path.exists(args.model_dir):
                         os.makedirs(args.model_dir)
                     
-                    ans_similarities, cos_similarities_preds, losses, f1_scores  = evaluate_estimations_and_cosines(
-                                                                                                                    test_results=results,
-                                                                                                                    source=args.source,
-                                                                                                                    prediction=args.prediction,
-                                                                                                                    version=args.version,
-                                                                                                                    model_dir=args.model_dir,
-                                                                                                                    batch_size=args.batch_size,
-                                                                                                                    n_epochs=args.n_epochs,
-                                                                                                                    layers=args.layers,
-                                                                                                                    w_strategy=args.w_strategy,
-                                                                                                                    computation=computation,
-                                                                                                                    rnd_seed=rnd_seed,
-                                                                                                                    )
+                    ans_similarities, cos_similarities_preds, losses, f1_scores, n_examples = evaluate_estimations_and_cosines(
+                                                                                                                                test_results=results,
+                                                                                                                                source=args.source,
+                                                                                                                                prediction=args.prediction,
+                                                                                                                                version=args.version,
+                                                                                                                                model_dir=args.model_dir,
+                                                                                                                                batch_size=args.batch_size,
+                                                                                                                                n_epochs=args.n_epochs,
+                                                                                                                                layers=args.layers,
+                                                                                                                                w_strategy=args.w_strategy,
+                                                                                                                                computation=computation,
+                                                                                                                                rnd_seed=rnd_seed,
+                                                                                                                                )
                     """
                     try:
                         hidden_reps_results['train_f1'] += train_f1
@@ -1054,18 +1054,18 @@ if __name__ == "__main__":
                         hidden_reps_results['train_f1s'] = [f1_scores]
 
                 else:
-                    ans_similarities, cos_similarities_preds, test_f1, test_acc = evaluate_estimations_and_cosines(
-                                                                                                                 test_results=results,
-                                                                                                                 source=args.source, 
-                                                                                                                 prediction=args.prediction,
-                                                                                                                 version=args.version,
-                                                                                                                 model_dir=args.model_dir,
-                                                                                                                 batch_size=args.batch_size,
-                                                                                                                 layers=args.layers,
-                                                                                                                 w_strategy=args.w_strategy,
-                                                                                                                 computation=computation,
-                                                                                                                 rnd_seed=rnd_seed,
-                                                                                                                 )
+                    ans_similarities, cos_similarities_preds, test_f1, test_acc, n_examples = evaluate_estimations_and_cosines(
+                                                                                                                             test_results=results,
+                                                                                                                             source=args.source, 
+                                                                                                                             prediction=args.prediction,
+                                                                                                                             version=args.version,
+                                                                                                                             model_dir=args.model_dir,
+                                                                                                                             batch_size=args.batch_size,
+                                                                                                                             layers=args.layers,
+                                                                                                                             w_strategy=args.w_strategy,
+                                                                                                                             computation=computation,
+                                                                                                                             rnd_seed=rnd_seed,
+                                                                                                                             )
                     try:
                         hidden_reps_results['test_f1'] += test_f1
                         hidden_reps_results['test_acc'] += test_acc
@@ -1076,6 +1076,7 @@ if __name__ == "__main__":
                 if k == 0:
                     hidden_reps_results['cos_similarities_true'] = ans_similarities
                     hidden_reps_results['cos_similarities_preds'] = cos_similarities_preds
+                    hidden_reps_results['dataset_size'] = n_examples
 
             
             #compute mean F1 score
