@@ -836,8 +836,8 @@ def evaluate_estimations_and_cosines(
 ):
     pred_answers = test_results['predicted_answers']
     true_answers = test_results['true_answers']
-    true_start_pos = test_results['true_start_pos']
-    true_end_pos = test_results['true_end_pos']
+    true_start_pos = np.asarray(test_results['true_start_pos'])
+    true_end_pos = np.asarray(test_results['true_end_pos'])
     s_log_probs = np.asarray(test_results['start_log_probs'])
     e_log_probs = np.asarray(test_results['end_log_probs'])
     sent_pairs = test_results['sent_pairs']
@@ -951,17 +951,25 @@ def evaluate_estimations_and_cosines(
             model.to(device)
             test_f1, test_acc, incorrect_preds = test(model=model, test_dl=dl)
             
-            sent_pairs = np.array(sent_pairs)[pred_indices][incorrect_preds]
-            sent_pairs = np.asarray(list(map(lambda sent_pair: sent_pair.strip(), sent_pairs)))
+            true_start_pos = true_start_pos[pred_indices][incorrect_preds]
+            true_end_pos = true_end_pos[pred_indices][incorrect_preds]
+            sent_pairs = np.asarray(sent_pairs)[pred_indices][incorrect_preds]
+            qas = []
+            for i, sent_pair in enumerate(sent_pairs):
+                sent_pair = sent_pair.strip().split()
+                q = sent_pair[:sent_pair.index('[SEP]')+1]
+                a = sent_pair[true_start_pos[i]:true_end_pos[i]+1]
+                qas.append(' '.join(q + a + ['[SEP]']))
+            qas = np.asarray(qas)
             y = y[incorrect_preds]
 
-            PATH = './incorrect_predictions/'
+            PATH = './incorrect_predictions/' + source.lower() + '/'
 
             if not os.path.exists(PATH):
                 os.makedirs(PATH)
 
-            with open(PATH + 'sent_pairs.txt', 'wb') as f:
-                np.save(f, sent_pairs)
+            with open(PATH + 'question_answers.txt', 'wb') as f:
+                np.save(f, qas)
 
             with open(PATH + 'labels.txt', 'wb') as f:
                 np.save(f, y)
