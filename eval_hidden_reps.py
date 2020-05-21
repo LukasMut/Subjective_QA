@@ -141,8 +141,8 @@ def test(model, test_dl):
             X, y = batch
             logits = model(X)
             probas = torch.sigmoid(logits)
-            y_pred = soft_to_hard(probas)
-            incorrect_preds.append(np.where(y.cpu() != y_pred)[0] + i)
+            y_pred = soft_to_hard(probas).long().numpy()
+            incorrect_preds.append(np.where(y.cpu().numpy() != y_pred)[0] + i)
             test_f1 += f1(probas=probas, y_true=y, task='binary')
             test_acc += accuracy(probas=probas, y_true=y, task='binary')
             test_steps += 1
