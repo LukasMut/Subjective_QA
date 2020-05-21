@@ -146,7 +146,7 @@ def test(model, test_dl):
             test_f1 += f1(probas=probas, y_true=y, task='binary')
             test_acc += accuracy(probas=probas, y_true=y, task='binary')
             test_steps += 1
-            i += len(y) #batch_size
+            i += X.size(0) #batch_size
         test_f1 /= test_steps
         test_acc /= test_steps
     incorrect_preds = np.asarray(incorrect_preds).flatten()
