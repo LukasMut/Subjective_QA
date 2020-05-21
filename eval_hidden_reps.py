@@ -967,6 +967,7 @@ def evaluate_estimations_and_cosines(
             X = X_cos[incorrect_preds][:, 2*L:] if computation in ['concat', 'weighting'] else X_cos[incorrect_preds][:, slice(L, None, 2)]
             y = y[incorrect_preds]
 
+            model_name = model_name.lstrip('fc_nn_')
             model_name =  "".join(filter(lambda char: not char.isdigit(), model_name))
             PATH = './incorrect_predictions/' + source.lower() + '/' + model_name + '/'
 
