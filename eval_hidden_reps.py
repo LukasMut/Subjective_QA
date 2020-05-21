@@ -977,7 +977,7 @@ def evaluate_estimations_and_cosines(
             with open(PATH + 'question_answers.txt', 'wb') as f:
                 np.save(f, qas)
 
-             with open(PATH + 'features.txt', 'wb') as f:
+            with open(PATH + 'features.txt', 'wb') as f:
                 np.save(f, X)
 
             with open(PATH + 'labels.txt', 'wb') as f:
