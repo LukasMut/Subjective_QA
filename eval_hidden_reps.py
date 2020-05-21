@@ -890,8 +890,7 @@ def evaluate_estimations_and_cosines(
                                          computation=computation,
                                          y=y if version == 'train' or w_strategy == 'oracle' else None,
                                          )
-
-            model_name = 'fc_nn' + '_' + layers + '_' + w_strategy + '_' + computation + '_' + 'heuristic' + '_' + str(rnd_seed)
+            model_name = 'fc_nn' + '_' + w_strategy + '_' + computation + '_' + 'heuristic' + '_' + str(rnd_seed)
 
         #elif re.search(r'baseline', computation):
         #    X = compute_baseline_features(
@@ -902,11 +901,9 @@ def evaluate_estimations_and_cosines(
         #                                  e_log_probs=e_log_probs,
         #                                  method='qa_concat' if re.search(r'concat', computation) else 'heuristic',
         #                                  )
-        #
         #    model_name = 'fc_nn' + '_' + computation + str(rnd_seed)
-
         else:
-            model_name = 'fc_nn' + '_' + layers + '_' + computation + '_' + 'heuristic' + '_'  + str(rnd_seed)
+            model_name = 'fc_nn' + '_' + computation + '_' + 'heuristic' + '_'  + str(rnd_seed)
 
         X_baseline = compute_baseline_features(
                                               feat_reps=feat_reps,
@@ -916,8 +913,13 @@ def evaluate_estimations_and_cosines(
                                               e_log_probs=e_log_probs,
                                               method='heuristic',
                                               )
-        X = np.hstack((X_baseline, X_cos))
-            
+
+        if re.search(r'baseline', computation):
+            X = X_baseline
+            model_name = 'fc_nn' + '_' + computation + str(rnd_seed)
+        else:
+            X = np.hstack((X_baseline, X_cos))
+
         M = X.shape[1] #M = number of input features (i.e., x $\in$ R^M)
         #X, y = shuffle_arrays(X, y) if version == 'train' else X, y #shuffle order of examples during training (this step is not necessary at inference time)
         tensor_ds = create_tensor_dataset(X, y)
@@ -963,7 +965,7 @@ def evaluate_estimations_and_cosines(
             qas = np.asarray(qas)
             y = y[incorrect_preds]
 
-            PATH = './incorrect_predictions/' + source.lower() + '/'
+            PATH = './incorrect_predictions/' + source.lower() + '/' + model_name + '/'
 
             if not os.path.exists(PATH):
                 os.makedirs(PATH)
@@ -1010,7 +1012,7 @@ if __name__ == "__main__":
     #iterate over five different random seeds to obtain more robust results
     rnd_seeds = np.random.randint(0, 100, 5)
 
-    computations = ['raw', 'concat', 'weighting'] if args.w_strategy == 'distance' else ['concat', 'weighting']
+    computations = ['raw', 'concat', 'weighting', 'baseline_heuristic'] if args.w_strategy == 'distance' else ['concat', 'weighting']
 
     #get hidden representations
     results, file_name = get_hidden_reps(source=args.source, version=args.version)
