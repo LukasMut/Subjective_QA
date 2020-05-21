@@ -963,8 +963,10 @@ def evaluate_estimations_and_cosines(
                 a = true_answers[i]
                 qas.append(' '.join(q + a + ['[SEP]']))
             qas = np.asarray(qas)
+            L = 6
+            X = X_cos[incorrect_preds][:, 2*L:] if computation in ['concat', 'weighting'] else X_cos[incorrect_preds][:, slice(L, None, 2)]
             y = y[incorrect_preds]
-            
+
             model_name =  "".join(filter(lambda char: not char.isdigit(), model_name))
             PATH = './incorrect_predictions/' + source.lower() + '/' + model_name + '/'
 
@@ -973,6 +975,9 @@ def evaluate_estimations_and_cosines(
 
             with open(PATH + 'question_answers.txt', 'wb') as f:
                 np.save(f, qas)
+
+             with open(PATH + 'features.txt', 'wb') as f:
+                np.save(f, X)
 
             with open(PATH + 'labels.txt', 'wb') as f:
                 np.save(f, y)
