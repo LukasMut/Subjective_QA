@@ -964,7 +964,8 @@ def evaluate_estimations_and_cosines(
                 qas.append(' '.join(q + a + ['[SEP]']))
             qas = np.asarray(qas)
             y = y[incorrect_preds]
-
+            
+            model_name =  "".join(filter(lambda char: not char.isdigit(), model_name))
             PATH = './incorrect_predictions/' + source.lower() + '/' + model_name + '/'
 
             if not os.path.exists(PATH):
