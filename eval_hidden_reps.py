@@ -962,7 +962,7 @@ def evaluate_estimations_and_cosines(
             for i, sent_pair in enumerate(sent_pairs):
                 sent_pair = sent_pair.strip().split()
                 q = sent_pair[:sent_pair.index('[SEP]')+1]
-                a = true_answers[i]
+                a = true_answers[i].split()
                 qas.append(' '.join(q + a + ['[SEP]']))
             qas = np.asarray(qas)
             L = 6
