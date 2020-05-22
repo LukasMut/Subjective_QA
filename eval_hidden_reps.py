@@ -149,7 +149,7 @@ def test(model, test_dl):
             i += X.size(0) #batch_size
         test_f1 /= test_steps
         test_acc /= test_steps
-    #NOTE: np.array().flatten() can only be applied to a matrix, iff all rows (i.e., vectors) are of equal length
+    #NOTE: np.array().flatten() can only be applied to a matrix, iff all rows (i.e., vectors) are of equal length (same magnitude)
     incorrect_preds = np.array([el for batch in incorrect_preds for el in batch])
     print("===================")
     print("==== Inference ====")
