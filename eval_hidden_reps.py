@@ -1015,19 +1015,17 @@ if __name__ == "__main__":
         help='Must be one of {distance, cdf, oracle}.')
     
     args = parser.parse_args()
-
-    #set NumPy random seed for reproducibility of results
-    np.random.seed(42)
-    
-    #iterate over five different random seeds to obtain more robust results
-    rnd_seeds = np.random.randint(0, 100, 5)
-
-    computations = ['raw', 'concat', 'weighting', 'baseline_heuristic'] if args.w_strategy == 'distance' else ['concat', 'weighting']
-
     #get hidden representations
     results, file_name = get_hidden_reps(source=args.source, version=args.version)
     
-    if args.prediction == 'learned':        
+    if args.prediction == 'learned':
+        
+        #set NumPy random seed for reproducibility of results
+        np.random.seed(42)
+        #iterate over five different random seeds to obtain more robust results
+        rnd_seeds = np.random.randint(0, 100, 5)
+        computations = ['raw', 'concat', 'weighting', 'baseline_heuristic'] if args.w_strategy == 'distance' else ['concat', 'weighting']
+
         for computation in computations:
             hidden_reps_results = {}
             #perform computations for different random seeds (results might vary as a function of random seeds due to different initialisations)
