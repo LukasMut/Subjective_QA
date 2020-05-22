@@ -149,7 +149,7 @@ def test(model, test_dl):
             i += X.size(0) #batch_size
         test_f1 /= test_steps
         test_acc /= test_steps
-    incorrect_preds = np.asarray(incorrect_preds).flatten().astype(int)
+    incorrect_preds = np.asarray([el for batch in incorrect_preds for el in batch])
     print("===================")
     print("==== Inference ====")
     print("==== F1: {} ====".format(round(test_f1, 3)))
