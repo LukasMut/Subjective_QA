@@ -991,8 +991,9 @@ def evaluate_estimations_and_cosines(
         if y_distrib[1] > y_distrib[0]:
             y_hat = np.ones(len(y))
         else:
-            y_hat = np.zeros(len(y))    
-        return f1_score(y_true=y, y_pred=y_hat, average='macro') 
+            y_hat = np.zeros(len(y))
+        acc = (y == y_hat).mean()    
+        return f1_score(y_true=y, y_pred=y_hat, average='macro'), acc 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -1115,12 +1116,12 @@ if __name__ == "__main__":
 
     elif args.prediction == 'majority':
         hidden_reps_results = {}
-        hidden_reps_results['f1_score'] = evaluate_estimations_and_cosines(
-                                                                           test_results=results,
-                                                                           source=args.source,
-                                                                           prediction=args.prediction, 
-                                                                           version=args.version,
-                                                                           )
+        hidden_reps_results['f1_score'],  hidden_reps_results['acc']= evaluate_estimations_and_cosines(
+                                                                                                       test_results=results,
+                                                                                                       source=args.source,
+                                                                                                       prediction=args.prediction, 
+                                                                                                       version=args.version,
+                                                                                                       )
         #create PATH
         PATH = './results_hidden_reps/' + '/' + args.source.lower() + '/' + args.prediction + '/'
         if not os.path.exists(PATH):
