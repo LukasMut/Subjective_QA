@@ -1017,11 +1017,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
     #get hidden representations
     results, file_name = get_hidden_reps(source=args.source, version=args.version)
+    #set NumPy random seed for reproducibility of results
+    np.random.seed(42)
     
     if args.prediction == 'learned':
-        
-        #set NumPy random seed for reproducibility of results
-        np.random.seed(42)
+
         #iterate over five different random seeds to obtain more robust results
         rnd_seeds = np.random.randint(0, 100, 5)
         computations = ['raw', 'concat', 'weighting', 'baseline_heuristic'] if args.w_strategy == 'distance' else ['concat', 'weighting']
