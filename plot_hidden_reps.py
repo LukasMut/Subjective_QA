@@ -10,6 +10,7 @@ import os
 import random
 import re
 
+from eval_squad import compute_exact
 from mpl_toolkits.mplot3d import Axes3D
 from plotting import *
 from sklearn.decomposition import PCA

@@ -18,7 +18,6 @@ import os
 import re
 
 from collections import defaultdict
-from eval_squad import compute_exact
 from itertools import islice, product
 from mpl_toolkits.mplot3d import Axes3D
 

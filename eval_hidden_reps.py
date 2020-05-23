@@ -958,6 +958,7 @@ def evaluate_estimations_and_cosines(
             #store Q & A, and corresponding answer span predictions for which the neural net failed to make a correct classification
             sent_pairs = np.asarray(sent_pairs)[pred_indices][incorrect_preds]
             true_answers = np.asarray(true_answers)[pred_indices][incorrect_preds]
+            pred_answers = np.asarray(pred_answers)[pred_indices][incorrect_preds]
             qas = []
             for i, sent_pair in enumerate(sent_pairs):
                 sent_pair = sent_pair.strip().split()
@@ -978,6 +979,9 @@ def evaluate_estimations_and_cosines(
 
             with open(PATH + 'question_answers.txt', 'wb') as f:
                 np.save(f, qas)
+
+            with open(PATH + 'ans_span_preds.txt', 'wb') as f:
+                np.save(f, pred_answers)
 
             with open(PATH + 'features.txt', 'wb') as f:
                 np.save(f, X)
