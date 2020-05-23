@@ -1,9 +1,7 @@
 import argparse
 import numpy as np
-import pandas as pd
 import matplotlib as mpl 
 import matplotlib.pyplot as plt
-import seaborn as sns
 
 import json
 import os
@@ -11,12 +9,7 @@ import random
 import re
 
 from eval_squad import compute_exact
-from mpl_toolkits.mplot3d import Axes3D
 from plotting import *
-from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
-from sklearn.metrics import classification_report, confusion_matrix
-from sklearn.utils.multiclass import unique_labels
 
 #set random seeds to reproduce results
 np.random.seed(42)
