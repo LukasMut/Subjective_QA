@@ -54,7 +54,7 @@ def get_hidden_reps(
 ##### OBTAIN FEAT REPS ON TOKEN LEVEL FOR RANDOM SENTENCE #######
 ################################################################
 
-def get_random_sent_feat_reps(
+def get_random_sent_hidden_reps(
                               test_results:dict,
                               prediction:str,
                               rnd_seed:int,
@@ -172,7 +172,7 @@ if __name__ == '__main__':
         if k > 0 and k % 2 == 0:
             rnd_seed += 1
         
-        feat_reps_per_layer, token_labels, rnd_sent = get_random_sent_feat_reps(results, pred, rnd_seed)
+        feat_reps_per_layer, token_labels, rnd_sent = get_random_sent_hidden_reps(results, pred, rnd_seed)
         
         file_name = file_name_c + '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred + '_' + str(k)
 

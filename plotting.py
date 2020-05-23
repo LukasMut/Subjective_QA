@@ -1,8 +1,5 @@
 __all__ = [
            'conf_mat',
-           'get_results',
-           'plot_results',
-           'plotting',
            'plot_confusion_matrix',
            'plot_seqs_projected_via_tsne',
            'plot_feat_reps_per_layer',
