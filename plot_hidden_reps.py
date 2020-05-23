@@ -66,7 +66,7 @@ def get_random_sent_feat_reps(
                               prediction:str,
                               rnd_seed:int,
 ):
-    # unpack test results
+    #unpack dev/test results
     pred_answers = test_results['predicted_answers']
     true_answers = test_results['true_answers']
     true_start_pos = test_results['true_start_pos']
@@ -74,14 +74,14 @@ def get_random_sent_feat_reps(
     sent_pairs = test_results['sent_pairs']
     feat_reps = test_results['feat_reps']
 
-    # [CLS] token id
+    #[CLS] token id
     cls_tok_id = 0
     
     if prediction == 'correct':
-        # indices for correct predictions
+        #indices for correct predictions
         indices = np.array([i for i, pred_ans in enumerate(pred_answers) if compute_exact(true_answers[i], pred_ans) and true_answers[i].strip() != '[CLS]' and len(true_answers[i].strip().split()) > 1])     
     else:
-        # indices for wrong predictions
+        #indices for wrong predictions
         indices = np.array([i for i, pred_ans in enumerate(pred_answers) if not compute_exact(true_answers[i], pred_ans) and true_answers[i].strip() != '[CLS]' and len(true_answers[i].strip().split()) > 1])
 
     #set random seed to reproduce plots

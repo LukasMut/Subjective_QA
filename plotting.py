@@ -1,6 +1,5 @@
 __all__ = [
            'conf_mat',
-           'get_random_sent_feat_reps',
            'get_results',
            'plot_results',
            'plotting',
