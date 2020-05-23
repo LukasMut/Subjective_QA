@@ -36,7 +36,7 @@ def euclidean_dist(u:np.ndarray, v:np.ndarray): return np.linalg.norm(u-v)
 
 def cosine_sim(x:np.ndarray, y:np.ndarray):
     num = x @ y
-    denom = np.linalg.norm(x) * np.linalg.norm(y) # default is Frobenius norm (i.e., L2 norm)
+    denom = np.linalg.norm(x) * np.linalg.norm(y) #default is Frobenius norm (i.e., L2 norm)
     return num / denom
 
 def avg_diameter_dist(samples:np.ndarray):
@@ -505,99 +505,6 @@ def plot_feat_reps_per_layer(
                                      support_labels=support_labels,
 
                                      )
-#################################################################        
-##### OBTAIN FEAT REPS ON TOKEN LEVEL FOR RANDOM SENTENCE #######
-################################################################
-
-def get_random_sent_feat_reps(
-                              test_results:dict,
-                              prediction:str,
-                              rnd_seed:int,
-):
-    # unpack test results
-    pred_answers = test_results['predicted_answers']
-    true_answers = test_results['true_answers']
-    true_start_pos = test_results['true_start_pos']
-    true_end_pos = test_results['true_end_pos']
-    sent_pairs = test_results['sent_pairs']
-    feat_reps = test_results['feat_reps']
-
-    # [CLS] token id
-    cls_tok_id = 0
-    
-    if prediction == 'correct':
-        # indices for correct predictions
-        indices = np.array([i for i, pred_ans in enumerate(pred_answers)
-                            if compute_exact(true_answers[i], pred_ans) and true_answers[i].strip() != '[CLS]' and len(true_answers[i].strip().split()) > 1])     
-    else:
-        # indices for wrong predictions
-        indices = np.array([i for i, pred_ans in enumerate(pred_answers)
-                            if not compute_exact(true_answers[i], pred_ans) and true_answers[i].strip() != '[CLS]' and len(true_answers[i].strip().split()) > 1])
-
-    # set random seed to reproduce plots
-    np.random.seed(rnd_seed)
-    # get random idx
-    rnd_sent_idx = np.random.choice(indices)
-    # get random sent according to random idx
-    rnd_sent = sent_pairs[rnd_sent_idx]
-    # convert sent into list
-    rnd_sent = rnd_sent.split()
-    # get sep idx (NOTE: .index() returns first occurrence of element in list)
-    sep_idx = rnd_sent.index('[SEP]')
-    # get question indices
-    q_indices = np.arange(1, sep_idx)
-    
-    print("=============================================================")
-    print("===== Question: {} =====".format(' '.join(rnd_sent[q_indices[0]:q_indices[-1]+1])))
-    print("=============================================================")
-    print()
-    
-    # get answer indices
-    a_indices = np.arange(true_start_pos[rnd_sent_idx], true_end_pos[rnd_sent_idx] + 1)
-    
-    print("=============================================================")
-    print("===== True answer: {} =====".format(' '.join(rnd_sent[a_indices[0]:a_indices[-1]+1])))
-    print("=============================================================")
-    print()
-
-    if re.search(r'wrong', prediction):
-      print("=============================================================")
-      print("===== Predicted answer: {} =====".format(pred_answers[rnd_sent_idx]))
-      print("=============================================================")
-      print()
-
-    
-    # create list of special token indices
-    special_tok_indices = [cls_tok_id, sep_idx, len(rnd_sent)-1]
-
-    try:
-      if a_indices == np.array([cls_tok_id]):
-          special_tok_indices.pop(special_tok_indices.index(cls_tok_id))
-    except ValueError:
-      pass
-    
-    special_tok_indices = np.array(special_tok_indices)
-    
-    # extract feat reps for random sent on token level and convert to NumPy
-    print("============================================================================")
-    print("================ Obtaining hidden reps for random sentence =================")
-    print("============================================================================")
-    print()
-    feat_reps_per_layer = {l: np.array(hiddens)[rnd_sent_idx] for l, hiddens in feat_reps.items()}
-    
-    # create synthetic labels for token sequence
-    T = len(rnd_sent)
-    token_labels = np.zeros(T, dtype=int)
-    
-    for i in range(T):
-        if i in special_tok_indices:
-            token_labels[i] += 99
-        elif i in q_indices:
-            token_labels[i] += 1
-        elif i in a_indices:
-            token_labels[i] += 2
-    
-    return feat_reps_per_layer, token_labels, rnd_sent
     
 ##########################################
 ########## CONFUSION MATRIX ##############
