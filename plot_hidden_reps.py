@@ -120,11 +120,7 @@ def get_random_sent_hidden_reps(
     
     special_tok_indices = np.array(special_tok_indices)
     
-    #extract feat reps for random sent on token level and convert to NumPy
-    print("============================================================================")
-    print("================ Obtaining hidden reps for random sentence =================")
-    print("============================================================================")
-    print()
+    #extract feat reps for random sent on token level and convert to NumPy matrix
     feat_reps_per_layer = {l: np.array(hiddens)[rnd_sent_idx] for l, hiddens in feat_reps.items()}
     
     # create synthetic labels for token sequence
