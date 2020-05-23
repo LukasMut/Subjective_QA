@@ -28,7 +28,7 @@ if __name__ == '__main__':
     parser.add_argument('--task', type=str, default='QA',
             help='If QA, plot hidden reps of QA model; if "sbj_class", plot hidden reps of sbj. class. model.')
     parser.add_argument('--visualization', type=str, default='tokens',
-            help='Must be one of {"question_words", "context_domains", "question_types", "tokens"}.')
+            help='Must be one of {"context_domains", "question_types", "tokens"}.')
     args = parser.parse_args()
  
     # set folder and subdirectory
