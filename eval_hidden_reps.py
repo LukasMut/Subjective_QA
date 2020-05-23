@@ -965,8 +965,8 @@ def evaluate_estimations_and_cosines(
                 a = true_answers[i].split()
                 qas.append(' '.join(q + a + ['[SEP]']))
             qas = np.asarray(qas)
-            L = 6
-            X = X_cos[incorrect_preds][:, 2*L:] if computation in ['concat', 'weighting'] else X_cos[incorrect_preds][:, slice(L, None, 2)]
+            M_h = 9
+            X = X[incorrect_preds][:, M_h:] if computation == 'concat' else X[incorrect_preds][:, slice(M_h, None, 2)]
             y = y[incorrect_preds]
 
             model_name = model_name.lstrip('fc_nn_')
