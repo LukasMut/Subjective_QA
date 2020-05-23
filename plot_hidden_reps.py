@@ -73,7 +73,7 @@ if __name__ == '__main__':
     ################################################################################################################
     
     #plot random sentence for both correct and incorrect (answer span) predictions 
-    predictions = ['correct_answerable', 'wrong_answerable', 'correct_answerable', 'wrong_answerable', 'correct_answerable', 'wrong_answerable']
+    predictions = ['correct' if i % 2 == 0 else 'wrong' for i in range(10)]
     classes = ['context', 'question', 'answer']
     labels = np.arange(len(classes))
     class_to_idx = {c: l for c, l in zip(classes, labels)}
@@ -82,7 +82,7 @@ if __name__ == '__main__':
     combined_ds = False
     retained_variance = .99
     rnd_state = 42
-    rnd_seed = 42
+    rnd_seed = rnd_state
     file_name_c = file_name[:]
     
     for k, pred in enumerate(predictions):
@@ -94,13 +94,6 @@ if __name__ == '__main__':
         
         file_name = file_name_c + '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred + '_' + str(k)
 
-        """
-        if k == 0:
-            model_name += '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred
-        else:
-            model_name = model_name_copy + '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred
-            break
-        """
         print("================================================================")
         print("=========== Started plotting: {} prediction =============".format(pred))
         print("================================================================")

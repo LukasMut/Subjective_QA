@@ -525,17 +525,11 @@ def get_random_sent_feat_reps(
     # [CLS] token id
     cls_tok_id = 0
     
-    if prediction == 'correct_answerable':
+    if prediction == 'correct':
         # indices for correct predictions
         indices = np.array([i for i, pred_ans in enumerate(pred_answers)
-                            if compute_exact(true_answers[i], pred_ans) and true_answers[i].strip() != '[CLS]' and len(true_answers[i].strip().split()) > 1])
-
-    elif prediction == 'correct_unanswerable':
-        # indices for correct predictions for an unanswerable question
-        indices = np.array([i for i, pred_ans in enumerate(pred_answers)
-                            if compute_exact(true_answers[i], pred_ans) and true_answers[i].strip() == '[CLS]'])
-        
-    elif prediction == 'wrong_answerable':
+                            if compute_exact(true_answers[i], pred_ans) and true_answers[i].strip() != '[CLS]' and len(true_answers[i].strip().split()) > 1])     
+    else:
         # indices for wrong predictions
         indices = np.array([i for i, pred_ans in enumerate(pred_answers)
                             if not compute_exact(true_answers[i], pred_ans) and true_answers[i].strip() != '[CLS]' and len(true_answers[i].strip().split()) > 1])
