@@ -174,7 +174,7 @@ def train(
     assert isinstance(y_weights, torch.Tensor), 'Tensor of weights wrt model predictions is not provided'
     loss_func = nn.BCEWithLogitsLoss(pos_weight=y_weights.to(device))
     optimizer = Adam(model.parameters(), lr=1e-2, weight_decay=0.005) #L2 Norm (i.e., weight decay)
-    max_grad_norm = 10 if version.lower() == 'subjqa' else 5 
+    max_grad_norm = 5 if version.lower() == 'subjqa' else 10
     losses = []
     f1_scores = []
 
