@@ -971,7 +971,7 @@ def evaluate_estimations_and_cosines(
             y = y[incorrect_preds]
 
             model_name = model_name.lstrip('fc_nn_')
-            model_name =  "".join(filter(lambda char: not char.isdigit(), model_name))
+            model_name =  "".join(filter(lambda char: not char.isdigit(), model_name)).rstrip('_')
             PATH = './incorrect_predictions/' + source.lower() + '/' + model_name + '/'
 
             if not os.path.exists(PATH):
