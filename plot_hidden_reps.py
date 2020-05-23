@@ -22,6 +22,13 @@ np.random.seed(42)
 random.seed(42)
 
 
+def euclidean_dist(u:np.ndarray, v:np.ndarray): return np.linalg.norm(u-v)
+
+def cosine_sim(x:np.ndarray, y:np.ndarray):
+    num = x @ y
+    denom = np.linalg.norm(x) * np.linalg.norm(y) #default is Frobenius norm (i.e., L2 norm)
+    return num / denom
+
 def get_hidden_reps(
                     source:str,
                     version:str,
