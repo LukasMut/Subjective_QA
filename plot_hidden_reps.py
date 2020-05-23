@@ -18,8 +18,8 @@ from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.utils.multiclass import unique_labels
 
 #set random seeds to reproduce results
-#np.random.seed(42)
-#random.seed(42)
+np.random.seed(42)
+random.seed(42)
 
 
 def get_hidden_reps(
@@ -30,7 +30,6 @@ def get_hidden_reps(
     folder = '/results_test/'
     subdir = '/feat_reps/'
     subsubdir = '/qa_per_token/'
-    task = 'ans_pred'
 
     #create PATH
     cwd = '.'
@@ -49,7 +48,7 @@ def get_hidden_reps(
     #load hidden representations into memory
     with open(PATH + f, encoding="utf-8") as json_file:
         results = json.load(json_file)
-        file_name = 'hidden_rep_cosines' + '_' +  task + '_' + version
+        file_name = 'hidden_reps' + '_' + version
         print()
         print("===============================================================")
         print("======= File loaded: {} =======".format(file_name))

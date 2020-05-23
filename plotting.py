@@ -455,19 +455,11 @@ def plot_seqs_projected_via_tsne(
     if not os.path.exists(PATH):
         os.makedirs(PATH)
 
-    if layer_wise:
-        layer = n_layer.split('_')
-        layer = ' '.join(layer).capitalize()
-        plt.tight_layout()
-        plt.savefig(PATH + file_name + '_' + n_layer.lower() + '.png')
-    else:
-        plt.tight_layout()
-        plt.savefig('./plots/feat_reps/' + file_name + '.png')
-    
-    #plt.show()
-    #plt.clf()
-    plt.close() # don't use plt.show() if you want to close window after plotting automatically 
-    
+    layer = n_layer.split('_')
+    layer = ' '.join(layer).capitalize()
+    plt.tight_layout()
+    plt.savefig(PATH + file_name + '_' + n_layer.lower() + '.png')
+    plt.close()
 
 def plot_feat_reps_per_layer(
                              y_true:np.ndarray,
