@@ -942,7 +942,7 @@ def evaluate_estimations_and_cosines(
             model.to(device)
             losses, f1_scores, model = train(model=model, train_dl=dl, version=version, n_epochs=n_epochs, batch_size=batch_size, y_weights=y_weights)
             torch.save(model.state_dict(), model_dir + '/%s' % (model_name)) #save model's weights
-            return ans_similarities, cos_similarities_preds, losses, f1_scores, len(y)
+            return ans_similarities, cos_similarities_preds, losses, f1_scores, len(true_preds)
 
         else:
             """
@@ -985,7 +985,7 @@ def evaluate_estimations_and_cosines(
             with open(PATH + 'labels.txt', 'wb') as f:
                 np.save(f, y)
 
-            return ans_similarities, cos_similarities_preds, test_f1, test_acc, len(y)
+            return ans_similarities, cos_similarities_preds, test_f1, test_acc, len(true_preds)
     else:
         y_distrib = Counter(y)
         if y_distrib[1] > y_distrib[0]:
