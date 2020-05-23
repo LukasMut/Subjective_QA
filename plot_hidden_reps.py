@@ -20,196 +20,107 @@ from sklearn.utils.multiclass import unique_labels
 #set random seeds to reproduce results
 #np.random.seed(42)
 #random.seed(42)
+
+
+def get_hidden_reps(
+                    source:str,
+                    version:str,
+):    
+    #set folder and subdirectories
+    folder = '/results_test/'
+    subdir = '/feat_reps/'
+    subsubdir = '/qa_per_token/'
+    task = 'ans_pred'
+
+    #create PATH
+    cwd = '.'
+    PATH = cwd + folder + subdir + subsubdir
+    PATH += '/bert_finetuned_subjqa/' if source == 'SubjQA' else '/bert_finetuned_squad/'
+    PATH += '/dev/' if version == 'train' else '/test/'
+
+    if not os.path.exists(PATH):
+        os.makedirs(PATH)
+        raise FileNotFoundError('PATH was not correctly defined. Move files to PATH before executing script again.')
+
+    #we want to exclusively capture .json files
+    files = [file for file in os.listdir(PATH) if file.endswith('.json')]
+    f = files.pop()
+
+    #load hidden representations into memory
+    with open(PATH + f, encoding="utf-8") as json_file:
+        results = json.load(json_file)
+        file_name = 'hidden_rep_cosines' + '_' +  task + '_' + version
+        print()
+        print("===============================================================")
+        print("======= File loaded: {} =======".format(file_name))
+        print("===============================================================")
+        print()
+
+    return results, file_name
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--hidden_reps', type=str, default='per_class',
-            help='If "per_class", plot hidden reps per class; if "across_classes" plot hidden reps per domain conditioned on qa_type; if "per_token" choose random sent and plot each tok in vec space.')
-    parser.add_argument('--task', type=str, default='QA',
-            help='If QA, plot hidden reps of QA model; if "sbj_class", plot hidden reps of sbj. class. model.')
-    parser.add_argument('--visualization', type=str, default='tokens',
-            help='Must be one of {"context_domains", "question_types", "tokens"}.')
+    parser.add_argument('--source', type=str, default='SQuAD',
+            help='Must be one of {SQuAD, SubjQA}')
+    parser.add_argument('--version', type=str, default='train',
+            help='Must be one of {train, test}')
     args = parser.parse_args()
  
-    # set folder and subdirectory
-    folder = '/results_test/'
-    subdir = '/feat_reps/'
 
-    if args.task == 'sbj_class':
-        subsubdir = '/sbj_class_multi/'
-        task = 'multi_sbj'
-
-    elif args.task == 'QA':
-        if args.hidden_reps == 'per_class':
-
-            if args.visualization == 'question_words':
-                subsubdir = '/qa_per_q_word/'
-            elif args.visualization == 'question_types':
-                subsubdir = '/qa_ds_agnostic/' 
-
-        elif args.hidden_reps == 'across_classes':
-            assert args.visualization == 'context_domains'
-            subsubdir = '/qa_sequential_transfer/'
-
-        else:
-            assert args.visualization == 'tokens'
-            subsubdir = '/qa_per_token/'
-
-        task = subsubdir.lstrip('/').rstrip('/').lower()
-        
-    # create PATH
-    cwd = '.'
-    PATH = cwd + folder + subdir + subsubdir + '/bert_stl_finetuned_subjqa/' if task == 'qa_per_token' else cwd + folder + subdir + subsubdir
-    # we exclusively want to capture .json files
-    files = [file for file in os.listdir(PATH) if file.endswith('.json')]
-    
-    # load files
-    for f in files:
-        if re.search(r'alternating', f):
-            with open(PATH + f) as json_file:
-                test_results_qa  = json.load(json_file)
-                model_name_qa = 'tsne_question_answer' + '_' + task
-                print("===============================================================")
-                print("======= File loaded: {} =======".format(model_name_qa))
-                print("===============================================================")
-                print()
-        else:
-            with open(PATH + f) as json_file:
-                test_results_qc  = json.load(json_file)
-                model_name_qc = 'tsne_question_context' + '_' + task
-                print("===============================================================")
-                print("======= File loaded: {} =======".format(model_name_qc))
-                print("===============================================================")
-                print()
-    
-    # define which results are to be inspected
-    test_results = test_results_qc if args.task == 'QA' and task != 'qa_sequential_transfer' else test_results_qa
-    model_name = model_name_qc if args.task == 'QA' and task != 'qa_sequential_transfer' else model_name_qa
-    
-    print("==============================================")
-    print("======= Test exact-match acc: {} =======".format(test_results['test_acc']))
-    print("======= Test F1: {} =======".format(test_results['test_f1']))
-    print("==============================================")
-    print()
-
-    ################################################################################################################
-    ################ plot model's hidden states per transformer layer for each class in test set ###################
-    ################################################################################################################
-    
-    if args.hidden_reps in ['per_class', 'across_classes']:
-        # split data
-        if task == 'multi_sbj':
-            combined_ds = True
-            y_pred = np.array(test_results['predictions'])
-            y_true = np.array(test_results['true_labels'])
-            classes = ['subjqa_obj', 'subjqa_sbj', 'squad'] 
-
-        elif task == 'qa_ds_agnostic':
-            combined_ds = True
-            y_true = np.array(test_results['sbj_labels'])
-            classes = ['subjqa_obj', 'subjqa_sbj', 'squad'] 
-
-        elif task == 'qa_review_agnostic':
-            combined_ds = False
-            y_true = np.array(test_results['sbj_labels'])
-            classes = ['subjqa_obj', 'subjqa_sbj', 'squad'] 
-
-        elif task == 'qa_sequential_transfer':
-            combined_ds = False
-            y_true = np.array(test_results['predictions']) #np.array(test_results['domain_labels'])
-            sbj_labels =np.array(test_results['true_labels']) #np.array(test_results['sbj_labels'])
-            classes = ['books', 'tripadvisor', 'grocery', 'electronics', 'movies', 'restaurants']
-
-        elif task == 'qa_per_q_word':
-            combined_ds = False
-            y_true = np.array(test_results['q_word_labels'])
-            classes = ['how', 'what', 'is', 'where', 'does', 'do']
-        
-        # convert hidden reps into NumPy arrays
-        feat_reps_per_layer = {l: np.array(h) for l, h in test_results['feat_reps'].items()}
-        
-        # define variables
-        labels = np.unique(y_true)
-        
-        class_to_idx = {c: l for c, l in zip(classes, labels)}
-        
-        # set hyperparams
-        retained_variance = .99
-        rnd_state = 42
-        model_name += '_' + str(retained_variance).lstrip('0.') + '_' + 'var'
-        
-        print("==========================================")
-        print("=========== Started plotting =============")
-        print("==========================================")
-        print()
-        plot_feat_reps_per_layer(
-                                 y_true=y_true,
-                                 feat_reps_per_layer=feat_reps_per_layer,
-                                 class_to_idx=class_to_idx,
-                                 retained_variance=retained_variance,
-                                 rnd_state=rnd_state,
-                                 model_name=model_name,
-                                 task=task,
-                                 combined_ds=combined_ds,
-                                 support_labels=sbj_labels if task == 'qa_sequential_transfer' else None,
-        )
-        print("==========================================")
-        print("=========== Finished plotting =============")
-        print("==========================================")
-        print()
+    results, file_name = get_hidden_reps(source=args.source, version=args.version)
     
     ################################################################################################################
     ####### Plot model's hidden states per transformer layer for each token in a randomly chosen word sequence #####
     ################################################################################################################
     
-    elif args.hidden_reps == 'per_token':
-        #plot random sentence for both correct and incorrect (answer span) predictions 
-        #predictions = ['correct_answerable', 'correct_unanswerable',  'wrong_answerable']
-        predictions = ['correct_answerable', 'wrong_answerable', 'correct_answerable', 'wrong_answerable', 'correct_answerable', 'wrong_answerable']
-        classes = ['context', 'question', 'answer']
-        labels = np.arange(len(classes))
-        class_to_idx = {c: l for c, l in zip(classes, labels)}
+    #plot random sentence for both correct and incorrect (answer span) predictions 
+    predictions = ['correct_answerable', 'wrong_answerable', 'correct_answerable', 'wrong_answerable', 'correct_answerable', 'wrong_answerable']
+    classes = ['context', 'question', 'answer']
+    labels = np.arange(len(classes))
+    class_to_idx = {c: l for c, l in zip(classes, labels)}
 
-        # set hyperparams
-        combined_ds = False
-        retained_variance = .99
-        rnd_state = 42
-        rnd_seed = 42
-        model_name_copy = model_name[:]
+    #set hyperparams
+    combined_ds = False
+    retained_variance = .99
+    rnd_state = 42
+    rnd_seed = 42
+    file_name_c = file_name[:]
+    
+    for k, pred in enumerate(predictions):
+
+        if k > 0 and k % 2 == 0:
+            rnd_seed += 1
         
-        for k, pred in enumerate(predictions):
+        feat_reps_per_layer, token_labels, rnd_sent = get_random_sent_feat_reps(results, pred, rnd_seed)
+        
+        file_name = file_name_c + '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred + '_' + str(k)
 
-            if k > 0 and k % 2 == 0:
-                rnd_seed += 1
-            
-            feat_reps_per_layer, token_labels, rnd_sent = get_random_sent_feat_reps(test_results, pred, rnd_seed)
-            
-            model_name = model_name_copy + '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred + '_' + str(k)
+        """
+        if k == 0:
+            model_name += '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred
+        else:
+            model_name = model_name_copy + '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred
+            break
+        """
+        print("================================================================")
+        print("=========== Started plotting: {} prediction =============".format(pred))
+        print("================================================================")
+        print()
+        plot_feat_reps_per_layer(
+                                 y_true=token_labels,
+                                 feat_reps_per_layer=feat_reps_per_layer,
+                                 class_to_idx=class_to_idx,
+                                 retained_variance=retained_variance,
+                                 rnd_state=rnd_state,
+                                 file_name=file_name,
+                                 source=args.source,
+                                 version=args.version,
+                                 combined_ds=combined_ds,
+                                 plot_qa=True,
+                                 sent_pair=rnd_sent,
 
-            """
-            if k == 0:
-                model_name += '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred
-            else:
-                model_name = model_name_copy + '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred
-                break
-            """
-            print("================================================================")
-            print("=========== Started plotting: {} prediction =============".format(pred))
-            print("================================================================")
-            print()
-            plot_feat_reps_per_layer(
-                                     y_true=token_labels,
-                                     feat_reps_per_layer=feat_reps_per_layer,
-                                     class_to_idx=class_to_idx,
-                                     retained_variance=retained_variance,
-                                     rnd_state=rnd_state,
-                                     model_name=model_name,
-                                     task=task,
-                                     combined_ds=combined_ds,
-                                     plot_qa=True,
-                                     sent_pair=rnd_sent,
-            )
-            print("================================================================")
-            print("=========== Finished plotting: {} prediction =============".format(pred))
-            print("================================================================")
-            print()
+        )
+        print("================================================================")
+        print("=========== Finished plotting: {} prediction =============".format(pred))
+        print("================================================================")
+        print()

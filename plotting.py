@@ -361,8 +361,9 @@ def plot_seqs_projected_via_tsne(
                                  tsne_embed_y:np.ndarray,
                                  y_true:np.ndarray,
                                  class_to_idx:dict,
-                                 model_name:str,
-                                 task:str,
+                                 file_name:str,
+                                 source:str,
+                                 version:str,
                                  combined_ds:bool=False,
                                  layer_wise:bool=False,
                                  n_layer:str=None,
@@ -417,7 +418,7 @@ def plot_seqs_projected_via_tsne(
                        tsne_embed_y[y_true == lab],
                        c = colors[lab],
                        marker = markers[lab],
-                       alpha = .5 if lab == 0 else .9,
+                       alpha = .5 if lab == 0 else 1.0,
                        label = classes[lab],
             )
         elif len(np.unique(y_true)) > 3 and isinstance(support_labels, np.ndarray):
@@ -450,18 +451,18 @@ def plot_seqs_projected_via_tsne(
 
     ax.legend(fancybox=True, shadow=True, loc='best', fontsize=legend_fontsize)
     
+    PATH = './plots/hidden_reps/layer_wise/' + source.lower() + '/' + version.lower() + '/'
+    if not os.path.exists(PATH):
+        os.makedirs(PATH)
+
     if layer_wise:
         layer = n_layer.split('_')
         layer = ' '.join(layer).capitalize()
-        #ax.set_title('Model fine-tuned on' + ' ' + dataset + ':' + ' ' + layer, fontsize=title_fontsize)
         plt.tight_layout()
-        #plt.savefig('./plots/feat_reps/layer_wise/' + task + '/' + model_name + '_' + n_layer.lower() + '_' + 'dark' + '.png')
-        plt.savefig('./plots/feat_reps/layer_wise/' + task + '/' + model_name + '_' + n_layer.lower() + '.png')
-        #plt.savefig('./plots/feat_reps/layer_wise/' + task + '/' + 'bert_stl_finetuned_squad' + '/' + model_name + '_' + n_layer.lower() + '.png')
+        plt.savefig(PATH + file_name + '_' + n_layer.lower() + '.png')
     else:
-        ax.set_title('Model fine-tuned on' + ' ' + dataset, fontsize=title_fontsize)
         plt.tight_layout()
-        plt.savefig('./plots/feat_reps/' + model_name + '.png')
+        plt.savefig('./plots/feat_reps/' + file_name + '.png')
     
     #plt.show()
     #plt.clf()
@@ -474,8 +475,9 @@ def plot_feat_reps_per_layer(
                              class_to_idx:dict,
                              retained_variance:float,
                              rnd_state:int,
-                             model_name:str,
-                             task:str,
+                             file_name:str,
+                             source:str,
+                             version:str,
                              combined_ds:bool=False,
                              plot_qa:bool=False,
                              sent_pair:list=None,
@@ -500,14 +502,16 @@ def plot_feat_reps_per_layer(
                                      tsne_embed_y,
                                      y_true,
                                      class_to_idx,
-                                     model_name,
-                                     task=task,
+                                     file_name,
+                                     source=args.source,
+                                     version=args.version,
                                      combined_ds=combined_ds,
                                      layer_wise=True,
                                      n_layer=layer,
                                      plot_qa=plot_qa,
                                      sent_pair=sent_pair,
                                      support_labels=support_labels,
+
                                      )
 #################################################################        
 ##### OBTAIN FEAT REPS ON TOKEN LEVEL FOR RANDOM SENTENCE #######
