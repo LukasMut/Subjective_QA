@@ -84,6 +84,7 @@ def plot_reps_projected_via_tsne(
             classes = list(class_to_idx.keys())
             markers = ['o', 'd', '*']
             colors = ['dimgrey', 'royalblue', 'firebrick']
+            marker_size = 30
         else:
             classes = ['$\mathbf{D}_{SubjQA}^{obj}$', '$\mathbf{D}_{SubjQA}^{sbj}$', '$\mathbf{D}_{SQuAD}$']
             colors = ['royalblue', 'palevioletred', 'green']
@@ -93,6 +94,7 @@ def plot_reps_projected_via_tsne(
             ax.scatter(
                        tsne_embed_x[y_true == lab],
                        tsne_embed_y[y_true == lab],
+                       s = marker_size,
                        c = colors[lab],
                        marker = markers[lab],
                        alpha = .5 if lab == 0 else 1.0,
