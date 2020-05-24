@@ -127,7 +127,9 @@ def plot_reps_projected_via_tsne(
             subfolder = 'annotations/'
         else:
             subfolder = 'no_annotations/'
-
+    else:
+        subfolder = ''
+        
     ax.legend(fancybox=True, shadow=True, loc='best', fontsize=legend_fontsize)
     
     PATH = './plots/hidden_reps/layer_wise/' + subfolder + source.lower() + '/' + version.lower() + '/'
