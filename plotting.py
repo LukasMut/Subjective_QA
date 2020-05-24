@@ -1,8 +1,8 @@
 __all__ = [
            'conf_mat',
            'plot_confusion_matrix',
-           'plot_seqs_projected_via_tsne',
            'plot_feat_reps_per_layer',
+           'plot_reps_projected_via_tsne',
 ]
 
 import numpy as np
@@ -129,7 +129,7 @@ def plot_reps_projected_via_tsne(
             subfolder = 'no_annotations/'
     else:
         subfolder = ''
-        
+
     ax.legend(fancybox=True, shadow=True, loc='best', fontsize=legend_fontsize)
     
     PATH = './plots/hidden_reps/layer_wise/' + subfolder + source.lower() + '/' + version.lower() + '/'
