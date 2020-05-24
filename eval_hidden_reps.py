@@ -956,7 +956,7 @@ def evaluate_estimations_and_cosines(
             model.to(device)
             test_f1, test_acc, incorrect_preds = test(model=model, test_dl=dl)
             
-            #store Q & A, and corresponding answer span predictions for which the neural net failed to make a correct classification
+            #store Q&A, and corresponding answer span predictions for which the neural net failed to make a correct classification
             sent_pairs = np.asarray(sent_pairs)[pred_indices][incorrect_preds]
             true_answers = np.asarray(true_answers)[pred_indices][incorrect_preds]
             pred_answers = np.asarray(pred_answers)[pred_indices][incorrect_preds]
@@ -967,7 +967,7 @@ def evaluate_estimations_and_cosines(
                 a = true_answers[i].split()
                 qas.append(' '.join(q + a + ['[SEP]']))
             qas = np.asarray(qas)
-            X = X_cos[incorrect_preds][:,::2]
+            X = X_cos[incorrect_preds][:, ::2]
             y = y[incorrect_preds]
 
             model_name = model_name.lstrip('fc_nn_')
