@@ -891,6 +891,7 @@ def evaluate_estimations_and_cosines(
                                          w_strategy=w_strategy,
                                          computation=computation,
                                          y=y if version == 'train' or w_strategy == 'oracle' else None,
+                                         concatenation='normal',
                                          )
             model_name = 'fc_nn' + '_' + w_strategy + '_' + computation + '_' + 'heuristic' + '_' + str(rnd_seed)
 
@@ -966,8 +967,7 @@ def evaluate_estimations_and_cosines(
                 a = true_answers[i].split()
                 qas.append(' '.join(q + a + ['[SEP]']))
             qas = np.asarray(qas)
-            M_h = 9
-            X = X[incorrect_preds][:, M_h:] if computation == 'concat' else X[incorrect_preds][:, slice(M_h, None, 2)]
+            X = X_cos[incorrect_preds][:,::2]
             y = y[incorrect_preds]
 
             model_name = model_name.lstrip('fc_nn_')
