@@ -143,6 +143,9 @@ if __name__ == '__main__':
             help='Must be one of {SQuAD, SubjQA}')
     parser.add_argument('--version', type=str, default='train',
             help='Must be one of {train, test}')
+    parser.add_argument('--text_annotations', action='store_true',
+            help='If provided, annotate token labels along each data point in the projected hidden representations')
+
     args = parser.parse_args()
 
     results, file_name = get_hidden_reps(source=args.source, version=args.version)
@@ -151,17 +154,18 @@ if __name__ == '__main__':
     ####### Plot model's hidden states per transformer layer for each token in a randomly chosen word sequence #####
     ################################################################################################################
     
-    #plot random sentence for both correct and incorrect (answer span) predictions 
+    #plot random sentence pair for both correct and incorrect (answer span) predictions 
     predictions = ['correct' if i % 2 == 0 else 'wrong' for i in range(10)]
     classes = ['context', 'question', 'answer']
     labels = np.arange(len(classes))
     class_to_idx = {c: l for c, l in zip(classes, labels)}
 
     #set hyperparams
+    combined_ds = False
     retained_variance = .99
     rnd_state = 42
     rnd_seed = rnd_state
-    file_name_c = file_name[:]
+    file_name_copy = file_name[:]
     
     for k, pred in enumerate(predictions):
 
@@ -170,7 +174,7 @@ if __name__ == '__main__':
         
         feat_reps_per_layer, token_labels, rnd_sent = get_random_sent_hidden_reps(results, pred, rnd_seed)
         
-        file_name = file_name_c + '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred + '_' + str(k)
+        file_name = file_name_copy + '_' + str(retained_variance).lstrip('0.') + '_' + 'var' + '_' + pred + '_' + str(k)
 
         print("================================================================")
         print("=========== Started plotting: {} prediction =============".format(pred))
@@ -185,9 +189,10 @@ if __name__ == '__main__':
                                  file_name=file_name,
                                  source=args.source,
                                  version=args.version,
-                                 combined_ds=False,
+                                 combined_ds=combined_ds,
                                  plot_qa=True,
                                  sent_pair=rnd_sent,
+                                 text_annotations=args.text_annotations,
 
         )
         print("================================================================")

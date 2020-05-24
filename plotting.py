@@ -32,7 +32,7 @@ from tqdm import trange, tqdm
 ################## t-SNE ##################
 ###########################################
 
-def plot_seqs_projected_via_tsne(
+def plot_reps_projected_via_tsne(
                                  tsne_embed_x:np.ndarray,
                                  tsne_embed_y:np.ndarray,
                                  y_true:np.ndarray,
@@ -46,6 +46,7 @@ def plot_seqs_projected_via_tsne(
                                  plot_qa:bool=False,
                                  sent_pair:list=None,
                                  support_labels=None,
+                                 text_annotations:bool=False,
 ):
     #NOTE: uncomment line below if you want to use a dark background for plots
     #plt.style.use('dark_background')
@@ -104,7 +105,7 @@ def plot_seqs_projected_via_tsne(
                          tsne_embed_y[np.add(y_true, support_labels) == np.add(lab, sbj_lab)],
                          marker = markers[lab],
                          color = colors[lab],
-                         alpha = .9 if sbj_lab == 1 else .3, # display subjective questions with higher color intensity 
+                         alpha = .9 if sbj_lab == 1 else .3, #display subjective questions with higher color intensity than objective questions
                          label = cat.capitalize() + ' ' + '(sbj)' if sbj_lab == 1 else cat.capitalize() + ' ' + '(obj)',
               )
         else:   
@@ -116,18 +117,20 @@ def plot_seqs_projected_via_tsne(
                        label = classes[lab],
             )
     
-    """
     if plot_qa:
-        assert isinstance(sent_pair, list)
-        special_toks = ['[SEP]'] if y_true.tolist().index(class_to_idx['answer']) == 0 else ['[CLS]', '[SEP]']
-        for t, tok in enumerate(sent_pair):
-            if tok not in special_toks:
-                ax.annotate(tok, (tsne_embed_x[t], tsne_embed_y[t] + .5))
-    """
+        if text_annotations:
+            assert isinstance(sent_pair, list)
+            special_toks = ['[SEP]'] if y_true.tolist().index(class_to_idx['answer']) == 0 else ['[CLS]', '[SEP]']
+            for t, tok in enumerate(sent_pair):
+                if tok not in special_toks:
+                    ax.annotate(tok, (tsne_embed_x[t], tsne_embed_y[t] + .5))
+            subfolder = 'annotations/'
+        else:
+            subfolder = 'no_annotations/'
 
     ax.legend(fancybox=True, shadow=True, loc='best', fontsize=legend_fontsize)
     
-    PATH = './plots/hidden_reps/layer_wise/' + source.lower() + '/' + version.lower() + '/'
+    PATH = './plots/hidden_reps/layer_wise/' + subfolder + source.lower() + '/' + version.lower() + '/'
     if not os.path.exists(PATH):
         os.makedirs(PATH)
 
@@ -150,22 +153,23 @@ def plot_feat_reps_per_layer(
                              plot_qa:bool=False,
                              sent_pair:list=None,
                              support_labels=None,
+                             text_annotations:bool=False,
 ):
     for layer, feat_reps in feat_reps_per_layer.items():
-        # initiliase PCA
+        #NOTE: uncomment line below, if you don't want to exploit t-SNE
         #pca = PCA(n_components=2, svd_solver='auto', random_state=rnd_state)
         pca = PCA(n_components=retained_variance, svd_solver='full', random_state=rnd_state)
-        # project feat reps onto n principial components
+        #project hidden reps onto n principal components that explain XY% of the original representation's variance
         transformed_feats = pca.fit_transform(feat_reps)
-        # initiliase TSNE
+        #initiliase TSNE
         tsne = TSNE(n_components=2, random_state=rnd_state)
-        # transform projected feat reps via t-SNE
+        #transform projected hidden reps via t-SNE into R^2
         tsne_embeds = tsne.fit_transform(transformed_feats)
-        # get x_pos and y_pos of transformed data
+        #get x_pos and y_pos of transformed data
         tsne_embed_x = tsne_embeds[:, 0]
         tsne_embed_y = tsne_embeds[:, 1]
-        # plot model's feature representations at layer l in 2D space
-        plot_seqs_projected_via_tsne(
+        #plot model's hidden representations (in 2D space) for layer l 
+        plot_reps_projected_via_tsne(
                                      tsne_embed_x,
                                      tsne_embed_y,
                                      y_true,
@@ -179,7 +183,7 @@ def plot_feat_reps_per_layer(
                                      plot_qa=plot_qa,
                                      sent_pair=sent_pair,
                                      support_labels=support_labels,
-
+                                     text_annotations=text_annotations,
                                      )
     
 ##########################################
