@@ -140,9 +140,9 @@ def get_random_sent_hidden_reps(
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--source', type=str, default='SQuAD',
-            help='Must be one of {SQuAD, SubjQA}')
+            help='Define dataset source. Must be one of {SQuAD, SubjQA}')
     parser.add_argument('--version', type=str, default='train',
-            help='Must be one of {train, test}')
+            help='Define dataset split. Must be one of {train, test}')
     parser.add_argument('--text_annotations', action='store_true',
             help='If provided, annotate token labels along each data point in the projected hidden representations')
 
