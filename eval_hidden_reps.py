@@ -64,7 +64,7 @@ def get_hidden_reps(
     cwd = '.'
     PATH = cwd + folder + subdir + subsubdir
     PATH += '/bert_finetuned_subjqa/' if source == 'SubjQA' else '/bert_finetuned_squad/'
-    PATH += '/dev/' if version == 'train' else '/test/'
+    PATH += '/test/' if version == 'train' else '/dev/' #NOTE: change this back to: '/dev/' if version == 'train' else '/test/'
 
     if not os.path.exists(PATH):
         os.makedirs(PATH)
