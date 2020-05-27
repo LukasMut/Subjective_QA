@@ -1634,7 +1634,7 @@ def test(
 
               if error_analysis_simple:
                 true_answers.append(b_true_answers)
-                pred_answers.append(b_pred_answers)
+                predicted_answers.append(b_pred_answers)
                 b_sent_pairs = get_answers(
                                            tokenizer=tokenizer,
                                            b_input_ids=b_input_ids,
