@@ -707,7 +707,7 @@ def compute_similarities_across_layers(
 
                 elif layer_no > 3:
                 #TODO: the if statement below is just a work-around for now (must be fixed properly later)
-                    if not (version == 'test' and source.lower() == 'subjqa'):
+                    if source.lower() == 'squad':
                         cos_similarities_preds = compute_cos_sim_across_logits(
                                                                                hiddens=hiddens,
                                                                                s_log_probs=s_log_probs[i],
