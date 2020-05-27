@@ -1320,6 +1320,7 @@ def test(
         output_all_hiddens_cls_q_words:bool=False,
         estimate_preds_wrt_hiddens:bool=False,
         get_erroneous_predictions:bool=False,
+        error_analysis_simple:bool=False,
         source=None,
 ):
     n_steps = len(test_dl)
@@ -1359,6 +1360,10 @@ def test(
       else:
         predictions, true_labels = [], []
       feat_reps = defaultdict(list) if output_all_hiddens_cls else []
+
+    elif error_analysis_simple:
+        assert task == 'QA', 'Model must perform QA, if we want to store hidden representations for every token in a word sequence at each layer'
+        predicted_answers, true_answers, questions, contexts = [], [], [], []
 
     elif output_all_hiddens:
         assert task == 'QA', 'Model must perform QA, if we want to store hidden representations for every token in a word sequence at each layer'
@@ -1624,6 +1629,25 @@ def test(
 
               correct_answers_test += compute_exact_batch(b_true_answers, b_pred_answers)
               batch_f1_test += compute_f1_batch(b_true_answers, b_pred_answers)
+
+              #### SAVE MODEL'S PRED ANSWERS, GOLD ANSWERS, QUESTIONS, AND CONTEXTS ####
+
+              if error_analysis_simple:
+                true_answers.append(b_true_answers)
+                pred_answers.append(b_pred_answers)
+                b_sent_pairs = get_answers(
+                                           tokenizer=tokenizer,
+                                           b_input_ids=b_input_ids,
+                                           start_logs=torch.zeros(batch_size).type_as(b_start_pos).to(device),
+                                           end_logs=torch.tensor([seq_len - 1 for seq_len in b_input_lengths]).type_as(b_end_pos).to(device),
+                                           predictions=False,
+                                           )
+
+                b_questions = list(map(lambda sent_pair: ' '.join(sent_pair.split()[1:sent_pair.split().index('[SEP]')]), b_sent_pairs))
+                b_contexts = list(map(lambda sent_pair: ' '.join(sent_pair.split()[sent_pair.split().index('[SEP]')+1:-1]), b_sent_pairs))
+
+                questions.append(b_questions)
+                contexts.append(b_contexts)
 
 
               #####################################################################################
@@ -1975,6 +1999,13 @@ def test(
     if detailed_analysis_sbj_class:
       results_per_ds = compute_acc_nested(results_per_ds)
       return test_loss, test_acc, test_f1, results_per_ds
+
+    elif task == 'QA' and error_analysis_simple:
+      predicted_answers = [pred_ans for b_pred_ans in predicted_answers for pred_ans in b_pred_ans]
+      true_answers = [true_ans for b_true_ans in true_answers for true_ans in b_true_ans]
+      questions = [q for b_q in questions for q in b_questions]
+      contexts = [c for b_c in contexts for c in b_c]
+      return test_loss, test_acc, test_f1, predicted_answers, true_answers, questions, contexts
 
     elif task == 'QA' and get_erroneous_predictions:
       erroneous_preds_distribution = {pred: (freq / len(erroneous_predictions)) * 100 for pred, freq in Counter(erroneous_predictions).items()}

@@ -101,6 +101,8 @@ if __name__ == '__main__':
             help='If provided, estimate model predictions (whether model will make a correct or an erroneous pred) w.r.t. hidden representations of both answer and context (in latent space) at inference time.')
     parser.add_argument('--get_erroneous_predictions', action='store_true',
             help='If provided, store erroneous answer span predictions at inference time and compute distribution w.r.t. the latter.')
+    parser.add_argument('--error_analysis_simple', action='store_true',
+            help='If provided, save predicted answers, gold answers, questions, and contexts')
     
     args = parser.parse_args()
     
@@ -1334,6 +1336,20 @@ if __name__ == '__main__':
                                                                     inference_strategy = args.sequential_transfer_evaluation,
                                                                     detailed_analysis_sbj_class = True,
                                                                     )
+            elif task == 'QA' and args.error_analysis_simple:
+                test_loss, test_acc, test_f1, predicted_answers, true_answers, questions, contexts = test(
+                                                                                                        model = model,
+                                                                                                        tokenizer = bert_tokenizer,
+                                                                                                        test_dl = test_dl,
+                                                                                                        batch_size = batch_size,
+                                                                                                        not_finetuned = args.not_finetuned,
+                                                                                                        task = 'QA' if task == 'all' else task,
+                                                                                                        n_domains = n_domain_labels,
+                                                                                                        input_sequence = 'question_answer' if args.batches == 'alternating' else 'question_context',
+                                                                                                        sequential_transfer = args.sequential_transfer,
+                                                                                                        inference_strategy = args.sequential_transfer_evaluation,
+                                                                                                        error_analysis_simple = args.error_analysis_simple,
+                                                                                                        )
             elif task == 'QA' and args.get_erroneous_predictions:
                 test_loss, test_acc, test_f1, erroneous_preds_distribution = test(
                                                                                 model = model,
@@ -1508,6 +1524,12 @@ if __name__ == '__main__':
 
             if args.detailed_analysis_sbj_class:
                 test_results['test_results_per_ds'] = results_per_ds
+
+            elif args.error_analysis_simple:
+                test_results['predicted_answers'] = predicted_answers
+                test_results['true_answers'] = true_answers
+                test_results['questions'] = questions
+                test_results['contexts'] = contexts
 
             elif task == 'QA' and args.get_erroneous_predictions:
                 test_results['erroneous_ans_distribution'] = erroneous_preds_distribution
