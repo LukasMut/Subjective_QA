@@ -1187,17 +1187,16 @@ if __name__ == '__main__':
                 tensor_dataset_test = squad_tensor_dataset_test
 
             else:
-        
                 subjqa_data_test_df, hidden_domain_idx_test = get_data(
                                                                        source='/SubjQA/',
-                                                                       split='/dev',
+                                                                       split='/test',
                                                                        domain='all',
                 )
                 
                 subjqa_data_test = convert_df_to_dict(
                                                       subjqa_data_test_df,
                                                       hidden_domain_indexes=hidden_domain_idx_test,
-                                                      split='dev',
+                                                      split='test',
                 )
                 
                 # convert dictionaries into instances of preprocessed question-answer-review examples    
