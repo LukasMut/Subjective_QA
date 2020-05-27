@@ -319,11 +319,11 @@ def create_examples(
 
                     # elif question is NOT answerable, then answer is the empty string and start and end positions are 0 
                     else:
-                        # skip unanswerable questions for now
-                        continue
-                        #start_position = 0
-                        #end_position = 0
-                        #orig_answer_text = ""
+                        #uncomment line below to skip unanswerable questions
+                        #continue
+                        start_position = 0
+                        end_position = 0
+                        orig_answer_text = ""
 
         elif source == 'SubjQA':
 
