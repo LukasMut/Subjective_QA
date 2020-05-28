@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 __all__ = [
            'conf_mat',
            'plot_confusion_matrix',
